@@ -1,13 +1,22 @@
+export type RootStackParamList = {
+  Auth: undefined;
+  App: undefined;
+};
+
 export type AuthStackParamList = {
   Login: undefined;
 };
 
 export type AppStackParamList = {
   ExamList: undefined;
-  Quiz: { quizId?: string };
-};
 
-export type RootStackParamList = {
-  Auth: undefined;
-  App: undefined;
+  Quiz: {
+    quizid: number;
+    quizName: string;
+  };
+
+  TakeQuiz: {
+    quizid: number;
+    quizName: string;
+  };
 };
