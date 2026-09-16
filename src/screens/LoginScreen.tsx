@@ -5,6 +5,7 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  DeviceEventEmitter,
   StyleSheet,
   Text,
   TextInput,
@@ -46,10 +47,7 @@ export default function LoginScreen() {
         console.log("Token đã lưu thành công:", data.token);
 
         // 2. Chuyển sang luồng AppStack (màn hình ExamListScreen)
-        navigation.getParent()?.reset({
-          index: 0,
-          routes: [{ name: "App" }],
-        });
+        DeviceEventEmitter.emit("authChange");
       } else {
         // Xử lý các dạng lỗi trả về từ Moodle Web Service
         const errorMessage =
