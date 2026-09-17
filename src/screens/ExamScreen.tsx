@@ -483,21 +483,38 @@ export default function ExamScreen() {
 
     const checkedInputs = html.match(checkedRegex) ?? [];
 
+    console.log("CHECKED INPUTS:", checkedInputs);
+
     if (checkedInputs.length === 0) {
       return;
     }
 
-    checkedInputs.forEach((input) => {
-      const nameMatch = input.match(/name=["']([^"']+)["']/i);
+    setSelectedAnswers((previous) => {
+      const restored = { ...previous };
 
-      const valueMatch = input.match(/value=["']([^"']*)["']/i);
+      checkedInputs.forEach((input) => {
+        const nameMatch = input.match(/name=["']([^"']+)["']/i);
 
-      if (nameMatch && valueMatch) {
-        setSelectedAnswers((previous) => ({
-          ...previous,
-          [nameMatch[1]]: valueMatch[1],
-        }));
-      }
+        const valueMatch = input.match(/value=["']([^"']*)["']/i);
+
+        if (!nameMatch || !valueMatch) {
+          return;
+        }
+
+        const name = nameMatch[1];
+        const value = valueMatch[1];
+
+        // Bỏ "Clear my choice"
+        if (value === "-1") {
+          return;
+        }
+
+        restored[name] = value;
+      });
+
+      console.log("RESTORED ANSWERS:", restored);
+
+      return restored;
     });
   };
 
