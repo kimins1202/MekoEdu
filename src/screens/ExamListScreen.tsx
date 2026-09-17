@@ -1,3 +1,8 @@
+import type { RouteProp } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
+
+import { AppStackParamList } from "../types/navigation";
+
 import { useEffect, useState } from "react";
 
 import {
@@ -12,15 +17,14 @@ import {
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import { useNavigation } from "@react-navigation/native";
+import { getQuizzesByCourses } from "../api/quizApi";
 
-import {
-  getQuizzesByCourses,
-  getSiteInfo,
-  getUserCourses,
-} from "../api/quizApi";
+type ExamListRouteProp = RouteProp<AppStackParamList, "ExamList">;
 
 export default function ExamListScreen() {
+  const route = useRoute<ExamListRouteProp>();
+  const { courseid } = route.params;
+
   const navigation = useNavigation<any>();
 
   const [exams, setExams] = useState<any[]>([]);
@@ -32,77 +36,24 @@ export default function ExamListScreen() {
 
   useEffect(() => {
     loadExams();
-  }, []);
+  }, [courseid]);
 
   const loadExams = async () => {
     try {
       setLoading(true);
 
       // =========================
-      // 1. LẤY TOKEN
+      // LẤY QUIZZES CỦA COURSE ĐƯỢC CHỌN
       // =========================
 
-      const token = await AsyncStorage.getItem("wstoken");
+      console.log("COURSE ID:", courseid);
 
-      console.log("TOKEN:", token);
-
-      if (!token) {
-        console.log("Không có token");
-        setExams([]);
-        return;
-      }
-
-      // =========================
-      // 2. LẤY USER ID
-      // =========================
-
-      const siteInfo = await getSiteInfo();
-
-      console.log("SITE INFO:", siteInfo);
-
-      const userid = siteInfo?.userid;
-
-      if (!userid) {
-        throw new Error("Không tìm thấy userid");
-      }
-
-      console.log("USER ID:", userid);
-
-      // =========================
-      // 3. LẤY COURSES
-      // =========================
-
-      const courses = await getUserCourses(userid);
-
-      console.log("COURSES:", courses);
-
-      if (!Array.isArray(courses)) {
-        throw new Error("Courses không hợp lệ");
-      }
-
-      // =========================
-      // 4. LẤY COURSE IDS
-      // =========================
-
-      const courseIds = courses.map((course: any) => course.id);
-
-      console.log("COURSE IDS:", courseIds);
-
-      if (courseIds.length === 0) {
-        setExams([]);
-        return;
-      }
-
-      // =========================
-      // 5. LẤY QUIZZES
-      // =========================
-
-      const quizData = await getQuizzesByCourses(courseIds);
+      const quizData = await getQuizzesByCourses([courseid]);
 
       console.log("QUIZ DATA:", quizData);
 
       // =========================
-      // 6. CẬP NHẬT DANH SÁCH
+      // CẬP NHẬT DANH SÁCH
       // =========================
 
       const quizzes = quizData?.quizzes ?? [];
@@ -208,7 +159,7 @@ export default function ExamListScreen() {
             <TouchableOpacity
               style={styles.examCard}
               onPress={() =>
-                navigation.navigate("Quiz", {
+                navigation.navigate("ExamDetail", {
                   quizid: item.id,
                   quizName: item.name,
                 })

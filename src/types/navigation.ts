@@ -8,14 +8,20 @@ export type AuthStackParamList = {
 };
 
 export type AppStackParamList = {
-  ExamList: undefined;
+  CourseList: undefined;
 
-  Quiz: {
-    quizid: number;
-    quizName: string;
+  ExamList: {
+    courseid: number;
   };
 
-  TakeQuiz: {
+  ExamDetail: {
+    quizid: number;
+    quizName: string;
+    questionCount?: number;
+    timelimit?: number;
+  };
+
+  Exam: {
     quizid: number;
     quizName: string;
   };
