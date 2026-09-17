@@ -1,6 +1,7 @@
 // src/screens/ExamScreen.tsx
 
 import { useEffect, useState } from "react";
+
 import {
   ActivityIndicator,
   Alert,
@@ -12,6 +13,7 @@ import {
 } from "react-native";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
 import { useNavigation, useRoute } from "@react-navigation/native";
 
 import {
@@ -22,9 +24,7 @@ import {
   startQuizAttempt,
 } from "../api/quizApi";
 
-// =====================================================
 // TYPES
-// =====================================================
 
 type AnswerOption = {
   name: string;
@@ -50,9 +50,7 @@ type QuizQuestion = {
   settings?: string;
 };
 
-// =====================================================
 // EXAM SCREEN
-// =====================================================
 
 export default function ExamScreen() {
   const navigation = useNavigation<any>();
@@ -60,49 +58,23 @@ export default function ExamScreen() {
 
   const { quizid, quizName } = route.params;
 
-  // ===================================================
   // ATTEMPT
-  // ===================================================
 
   const [attemptId, setAttemptId] = useState<number | null>(null);
 
-  // ===================================================
-  // QUESTION
-  // ===================================================
-
-  const [question, setQuestion] = useState<QuizQuestion | null>(null);
-
-  const [answers, setAnswers] = useState<AnswerOption[]>([]);
-
-  // ===================================================
-  // SELECTED ANSWERS
-  //
-  // Ví dụ:
-  //
-  // {
-  //   "q7:1_answer": "2",
-  //   "q7:2_answer": "0"
-  // }
-  //
-  // key = name của input Moodle
-  // value = value của đáp án
-  // ===================================================
+  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
 
   const [selectedAnswers, setSelectedAnswers] = useState<
     Record<string, string>
   >({});
 
-  // ===================================================
   // PAGE
-  // ===================================================
 
   const [currentPage, setCurrentPage] = useState(0);
 
   const [nextPage, setNextPage] = useState(-1);
 
-  // ===================================================
   // LOADING
-  // ===================================================
 
   const [loading, setLoading] = useState(true);
 
@@ -110,25 +82,19 @@ export default function ExamScreen() {
 
   const [submitting, setSubmitting] = useState(false);
 
-  // ===================================================
   // INITIALIZE
-  // ===================================================
 
   useEffect(() => {
     initializeExam();
   }, []);
 
-  // =====================================================
   // API 7 → API 8 → API 9
-  // =====================================================
 
   const initializeExam = async () => {
     try {
       setLoading(true);
 
-      // -------------------------------------------------
       // LẤY USER ID
-      // -------------------------------------------------
 
       const userId = await AsyncStorage.getItem("userid");
 
@@ -136,26 +102,14 @@ export default function ExamScreen() {
         throw new Error("Không tìm thấy User ID. Vui lòng đăng nhập lại.");
       }
 
-      console.log("================================");
-      console.log("INITIALIZE EXAM");
-      console.log("USER ID:", userId);
-      console.log("QUIZ ID:", quizid);
-      console.log("================================");
-
-      // =================================================
       // API 7
       // mod_quiz_get_user_attempts
-      // =================================================
-
-      console.log("API 7 - GET USER ATTEMPTS");
 
       const attemptsResponse = await getUserAttempts(
         Number(quizid),
         Number(userId),
         "all",
       );
-
-      console.log("API 7 RESPONSE:", attemptsResponse);
 
       if (attemptsResponse?.exception) {
         throw new Error(
@@ -165,9 +119,7 @@ export default function ExamScreen() {
 
       const attempts = attemptsResponse?.attempts ?? [];
 
-      // -------------------------------------------------
       // TÌM ATTEMPT ĐANG LÀM
-      // -------------------------------------------------
 
       const inProgressAttempt = attempts.find(
         (attempt: any) => attempt.state === "inprogress",
@@ -175,35 +127,21 @@ export default function ExamScreen() {
 
       let currentAttemptId: number;
 
-      // =================================================
       // CÓ ATTEMPT ĐANG LÀM
-      // =================================================
 
       if (inProgressAttempt) {
         currentAttemptId = Number(inProgressAttempt.id);
-
-        console.log("ĐÃ CÓ ATTEMPT ĐANG LÀM:", currentAttemptId);
       } else {
-        // =================================================
         // API 8
         // mod_quiz_start_attempt
-        // =================================================
-
-        console.log("KHÔNG CÓ ATTEMPT INPROGRESS");
-
-        console.log("API 8 - START QUIZ ATTEMPT");
 
         currentAttemptId = await startQuizAttempt(Number(quizid));
-
-        console.log("NEW ATTEMPT ID:", currentAttemptId);
       }
 
       setAttemptId(currentAttemptId);
 
-      // =================================================
       // API 9
       // mod_quiz_get_attempt_data
-      // =================================================
 
       await loadQuestion(currentAttemptId, 0);
     } catch (error: any) {
@@ -222,70 +160,47 @@ export default function ExamScreen() {
     }
   };
 
-  // =====================================================
   // API 9
   // mod_quiz_get_attempt_data
-  // =====================================================
+  // Moodle quyết định số câu trên page.
 
   const loadQuestion = async (currentAttemptId: number, page: number) => {
     try {
       setLoading(true);
 
-      console.log("================================");
-      console.log("API 9 - GET ATTEMPT DATA");
-      console.log("ATTEMPT ID:", currentAttemptId);
-      console.log("PAGE:", page);
-      console.log("================================");
-
       const response = await getAttemptData(currentAttemptId, page);
-
-      console.log("API 9 RESPONSE:", response);
 
       if (response?.exception) {
         throw new Error(response.message || "Không thể lấy dữ liệu bài thi.");
       }
 
-      const questions = response?.questions ?? [];
+      // LẤY TOÀN BỘ QUESTIONS CỦA PAGE
 
-      if (questions.length === 0) {
+      const pageQuestions = response?.questions ?? [];
+
+      if (pageQuestions.length === 0) {
         throw new Error("Không tìm thấy câu hỏi.");
       }
 
-      // -------------------------------------------------
-      // LẤY CÂU HỎI HIỆN TẠI
-      // -------------------------------------------------
+      // LƯU TOÀN BỘ QUESTIONS
 
-      const currentQuestion = questions[0] as QuizQuestion;
+      setQuestions(pageQuestions);
 
-      setQuestion(currentQuestion);
+      // KHÔI PHỤC ANSWER
+      //
+      // Mỗi câu có HTML riêng.
+      // Moodle trả checked nếu câu đó đã được lưu.
+      // =================================================
 
-      // -------------------------------------------------
-      // PARSE ANSWERS TỪ HTML
-      // -------------------------------------------------
+      pageQuestions.forEach((question: QuizQuestion) => {
+        restoreSelectedAnswer(question.html);
+      });
 
-      const parsedAnswers = parseQuestionHtml(currentQuestion.html);
-
-      setAnswers(parsedAnswers);
-
-      // -------------------------------------------------
-      // KHÔI PHỤC ĐÁP ÁN ĐÃ CHỌN
-      // -------------------------------------------------
-
-      restoreSelectedAnswer(currentQuestion.html);
-
-      // -------------------------------------------------
       // PAGE
-      // -------------------------------------------------
 
       setCurrentPage(page);
 
       setNextPage(response?.nextpage ?? -1);
-
-      console.log("CURRENT PAGE:", page);
-
-      console.log("NEXT PAGE:", response?.nextpage);
-
-      console.log("PARSED ANSWERS:", parsedAnswers);
     } catch (error: any) {
       console.error("LOAD QUESTION ERROR:", error);
 
@@ -295,24 +210,14 @@ export default function ExamScreen() {
     }
   };
 
-  // =====================================================
   // PARSE ANSWERS
-  //
-  // API 9 trả:
-  //
-  // <input
-  //   type="radio"
-  //   name="q7:1_answer"
-  //   value="0"
-  // />
-  //
-  // <p>3</p>
-  // =====================================================
+  // Lấy radio input từ HTML của TỪNG CÂU.
 
   const parseQuestionHtml = (html: string): AnswerOption[] => {
     const result: AnswerOption[] = [];
 
     // Tìm tất cả radio input
+
     const radioRegex = /<input\b[^>]*type=["']radio["'][^>]*>/gi;
 
     const radioMatches = [...html.matchAll(radioRegex)];
@@ -321,9 +226,11 @@ export default function ExamScreen() {
       const input = match[0];
 
       // Lấy name
+
       const nameMatch = input.match(/name=["']([^"']+)["']/i);
 
       // Lấy value
+
       const valueMatch = input.match(/value=["']([^"']*)["']/i);
 
       if (!nameMatch || !valueMatch) {
@@ -331,44 +238,43 @@ export default function ExamScreen() {
       }
 
       const name = nameMatch[1];
+
       const value = valueMatch[1];
 
       // Chỉ nhận radio của answer
+
       if (!name.endsWith("_answer")) {
         return;
       }
 
-      // ==========================================
-      // BỎ QUA RADIO "CLEAR MY CHOICE" CỦA MOODLE
-      // ==========================================
-      if (value === "-1") {
-        console.log("BỎ QUA RADIO CLEAR MY CHOICE:", {
-          name,
-          value,
-        });
+      // BỎ QUA "CLEAR MY CHOICE"
 
+      if (value === "-1") {
         return;
       }
 
       // Vị trí radio hiện tại
+
       const startIndex = match.index ?? 0;
 
       // Vị trí radio tiếp theo
+
       const nextMatch = radioMatches[index + 1];
 
       const endIndex = nextMatch?.index ?? html.length;
 
-      // Lấy phần HTML nằm giữa
-      // radio hiện tại và radio tiếp theo
+      // Lấy HTML từ radio hiện tại
+      // đến radio tiếp theo
+
       const answerHtml = html.substring(startIndex, endIndex);
 
-      // ==========================================
       // TÌM NỘI DUNG ĐÁP ÁN
-      // ==========================================
 
       let label = "";
 
-      // Cách 1: tìm phần answernumber + nội dung
+      // Cách 1:
+      // tìm answernumber + nội dung
+
       const answerNumberMatch = answerHtml.match(
         /<span[^>]*class=["'][^"']*answernumber[^"']*["'][^>]*>[\s\S]*?<\/span>([\s\S]*?)(?:<\/div>|<\/label>)/i,
       );
@@ -377,8 +283,9 @@ export default function ExamScreen() {
         label = cleanHtmlText(answerNumberMatch[1]);
       }
 
-      // Cách 2: nếu không tìm được,
+      // Cách 2:
       // lấy p đầu tiên có nội dung
+
       if (!label) {
         const pMatches = answerHtml.match(/<p[^>]*>([\s\S]*?)<\/p>/gi) ?? [];
 
@@ -392,23 +299,13 @@ export default function ExamScreen() {
         }
       }
 
-      // ==========================================
       // NẾU KHÔNG CÓ NỘI DUNG
-      // → KHÔNG THÊM VÀO RESULT
-      // ==========================================
 
       if (!label) {
-        console.log("BỎ QUA RADIO KHÔNG CÓ NỘI DUNG:", {
-          name,
-          value,
-        });
-
         return;
       }
 
-      // ==========================================
-      // THÊM ĐÁP ÁN
-      // ==========================================
+      // THÊM ANSWER
 
       result.push({
         name,
@@ -417,29 +314,12 @@ export default function ExamScreen() {
       });
     });
 
-    // ==========================================
     // DEBUG
-    // ==========================================
-
-    console.log("================================");
-    console.log("SỐ RADIO TÌM THẤY:", radioMatches.length);
-    console.log("SỐ ĐÁP ÁN HỢP LỆ:", result.length);
-    console.log("ĐÁP ÁN:", result);
-    console.log("================================");
 
     return result;
   };
-  console.log(
-    "ANSWERS PARSED:",
-    answers.map((a) => ({
-      name: a.name,
-      value: a.value,
-      label: a.label,
-    })),
-  );
-  // =====================================================
+
   // CLEAN HTML TEXT
-  // =====================================================
 
   const cleanHtmlText = (html: string): string => {
     return html
@@ -456,9 +336,7 @@ export default function ExamScreen() {
       .trim();
   };
 
-  // =====================================================
   // LẤY NỘI DUNG CÂU HỎI
-  // =====================================================
 
   const extractQuestionText = (html: string): string => {
     const qtextMatch = html.match(
@@ -472,25 +350,22 @@ export default function ExamScreen() {
     return text;
   };
 
-  // =====================================================
   // KHÔI PHỤC ANSWER
-  //
   // Nếu Moodle trả checked thì lấy value đó.
-  // =====================================================
 
   const restoreSelectedAnswer = (html: string) => {
     const checkedRegex = /<input[^>]*type=["']radio["'][^>]*checked[^>]*>/gi;
 
     const checkedInputs = html.match(checkedRegex) ?? [];
 
-    console.log("CHECKED INPUTS:", checkedInputs);
-
     if (checkedInputs.length === 0) {
       return;
     }
 
     setSelectedAnswers((previous) => {
-      const restored = { ...previous };
+      const restored = {
+        ...previous,
+      };
 
       checkedInputs.forEach((input) => {
         const nameMatch = input.match(/name=["']([^"']+)["']/i);
@@ -502,9 +377,11 @@ export default function ExamScreen() {
         }
 
         const name = nameMatch[1];
+
         const value = valueMatch[1];
 
         // Bỏ "Clear my choice"
+
         if (value === "-1") {
           return;
         }
@@ -512,47 +389,28 @@ export default function ExamScreen() {
         restored[name] = value;
       });
 
-      console.log("RESTORED ANSWERS:", restored);
-
       return restored;
     });
   };
 
-  // =====================================================
   // CHỌN ANSWER
-  // =====================================================
 
   const handleSelectAnswer = (answer: AnswerOption) => {
     if (saving || submitting) {
       return;
     }
 
-    console.log("SELECT ANSWER:", answer.name, answer.value);
-
     setSelectedAnswers((previous) => ({
       ...previous,
 
-      // QUAN TRỌNG:
-      // Không tự tạo name.
-      // Dùng chính name Moodle trả về.
+      // Dùng chính name Moodle trả về
+
       [answer.name]: answer.value,
     }));
   };
 
-  // =====================================================
   // BUILD DATA
-  //
-  // API 10:
-  //
-  // attemptid
-  // data
-  //
-  // API 11:
-  //
-  // attemptid
-  // data
-  // finishattempt
-  // =====================================================
+  // Chuyển selectedAnswers thành format API 10/11.
 
   const buildSaveData = () => {
     return Object.entries(selectedAnswers).map(([name, value]) => ({
@@ -561,10 +419,8 @@ export default function ExamScreen() {
     }));
   };
 
-  // =====================================================
   // API 10
   // mod_quiz_save_attempt
-  // =====================================================
 
   const saveAnswers = async () => {
     if (!attemptId) {
@@ -573,31 +429,20 @@ export default function ExamScreen() {
 
     const data = buildSaveData();
 
-    console.log("================================");
-    console.log("API 10 - SAVE ATTEMPT");
-    console.log("ATTEMPT ID:", attemptId);
-    console.log("DATA:", data);
-    console.log("================================");
+    // Không có đáp án thì không gọi API
 
-    // Không có data thì không gọi
     if (data.length === 0) {
-      console.log("Không có đáp án để lưu.");
-
       return;
     }
 
     const response = await saveQuizAttempt(attemptId, data);
-
-    console.log("API 10 RESPONSE:", response);
 
     if (response?.exception) {
       throw new Error(response.message || "Không thể lưu câu trả lời.");
     }
   };
 
-  // =====================================================
-  // CÂU TIẾP THEO
-  // =====================================================
+  // CÂU / PAGE TIẾP THEO
 
   const handleNext = async () => {
     if (!attemptId) {
@@ -607,16 +452,12 @@ export default function ExamScreen() {
     try {
       setSaving(true);
 
-      // -------------------------------------------------
       // API 10
-      // LƯU TRƯỚC KHI SANG CÂU TIẾP
-      // -------------------------------------------------
+      // Lưu toàn bộ đáp án trước khi sang page khác
 
       await saveAnswers();
 
-      // -------------------------------------------------
-      // CÒN CÂU TIẾP
-      // -------------------------------------------------
+      // CÒN PAGE TIẾP THEO
 
       if (nextPage !== -1) {
         await loadQuestion(attemptId, nextPage);
@@ -624,26 +465,22 @@ export default function ExamScreen() {
         return;
       }
 
-      // -------------------------------------------------
-      // ĐÃ TỚI CÂU CUỐI
-      // -------------------------------------------------
+      // ĐÃ TỚI PAGE CUỐI
 
       Alert.alert(
         "Thông báo",
-        "Đây là câu hỏi cuối cùng. Bạn có thể kiểm tra lại đáp án rồi nộp bài.",
+        "Đây là trang cuối cùng. Bạn có thể kiểm tra lại đáp án rồi nộp bài.",
       );
     } catch (error: any) {
       console.error("NEXT ERROR:", error);
 
-      Alert.alert("Lỗi", error?.message || "Không thể chuyển câu.");
+      Alert.alert("Lỗi", error?.message || "Không thể chuyển trang.");
     } finally {
       setSaving(false);
     }
   };
 
-  // =====================================================
-  // CÂU TRƯỚC
-  // =====================================================
+  // PAGE TRƯỚC
 
   const handlePrevious = async () => {
     if (!attemptId) {
@@ -657,30 +494,25 @@ export default function ExamScreen() {
     try {
       setSaving(true);
 
-      // -------------------------------------------------
       // API 10
-      // -------------------------------------------------
+      // Lưu đáp án hiện tại
 
       await saveAnswers();
 
-      // -------------------------------------------------
       // API 9
-      // LOAD PAGE TRƯỚC
-      // -------------------------------------------------
+      // Load page trước
 
       await loadQuestion(attemptId, currentPage - 1);
     } catch (error: any) {
       console.error("PREVIOUS ERROR:", error);
 
-      Alert.alert("Lỗi", error?.message || "Không thể quay lại câu trước.");
+      Alert.alert("Lỗi", error?.message || "Không thể quay lại trang trước.");
     } finally {
       setSaving(false);
     }
   };
 
-  // =====================================================
   // XÁC NHẬN NỘP
-  // =====================================================
 
   const handleSubmit = () => {
     Alert.alert("Nộp bài", "Bạn có chắc chắn muốn nộp bài không?", [
@@ -695,17 +527,7 @@ export default function ExamScreen() {
     ]);
   };
 
-  // =====================================================
   // API 10 → API 11
-  //
-  // API 10:
-  // save_quiz_attempt
-  //
-  // API 11:
-  // mod_quiz_process_attempt
-  //
-  // finishattempt = 1
-  // =====================================================
 
   const submitExam = async () => {
     if (!attemptId) {
@@ -717,52 +539,27 @@ export default function ExamScreen() {
     try {
       setSubmitting(true);
 
-      // =================================================
       // API 10
       // LƯU ĐÁP ÁN CUỐI
-      // =================================================
-
-      console.log("================================");
-      console.log("SUBMIT - API 10");
-      console.log("SAVE LAST ANSWERS");
-      console.log("================================");
 
       await saveAnswers();
 
-      // =================================================
       // DATA
-      // =================================================
 
       const data = buildSaveData();
 
-      // =================================================
       // API 11
       // mod_quiz_process_attempt
-      // =================================================
-
-      console.log("================================");
-      console.log("SUBMIT - API 11");
-      console.log("PROCESS ATTEMPT");
-      console.log("ATTEMPT ID:", attemptId);
-      console.log("DATA:", data);
-      console.log("FINISH ATTEMPT:", 1);
-      console.log("================================");
 
       const response = await processQuizAttempt(attemptId, data, 1);
 
-      console.log("API 11 RESPONSE:", response);
-
-      // =================================================
       // ERROR
-      // =================================================
 
       if (response?.exception) {
         throw new Error(response.message || "Không thể nộp bài.");
       }
 
-      // =================================================
-      // THÀNH CÔNG
-      // =================================================
+      // SUCCESS
 
       Alert.alert("Nộp bài thành công", "Bài thi đã được nộp và xử lý.", [
         {
@@ -781,25 +578,13 @@ export default function ExamScreen() {
     }
   };
 
-  // =====================================================
-  // GET CURRENT SELECTED ANSWER
-  // =====================================================
-
-  const currentAnswerName = answers.length > 0 ? answers[0].name : "";
-
-  const selectedValue = selectedAnswers[currentAnswerName];
-
-  // =====================================================
   // LAST PAGE
-  // =====================================================
 
   const isLastQuestion = nextPage === -1;
 
-  // =====================================================
   // INITIAL LOADING
-  // =====================================================
 
-  if (loading && !question) {
+  if (loading && questions.length === 0) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" />
@@ -809,11 +594,9 @@ export default function ExamScreen() {
     );
   }
 
-  // =====================================================
   // NO QUESTION
-  // =====================================================
 
-  if (!question) {
+  if (questions.length === 0) {
     return (
       <View style={styles.loadingContainer}>
         <Text>Không có câu hỏi.</Text>
@@ -821,106 +604,100 @@ export default function ExamScreen() {
     );
   }
 
-  // =====================================================
   // UI
-  // =====================================================
 
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* =============================================
-            HEADER
-        ============================================= */}
-
         <View style={styles.header}>
           <Text style={styles.quizName}>{quizName}</Text>
 
           <Text style={styles.questionCounter}>
-            Câu {question.questionnumber || currentPage + 1}
+            Trang {currentPage + 1} · {questions.length} câu
           </Text>
         </View>
 
-        {/* =============================================
-            QUESTION
-        ============================================= */}
+        {questions.map((questionItem, questionIndex) => {
+          // -----------------------------------------
+          // Mỗi câu tự lấy danh sách đáp án
+          // -----------------------------------------
 
-        <View style={styles.questionBox}>
-          <Text style={styles.questionTitle}>
-            Câu {question.questionnumber || currentPage + 1}
-          </Text>
+          const answers = parseQuestionHtml(questionItem.html);
 
-          <Text style={styles.questionText}>
-            {extractQuestionText(question.html)}
-          </Text>
-        </View>
-
-        {/* =============================================
-            ANSWERS
-        ============================================= */}
-
-        <View style={styles.answerBox}>
-          <Text style={styles.answerTitle}>Chọn đáp án:</Text>
-
-          {answers.map((answer, index) => {
-            const isSelected = selectedAnswers[answer.name] === answer.value;
-
-            return (
-              <TouchableOpacity
-                key={`${answer.name}-${answer.value}-${index}`}
-                style={[
-                  styles.answerOption,
-                  isSelected && styles.answerSelected,
-                ]}
-                onPress={() => handleSelectAnswer(answer)}
-                disabled={saving || submitting}
-              >
-                {/* RADIO */}
-
-                <View
-                  style={[
-                    styles.radioOuter,
-                    isSelected && styles.radioOuterSelected,
-                  ]}
-                >
-                  {isSelected && <View style={styles.radioInner} />}
-                </View>
-
-                {/* TEXT */}
-
-                <Text
-                  style={[
-                    styles.answerText,
-                    isSelected && styles.answerTextSelected,
-                  ]}
-                >
-                  {getAnswerLabel(index, answer.label)}
+          return (
+            <View
+              key={`${questionItem.slot}-${questionItem.questionnumber}`}
+              style={styles.questionContainer}
+            >
+              <View style={styles.questionBox}>
+                <Text style={styles.questionTitle}>
+                  Câu {questionItem.questionnumber || questionIndex + 1}
                 </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
 
-        {/* =============================================
-            ATTEMPT INFO
-        ============================================= */}
+                <Text style={styles.questionText}>
+                  {extractQuestionText(questionItem.html)}
+                </Text>
+              </View>
+
+              <View style={styles.answerBox}>
+                <Text style={styles.answerTitle}>Chọn đáp án:</Text>
+
+                {answers.map((answer, answerIndex) => {
+                  const isSelected =
+                    selectedAnswers[answer.name] === answer.value;
+
+                  return (
+                    <TouchableOpacity
+                      key={`${answer.name}-${answer.value}-${answerIndex}`}
+                      style={[
+                        styles.answerOption,
+                        isSelected && styles.answerSelected,
+                      ]}
+                      onPress={() => handleSelectAnswer(answer)}
+                      disabled={saving || submitting}
+                    >
+                      {/* RADIO */}
+
+                      <View
+                        style={[
+                          styles.radioOuter,
+                          isSelected && styles.radioOuterSelected,
+                        ]}
+                      >
+                        {isSelected && <View style={styles.radioInner} />}
+                      </View>
+
+                      {/* TEXT */}
+
+                      <Text
+                        style={[
+                          styles.answerText,
+                          isSelected && styles.answerTextSelected,
+                        ]}
+                      >
+                        {getAnswerLabel(answerIndex, answer.label)}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          );
+        })}
 
         <View style={styles.attemptInfo}>
           <Text style={styles.attemptText}>Attempt ID: {attemptId}</Text>
 
           <Text style={styles.attemptText}>Trang: {currentPage + 1}</Text>
 
+          <Text style={styles.attemptText}>
+            Số câu trên trang: {questions.length}
+          </Text>
+
           <Text style={styles.attemptText}>Trạng thái: Đang làm bài</Text>
         </View>
 
-        {/* =============================================
-            NAVIGATION
-        ============================================= */}
-
         <View style={styles.navigation}>
-          {/* ===========================================
-              PREVIOUS
-          =========================================== */}
-
           <TouchableOpacity
             style={[
               styles.navButton,
@@ -929,12 +706,8 @@ export default function ExamScreen() {
             disabled={currentPage === 0 || saving || submitting}
             onPress={handlePrevious}
           >
-            <Text style={styles.navButtonText}>← Câu trước</Text>
+            <Text style={styles.navButtonText}>← Trang trước</Text>
           </TouchableOpacity>
-
-          {/* ===========================================
-              NEXT / SUBMIT
-          =========================================== */}
 
           {!isLastQuestion ? (
             <TouchableOpacity
@@ -947,7 +720,7 @@ export default function ExamScreen() {
               onPress={handleNext}
             >
               <Text style={styles.navButtonText}>
-                {saving ? "Đang lưu..." : "Câu tiếp →"}
+                {saving ? "Đang lưu..." : "Trang tiếp →"}
               </Text>
             </TouchableOpacity>
           ) : (
@@ -967,10 +740,6 @@ export default function ExamScreen() {
           )}
         </View>
 
-        {/* =============================================
-            LOADING KHI CHUYỂN CÂU
-        ============================================= */}
-
         {loading && (
           <View style={styles.loadingMore}>
             <ActivityIndicator size="small" />
@@ -983,9 +752,7 @@ export default function ExamScreen() {
   );
 }
 
-// =====================================================
 // ANSWER LABEL
-// =====================================================
 
 const getAnswerLabel = (index: number, label: string) => {
   const letters = ["A", "B", "C", "D", "E", "F"];
@@ -995,9 +762,7 @@ const getAnswerLabel = (index: number, label: string) => {
   return `${prefix}. ${label}`;
 };
 
-// =====================================================
 // STYLES
-// =====================================================
 
 const styles = StyleSheet.create({
   container: {
@@ -1009,9 +774,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
 
-  // ===================================================
   // LOADING
-  // ===================================================
 
   loadingContainer: {
     flex: 1,
@@ -1039,9 +802,7 @@ const styles = StyleSheet.create({
     color: "#666666",
   },
 
-  // ===================================================
   // HEADER
-  // ===================================================
 
   header: {
     paddingHorizontal: 20,
@@ -1064,12 +825,17 @@ const styles = StyleSheet.create({
     color: "#2563EB",
   },
 
-  // ===================================================
+  // QUESTION CONTAINER
+
+  questionContainer: {
+    marginBottom: 5,
+  },
+
   // QUESTION
-  // ===================================================
 
   questionBox: {
     margin: 20,
+    marginBottom: 10,
     padding: 18,
     borderWidth: 1,
     borderColor: "#DDDDDD",
@@ -1090,12 +856,11 @@ const styles = StyleSheet.create({
     color: "#222222",
   },
 
-  // ===================================================
   // ANSWERS
-  // ===================================================
 
   answerBox: {
     marginHorizontal: 20,
+    marginBottom: 15,
   },
 
   answerTitle: {
@@ -1121,9 +886,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#EFF6FF",
   },
 
-  // ===================================================
   // RADIO
-  // ===================================================
 
   radioOuter: {
     width: 22,
@@ -1147,9 +910,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#2563EB",
   },
 
-  // ===================================================
   // ANSWER TEXT
-  // ===================================================
 
   answerText: {
     flex: 1,
