@@ -43,8 +43,6 @@ export default function CourseListScreen() {
 
       const useridString = await AsyncStorage.getItem("userid");
 
-      console.log("USER ID:", useridString);
-
       if (!useridString) {
         throw new Error("Không tìm thấy userid");
       }
@@ -53,12 +51,8 @@ export default function CourseListScreen() {
 
       const data = await getUserCourses(userid);
 
-      console.log("COURSES FROM MOODLE:", data);
-
       setCourses(data);
     } catch (error: any) {
-      console.log("GET COURSES ERROR:", error);
-
       setError(error?.message || "Không thể lấy danh sách khóa học");
     } finally {
       setLoading(false);

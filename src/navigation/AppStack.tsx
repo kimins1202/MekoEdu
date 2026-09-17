@@ -25,7 +25,11 @@ export default function AppStack() {
         component={ExamDetailScreen}
         options={{ title: "Chi tiết bài thi" }}
       />
-      <Stack.Screen name="Exam" component={ExamScreen} />
+      <Stack.Screen
+        name="Exam"
+        component={ExamScreen}
+        options={{ title: "Làm bài" }}
+      />
     </Stack.Navigator>
   );
 }

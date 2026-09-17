@@ -1,11 +1,7 @@
+// src/screens/LoginScreen.tsx
+
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-import { useNavigation } from "@react-navigation/native";
-
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-
 import { useState } from "react";
-
 import {
   ActivityIndicator,
   Alert,
@@ -19,101 +15,86 @@ import {
 
 import { loginApi } from "../api/authApi";
 
-import { getSiteInfo } from "../api/quizApi";
-
-import { RootStackParamList } from "../types/navigation";
-
-type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
-
 export default function LoginScreen() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const navigation = useNavigation<NavigationProp>();
+  // =========================
+  // ĐĂNG NHẬP
+  // =========================
 
   const handleLogin = async () => {
     const cleanUsername = username.trim();
     const cleanPassword = password.trim();
 
+    // Kiểm tra input
     if (!cleanUsername || !cleanPassword) {
       Alert.alert(
         "Thông báo",
         "Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu!",
       );
-
       return;
     }
 
-    setLoading(true);
-
     try {
-      // =================================================
-      // 1. ĐĂNG NHẬP MOODLE
-      // =================================================
+      setLoading(true);
+
+      // =========================
+      // 1. GỌI API LOGIN
+      // =========================
 
       const data = await loginApi(cleanUsername, cleanPassword);
 
-      console.log("Moodle Response Data:", data);
+      // =========================
+      // 2. KIỂM TRA LOGIN
+      // =========================
 
-      if (data.token) {
-        // =================================================
-        // 2. LƯU TOKEN
-        // =================================================
-
-        await AsyncStorage.setItem("wstoken", data.token);
-
-        console.log("Token đã lưu thành công:", data.token);
-
-        // =================================================
-        // 3. LẤY THÔNG TIN USER
-        // API: core_webservice_get_site_info
-        // =================================================
-
-        const siteInfo = await getSiteInfo();
-
-        console.log("Site Info:", siteInfo);
-
-        // =================================================
-        // 4. LƯU USER ID
-        // =================================================
-
-        if (siteInfo.userid) {
-          await AsyncStorage.setItem("userid", String(siteInfo.userid));
-
-          console.log("User ID đã lưu:", siteInfo.userid);
-        } else {
-          console.log("Không tìm thấy userid trong Site Info");
-        }
-
-        // =================================================
-        // 5. CHUYỂN SANG APPSTACK
-        // =================================================
-
-        DeviceEventEmitter.emit("authChange");
-      } else {
-        // =================================================
-        // LOGIN THẤT BẠI
-        // =================================================
-
+      if (!data?.token) {
         const errorMessage =
-          data.error ||
-          data.message ||
+          data?.error ||
+          data?.message ||
           "Tài khoản hoặc mật khẩu không chính xác.";
 
         Alert.alert("Lỗi đăng nhập", errorMessage);
-      }
-    } catch (error: any) {
-      console.error("Lỗi khi gọi API đăng nhập:", error);
 
+        return;
+      }
+
+      // =========================
+      // 3. LƯU TOKEN
+      // =========================
+
+      await AsyncStorage.setItem("wstoken", data.token);
+
+      // =========================
+      // 4. XÓA USERID CŨ
+      // =========================
+      // Tránh trường hợp đổi tài khoản
+      // nhưng vẫn giữ userid của tài khoản trước.
+
+      await AsyncStorage.removeItem("userid");
+
+      // =========================
+      // 5. BÁO APP ĐÃ ĐĂNG NHẬP
+      // =========================
+
+      console.log("LOGIN SUCCESS → APP INIT");
+
+      DeviceEventEmitter.emit("authChange");
+    } catch (error: any) {
       Alert.alert(
         "Lỗi kết nối",
-        "Không thể kết nối đến máy chủ Moodle. Vui lòng kiểm tra lại kết nối mạng hoặc server IP.",
+        "Không thể kết nối đến máy chủ Moodle. Vui lòng kiểm tra kết nối mạng hoặc server.",
       );
     } finally {
       setLoading(false);
     }
   };
+
+  // =========================
+  // UI
+  // =========================
 
   return (
     <View style={styles.container}>
@@ -121,22 +102,34 @@ export default function LoginScreen() {
 
       <Text style={styles.subtitle}>Đăng nhập tài khoản Moodle</Text>
 
+      {/* USERNAME */}
+
+      <Text style={styles.label}>Tên đăng nhập</Text>
+
       <TextInput
         style={styles.input}
-        placeholder="Tên đăng nhập / Email"
+        placeholder="Nhập tên đăng nhập"
         value={username}
         onChangeText={setUsername}
         autoCapitalize="none"
         autoCorrect={false}
+        editable={!loading}
       />
+
+      {/* PASSWORD */}
+
+      <Text style={styles.label}>Mật khẩu</Text>
 
       <TextInput
         style={styles.input}
-        placeholder="Mật khẩu"
+        placeholder="Nhập mật khẩu"
         value={password}
         onChangeText={setPassword}
         secureTextEntry
+        editable={!loading}
       />
+
+      {/* LOGIN BUTTON */}
 
       <TouchableOpacity
         style={[styles.button, loading && styles.buttonDisabled]}
@@ -153,6 +146,10 @@ export default function LoginScreen() {
     </View>
   );
 }
+
+// =========================
+// STYLE
+// =========================
 
 const styles = StyleSheet.create({
   container: {
@@ -175,6 +172,13 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: "#6B7280",
     marginBottom: 32,
+  },
+
+  label: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#374151",
+    marginBottom: 6,
   },
 
   input: {
