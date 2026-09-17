@@ -20,9 +20,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // =========================
   // ĐĂNG NHẬP
-  // =========================
 
   const handleLogin = async () => {
     const cleanUsername = username.trim();
@@ -40,15 +38,11 @@ export default function LoginScreen() {
     try {
       setLoading(true);
 
-      // =========================
       // 1. GỌI API LOGIN
-      // =========================
 
       const data = await loginApi(cleanUsername, cleanPassword);
 
-      // =========================
       // 2. KIỂM TRA LOGIN
-      // =========================
 
       if (!data?.token) {
         const errorMessage =
@@ -61,25 +55,17 @@ export default function LoginScreen() {
         return;
       }
 
-      // =========================
       // 3. LƯU TOKEN
-      // =========================
 
       await AsyncStorage.setItem("wstoken", data.token);
 
-      // =========================
       // 4. XÓA USERID CŨ
-      // =========================
       // Tránh trường hợp đổi tài khoản
       // nhưng vẫn giữ userid của tài khoản trước.
 
       await AsyncStorage.removeItem("userid");
 
-      // =========================
       // 5. BÁO APP ĐÃ ĐĂNG NHẬP
-      // =========================
-
-      console.log("LOGIN SUCCESS → APP INIT");
 
       DeviceEventEmitter.emit("authChange");
     } catch (error: any) {
@@ -92,9 +78,7 @@ export default function LoginScreen() {
     }
   };
 
-  // =========================
   // UI
-  // =========================
 
   return (
     <View style={styles.container}>
@@ -147,9 +131,7 @@ export default function LoginScreen() {
   );
 }
 
-// =========================
 // STYLE
-// =========================
 
 const styles = StyleSheet.create({
   container: {

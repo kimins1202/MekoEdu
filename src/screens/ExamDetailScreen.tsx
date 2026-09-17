@@ -21,14 +21,10 @@ export default function ExamDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
 
-  // =====================================================
   // LẤY THÔNG TIN BÀI THI TỪ EXAM LIST
-  // =====================================================
   const { quizid, quizName, questionCount, timelimit } = route.params;
 
-  // =====================================================
   // STATE
-  // =====================================================
   const [loading, setLoading] = useState(true);
 
   // API 6 - Quyền truy cập
@@ -41,9 +37,7 @@ export default function ExamDetailScreen() {
   // API 7 - Lịch sử làm bài
   const [attempts, setAttempts] = useState<any[]>([]);
 
-  // =====================================================
   // GỌI API KHI MỞ MÀN HÌNH
-  // =====================================================
   useEffect(() => {
     loadExamData();
   }, []);
@@ -52,26 +46,18 @@ export default function ExamDetailScreen() {
     try {
       setLoading(true);
 
-      // =================================================
       // LẤY USER ID TỪ ASYNC STORAGE
-      // =================================================
       const userId = await AsyncStorage.getItem("userid");
-
-      console.log("USER ID:", userId);
 
       if (!userId) {
         Alert.alert("Lỗi", "Không tìm thấy User ID. Vui lòng đăng nhập lại.");
         return;
       }
 
-      // =================================================
       // API 6
       // mod_quiz_get_quiz_access_information
-      // =================================================
 
       const accessResponse = await getQuizAccessInformation(quizid);
-
-      console.log("QUIZ ACCESS API:", accessResponse);
 
       // Kiểm tra quyền làm bài
       setCanAttempt(accessResponse?.canattempt ?? false);
@@ -79,18 +65,14 @@ export default function ExamDetailScreen() {
       // Lấy lý do không được truy cập
       setPreventAccessReasons(accessResponse?.preventaccessreasons ?? []);
 
-      // =================================================
       // API 7
       // mod_quiz_get_user_attempts
-      // =================================================
 
       const attemptsResponse = await getUserAttempts(
         quizid,
         Number(userId),
         "all",
       );
-
-      console.log("USER ATTEMPTS API:", attemptsResponse);
 
       // Lưu lịch sử làm bài
       setAttempts(attemptsResponse?.attempts ?? []);
@@ -103,9 +85,7 @@ export default function ExamDetailScreen() {
     }
   };
 
-  // =====================================================
   // CHUYỂN TRẠNG THÁI ATTEMPT SANG TIẾNG VIỆT
-  // =====================================================
   const getAttemptStatus = (state: string) => {
     switch (state) {
       case "finished":
@@ -125,9 +105,7 @@ export default function ExamDetailScreen() {
     }
   };
 
-  // =====================================================
   // FORMAT NGÀY GIỜ
-  // =====================================================
   const formatDate = (timestamp: number) => {
     if (!timestamp || timestamp === 0) {
       return "Chưa xác định";
@@ -136,10 +114,8 @@ export default function ExamDetailScreen() {
     return new Date(timestamp * 1000).toLocaleString("vi-VN");
   };
 
-  // =====================================================
   // FORMAT THỜI GIAN LÀM BÀI
   // timelimit từ Moodle tính bằng GIÂY
-  // =====================================================
   const formatTimeLimit = (seconds: number) => {
     if (!seconds || seconds <= 0) {
       return "Không giới hạn";
@@ -159,9 +135,7 @@ export default function ExamDetailScreen() {
     return `${minutes} phút`;
   };
 
-  // =====================================================
   // BẮT ĐẦU LÀM BÀI
-  // =====================================================
   const handleStartQuiz = () => {
     // Nếu không có quyền
     if (!canAttempt) {
@@ -182,9 +156,7 @@ export default function ExamDetailScreen() {
     });
   };
 
-  // =====================================================
   // LOADING
-  // =====================================================
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -195,17 +167,15 @@ export default function ExamDetailScreen() {
     );
   }
 
-  // =====================================================
   // UI
-  // =====================================================
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.scrollContent}
     >
-      {/* =================================================
+      {/* 
           HEADER
-      ================================================= */}
+       */}
 
       <View style={styles.header}>
         {/* Nút quay lại */}
@@ -217,14 +187,14 @@ export default function ExamDetailScreen() {
         <Text style={styles.title}>{quizName}</Text>
       </View>
 
-      {/* =================================================
+      {/* 
           CONTENT
-      ================================================= */}
+       */}
 
       <View style={styles.content}>
-        {/* =================================================
+        {/* 
             THÔNG TIN BÀI THI
-        ================================================= */}
+         */}
 
         <Text style={styles.sectionTitle}>Thông tin bài thi</Text>
 
@@ -251,9 +221,9 @@ export default function ExamDetailScreen() {
           </Text>
         </View>
 
-        {/* =================================================
+        {/* 
             QUYỀN TRUY CẬP - API 6
-        ================================================= */}
+         */}
 
         <Text style={styles.sectionTitle}>Quyền truy cập</Text>
 
@@ -282,9 +252,9 @@ export default function ExamDetailScreen() {
           )}
         </View>
 
-        {/* =================================================
+        {/* 
             LỊCH SỬ LÀM BÀI - API 7
-        ================================================= */}
+         */}
 
         <Text style={styles.sectionTitle}>Lịch sử làm bài</Text>
 
@@ -329,9 +299,9 @@ export default function ExamDetailScreen() {
           )}
         </View>
 
-        {/* =================================================
+        {/* 
             BUTTON BẮT ĐẦU
-        ================================================= */}
+         */}
 
         <TouchableOpacity
           style={[styles.button, !canAttempt && styles.buttonDisabled]}
@@ -345,9 +315,7 @@ export default function ExamDetailScreen() {
   );
 }
 
-// =====================================================
 // STYLES
-// =====================================================
 
 const styles = StyleSheet.create({
   container: {
@@ -359,9 +327,7 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
   },
 
-  // ===================================================
   // LOADING
-  // ===================================================
 
   loadingContainer: {
     flex: 1,
@@ -376,9 +342,7 @@ const styles = StyleSheet.create({
     color: "#555555",
   },
 
-  // ===================================================
   // HEADER
-  // ===================================================
 
   header: {
     paddingHorizontal: 20,
@@ -400,9 +364,7 @@ const styles = StyleSheet.create({
     color: "#111827",
   },
 
-  // ===================================================
   // CONTENT
-  // ===================================================
 
   content: {
     padding: 20,
@@ -416,9 +378,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 
-  // ===================================================
   // INFO
-  // ===================================================
 
   infoBox: {
     padding: 15,
@@ -434,9 +394,7 @@ const styles = StyleSheet.create({
     color: "#555555",
   },
 
-  // ===================================================
   // SUCCESS / ERROR
-  // ===================================================
 
   success: {
     fontSize: 14,
@@ -450,9 +408,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  // ===================================================
   // WARNING
-  // ===================================================
 
   warningBox: {
     marginTop: 5,
@@ -475,9 +431,7 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
 
-  // ===================================================
   // ATTEMPT
-  // ===================================================
 
   attemptItem: {
     paddingBottom: 10,
@@ -493,9 +447,7 @@ const styles = StyleSheet.create({
     color: "#111827",
   },
 
-  // ===================================================
   // BUTTON
-  // ===================================================
 
   button: {
     marginTop: 30,

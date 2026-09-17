@@ -1,9 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axiosInstance from "./axiosInstance";
 
-// =========================
 // 1. LOGIN
-// =========================
 
 export const loginApi = async (username: string, password: string) => {
   const response = await axiosInstance.post("/login/token.php", null, {
@@ -17,9 +15,7 @@ export const loginApi = async (username: string, password: string) => {
   return response.data;
 };
 
-// =========================
 // 2. LẤY THÔNG TIN USER
-// =========================
 
 export const getSiteInfo = async () => {
   const token = await AsyncStorage.getItem("wstoken");

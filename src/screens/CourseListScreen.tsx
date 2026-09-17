@@ -92,8 +92,6 @@ export default function CourseListScreen() {
           <TouchableOpacity
             style={styles.courseCard}
             onPress={() => {
-              console.log("CHỌN COURSE:", item);
-
               navigation.navigate("ExamList", {
                 courseid: item.id,
               });

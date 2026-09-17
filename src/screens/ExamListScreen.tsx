@@ -32,9 +32,7 @@ export default function ExamListScreen() {
   const [exams, setExams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // =========================
   // LOAD EXAM TỪ API
-  // =========================
 
   useEffect(() => {
     loadExams();
@@ -44,23 +42,13 @@ export default function ExamListScreen() {
     try {
       setLoading(true);
 
-      // =========================
-      // LẤY QUIZZES CỦA COURSE ĐƯỢC CHỌN
-      // =========================
-
-      console.log("COURSE ID:", courseid);
+          // LẤY QUIZZES CỦA COURSE ĐƯỢC CHỌN
 
       const quizData = await getQuizzesByCourses([courseid]);
 
-      console.log("QUIZ DATA:", quizData);
-
-      // =========================
-      // CẬP NHẬT DANH SÁCH
-      // =========================
-
+          // CẬP NHẬT DANH SÁCH
+    
       const quizzes = quizData?.quizzes ?? [];
-
-      console.log("QUIZZES:", quizzes);
 
       setExams(quizzes);
     } catch (error: any) {
@@ -72,9 +60,7 @@ export default function ExamListScreen() {
     }
   };
 
-  // =========================
   // ĐĂNG XUẤT
-  // =========================
 
   const handleLogout = async () => {
     try {
@@ -86,9 +72,7 @@ export default function ExamListScreen() {
     }
   };
 
-  // =========================
   // LOADING LẦN ĐẦU
-  // =========================
 
   if (loading && exams.length === 0) {
     return (
@@ -100,15 +84,13 @@ export default function ExamListScreen() {
     );
   }
 
-  // =========================
   // UI
-  // =========================
 
   return (
     <View style={styles.container}>
-      {/* =========================
+      {/* 
           HEADER
-      ========================= */}
+       */}
 
       <View style={styles.header}>
         <View style={styles.headerContent}>
@@ -124,9 +106,9 @@ export default function ExamListScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* =========================
+      {/* 
           NÚT TẢI LẠI
-      ========================= */}
+       */}
 
       <TouchableOpacity
         style={[styles.reloadButton, loading && styles.reloadButtonDisabled]}
@@ -144,9 +126,9 @@ export default function ExamListScreen() {
         )}
       </TouchableOpacity>
 
-      {/* =========================
+      {/* 
           DANH SÁCH BÀI THI
-      ========================= */}
+       */}
 
       {exams.length === 0 ? (
         <View style={styles.center}>
@@ -191,9 +173,7 @@ export default function ExamListScreen() {
   );
 }
 
-// =========================
-// STYLE
-// =========================
+// STYLE 
 
 const styles = StyleSheet.create({
   container: {
@@ -211,9 +191,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
 
-  // =========================
   // HEADER
-  // =========================
 
   header: {
     paddingHorizontal: 20,
@@ -242,9 +220,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
-  // =========================
   // LOGOUT
-  // =========================
 
   logoutButton: {
     paddingHorizontal: 12,
@@ -261,9 +237,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  // =========================
   // RELOAD
-  // =========================
 
   reloadButton: {
     marginHorizontal: 20,
@@ -292,9 +266,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  // =========================
   // EXAM LIST
-  // =========================
 
   list: {
     padding: 20,

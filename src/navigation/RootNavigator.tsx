@@ -39,9 +39,7 @@ export default function RootNavigator() {
     return () => subscription.remove();
   }, []);
 
-  // =========================
   // APP ĐANG KIỂM TRA TOKEN
-  // =========================
 
   if (isLoading) {
     return (
@@ -64,15 +62,11 @@ export default function RootNavigator() {
       }}
     >
       {userToken == null ? (
-        // =========================
-        // CHƯA ĐĂNG NHẬP
-        // =========================
-        <Stack.Screen name="Auth" component={AuthStack} />
+              // CHƯA ĐĂNG NHẬP
+              <Stack.Screen name="Auth" component={AuthStack} />
       ) : (
-        // =========================
-        // ĐÃ CÓ TOKEN
-        // =========================
-        <>
+              // ĐÃ CÓ TOKEN
+              <>
           <Stack.Screen name="AppInit" component={AppInitScreen} />
 
           <Stack.Screen name="App" component={AppStack} />
