@@ -1,7 +1,6 @@
 import type { RouteProp } from "@react-navigation/native";
 import { useNavigation, useRoute } from "@react-navigation/native";
-
-import { AppStackParamList } from "../types/navigation";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import { useEffect, useState } from "react";
 
@@ -18,14 +17,17 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { getQuizzesByCourses } from "../api/quizApi";
+import { AppStackParamList } from "../types/navigation";
 
 type ExamListRouteProp = RouteProp<AppStackParamList, "ExamList">;
 
+type NavigationProp = NativeStackNavigationProp<AppStackParamList, "ExamList">;
+
 export default function ExamListScreen() {
   const route = useRoute<ExamListRouteProp>();
-  const { courseid } = route.params;
+  const navigation = useNavigation<NavigationProp>();
 
-  const navigation = useNavigation<any>();
+  const { courseid } = route.params;
 
   const [exams, setExams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -162,6 +164,8 @@ export default function ExamListScreen() {
                 navigation.navigate("ExamDetail", {
                   quizid: item.id,
                   quizName: item.name,
+                  questionCount: item.questioncount,
+                  timelimit: item.timelimit,
                 })
               }
             >
@@ -215,10 +219,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 50,
     paddingBottom: 20,
-
     borderBottomWidth: 1,
     borderBottomColor: "#DDDDDD",
-
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -247,11 +249,9 @@ const styles = StyleSheet.create({
   logoutButton: {
     paddingHorizontal: 12,
     paddingVertical: 8,
-
     borderWidth: 1,
     borderColor: "#EF4444",
     borderRadius: 8,
-
     marginLeft: 10,
   },
 
@@ -269,13 +269,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginTop: 15,
     marginBottom: 5,
-
     paddingVertical: 12,
-
     borderWidth: 1,
     borderColor: "#2563EB",
     borderRadius: 8,
-
     alignItems: "center",
   },
 
@@ -306,11 +303,9 @@ const styles = StyleSheet.create({
   examCard: {
     padding: 20,
     marginBottom: 15,
-
     borderWidth: 1,
     borderColor: "#DDDDDD",
     borderRadius: 10,
-
     backgroundColor: "#FAFAFA",
   },
 
@@ -318,14 +313,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     color: "#111827",
-
     marginBottom: 10,
   },
 
   examInfo: {
     fontSize: 14,
     color: "#555555",
-
     marginBottom: 5,
   },
 });
