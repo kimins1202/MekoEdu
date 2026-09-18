@@ -42,12 +42,12 @@ export default function ExamListScreen() {
     try {
       setLoading(true);
 
-          // LẤY QUIZZES CỦA COURSE ĐƯỢC CHỌN
+      // LẤY QUIZZES CỦA COURSE ĐƯỢC CHỌN
 
       const quizData = await getQuizzesByCourses([courseid]);
 
-          // CẬP NHẬT DANH SÁCH
-    
+      // CẬP NHẬT DANH SÁCH
+
       const quizzes = quizData?.quizzes ?? [];
 
       setExams(quizzes);
@@ -161,10 +161,6 @@ export default function ExamListScreen() {
                   ? `${Math.floor(item.timelimit / 60)} phút`
                   : "Không giới hạn"}
               </Text>
-
-              <Text style={styles.examInfo}>
-                Số lần làm: {item.attempts ?? "Không giới hạn"}
-              </Text>
             </TouchableOpacity>
           )}
         />
@@ -173,7 +169,7 @@ export default function ExamListScreen() {
   );
 }
 
-// STYLE 
+// STYLE
 
 const styles = StyleSheet.create({
   container: {
