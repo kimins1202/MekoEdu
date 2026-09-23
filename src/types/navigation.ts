@@ -1,7 +1,11 @@
 export type RootStackParamList = {
+  Splash: undefined;
+  Onboarding: undefined;
+  Launch: undefined;
+
   Auth: undefined;
-  App: undefined;
   AppInit: undefined;
+  App: undefined;
 };
 
 export type AuthStackParamList = {

@@ -3,7 +3,11 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, DeviceEventEmitter, View } from "react-native";
 
-import AppInitScreen from "../screens/AppInitScreen";
+import AppInitScreen from "../screens/launch/AppInitScreen";
+import LaunchScreen from "../screens/launch/LaunchScreen";
+import OnboardingScreen from "../screens/launch/OnboardingScreen";
+import SplashScreen from "../screens/launch/SplashScreen";
+
 import { RootStackParamList } from "../types/navigation";
 import AppStack from "./AppStack";
 import AuthStack from "./AuthStack";
@@ -22,7 +26,7 @@ export default function RootNavigator() {
 
       setUserToken(token);
     } catch (error) {
-      console.error("Lỗi khi đọc token từ AsyncStorage:", error);
+      console.error("Lỗi khi đọc token:", error);
     } finally {
       setIsLoading(false);
     }
@@ -39,8 +43,6 @@ export default function RootNavigator() {
     return () => subscription.remove();
   }, []);
 
-  // APP ĐANG KIỂM TRA TOKEN
-
   if (isLoading) {
     return (
       <View
@@ -50,7 +52,7 @@ export default function RootNavigator() {
           alignItems: "center",
         }}
       >
-        <ActivityIndicator size="large" color="#2563EB" />
+        <ActivityIndicator size="large" color="#3EAF7C" />
       </View>
     );
   }
@@ -61,12 +63,16 @@ export default function RootNavigator() {
         headerShown: false,
       }}
     >
-      {userToken == null ? (
-              // CHƯA ĐĂNG NHẬP
-              <Stack.Screen name="Auth" component={AuthStack} />
-      ) : (
-              // ĐÃ CÓ TOKEN
-              <>
+      <Stack.Screen name="Splash" component={SplashScreen} />
+
+      <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+
+      <Stack.Screen name="Launch" component={LaunchScreen} />
+
+      <Stack.Screen name="Auth" component={AuthStack} />
+
+      {userToken != null && (
+        <>
           <Stack.Screen name="AppInit" component={AppInitScreen} />
 
           <Stack.Screen name="App" component={AppStack} />
