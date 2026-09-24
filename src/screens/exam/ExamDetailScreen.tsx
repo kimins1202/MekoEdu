@@ -1,9 +1,10 @@
 // src/screens/ExamDetailScreen.tsx
 
+import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { useEffect, useState } from "react";
-
 import {
-  ActivityIndicator,
   Alert,
   ScrollView,
   StyleSheet,
@@ -12,8 +13,9 @@ import {
   View,
 } from "react-native";
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import AppHeader from "@/components/common/AppHeader";
+import Loading from "@/components/common/Loading";
+import COLORS from "@/constants/colors";
 
 import { getQuizAccessInformation, getUserAttempts } from "../../api/quizApi";
 
@@ -21,23 +23,31 @@ export default function ExamDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
 
-  // LẤY THÔNG TIN BÀI THI TỪ EXAM LIST
+  // =========================================
+  // THÔNG TIN BÀI THI
+  // =========================================
+
   const { quizid, quizName, questionCount, timelimit } = route.params;
 
+  // =========================================
   // STATE
+  // =========================================
+
   const [loading, setLoading] = useState(true);
 
-  // API 6 - Quyền truy cập
+  // API 6
   const [canAttempt, setCanAttempt] = useState(false);
-
   const [preventAccessReasons, setPreventAccessReasons] = useState<string[]>(
     [],
   );
 
-  // API 7 - Lịch sử làm bài
+  // API 7
   const [attempts, setAttempts] = useState<any[]>([]);
 
-  // GỌI API KHI MỞ MÀN HÌNH
+  // =========================================
+  // LOAD DATA
+  // =========================================
+
   useEffect(() => {
     loadExamData();
   }, []);
@@ -46,7 +56,10 @@ export default function ExamDetailScreen() {
     try {
       setLoading(true);
 
-      // LẤY USER ID TỪ ASYNC STORAGE
+      // =====================================
+      // LẤY USER ID
+      // =====================================
+
       const userId = await AsyncStorage.getItem("userid");
 
       if (!userId) {
@@ -54,19 +67,21 @@ export default function ExamDetailScreen() {
         return;
       }
 
+      // =====================================
       // API 6
       // mod_quiz_get_quiz_access_information
+      // =====================================
 
       const accessResponse = await getQuizAccessInformation(quizid);
 
-      // Kiểm tra quyền làm bài
       setCanAttempt(accessResponse?.canattempt ?? false);
 
-      // Lấy lý do không được truy cập
       setPreventAccessReasons(accessResponse?.preventaccessreasons ?? []);
 
+      // =====================================
       // API 7
       // mod_quiz_get_user_attempts
+      // =====================================
 
       const attemptsResponse = await getUserAttempts(
         quizid,
@@ -74,7 +89,6 @@ export default function ExamDetailScreen() {
         "all",
       );
 
-      // Lưu lịch sử làm bài
       setAttempts(attemptsResponse?.attempts ?? []);
     } catch (error) {
       console.error("EXAM DETAIL ERROR:", error);
@@ -85,7 +99,10 @@ export default function ExamDetailScreen() {
     }
   };
 
-  // CHUYỂN TRẠNG THÁI ATTEMPT SANG TIẾNG VIỆT
+  // =========================================
+  // ATTEMPT STATUS
+  // =========================================
+
   const getAttemptStatus = (state: string) => {
     switch (state) {
       case "finished":
@@ -105,7 +122,10 @@ export default function ExamDetailScreen() {
     }
   };
 
-  // FORMAT NGÀY GIỜ
+  // =========================================
+  // FORMAT DATE
+  // =========================================
+
   const formatDate = (timestamp: number) => {
     if (!timestamp || timestamp === 0) {
       return "Chưa xác định";
@@ -114,14 +134,17 @@ export default function ExamDetailScreen() {
     return new Date(timestamp * 1000).toLocaleString("vi-VN");
   };
 
-  // FORMAT THỜI GIAN LÀM BÀI
-  // timelimit từ Moodle tính bằng GIÂY
+  // =========================================
+  // FORMAT TIME LIMIT
+  // =========================================
+
   const formatTimeLimit = (seconds: number) => {
     if (!seconds || seconds <= 0) {
       return "Không giới hạn";
     }
 
     const hours = Math.floor(seconds / 3600);
+
     const minutes = Math.floor((seconds % 3600) / 60);
 
     if (hours > 0 && minutes > 0) {
@@ -135,9 +158,12 @@ export default function ExamDetailScreen() {
     return `${minutes} phút`;
   };
 
+  // =========================================
   // BẮT ĐẦU LÀM BÀI
+  // GIỮ NGUYÊN LUỒNG CŨ
+  // =========================================
+
   const handleStartQuiz = () => {
-    // Nếu không có quyền
     if (!canAttempt) {
       Alert.alert(
         "Không thể làm bài",
@@ -149,322 +175,812 @@ export default function ExamDetailScreen() {
       return;
     }
 
-    // Nếu có quyền → sang Exam
     navigation.navigate("Exam", {
       quizid: quizid,
       quizName: quizName,
     });
   };
 
+  // =========================================
   // LOADING
+  // =========================================
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" />
-
-        <Text style={styles.loadingText}>Đang tải thông tin bài thi...</Text>
+        <Loading message="Đang tải thông tin bài thi..." />
       </View>
     );
   }
 
+  // =========================================
   // UI
+  // =========================================
+
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.scrollContent}
-    >
-      {/* 
-          HEADER
-       */}
+    <View style={styles.container}>
+      <AppHeader
+        title="Chi tiết bài thi"
+        subtitle="Thông tin và lịch sử làm bài"
+        showBack
+      />
 
-      <View style={styles.header}>
-        {/* Nút quay lại */}
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.back}>← Quay lại</Text>
-        </TouchableOpacity>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* =====================================
+            QUIZ HEADER CARD
+        ===================================== */}
 
-        {/* Tên bài thi */}
-        <Text style={styles.title}>{quizName}</Text>
-      </View>
+        <View style={styles.quizCard}>
+          <View style={styles.quizIcon}>
+            <Ionicons
+              name="document-text-outline"
+              size={30}
+              color={COLORS.primary}
+            />
+          </View>
 
-      {/* 
-          CONTENT
-       */}
+          <View style={styles.quizInfo}>
+            <Text style={styles.quizName} numberOfLines={3}>
+              {quizName}
+            </Text>
 
-      <View style={styles.content}>
-        {/* 
+            <View style={styles.quizIdRow}>
+              <Ionicons
+                name="pricetag-outline"
+                size={13}
+                color={COLORS.textLight}
+              />
+
+              <Text style={styles.quizId}>Quiz ID: {quizid}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* =====================================
             THÔNG TIN BÀI THI
-         */}
+        ===================================== */}
 
         <Text style={styles.sectionTitle}>Thông tin bài thi</Text>
 
-        <View style={styles.infoBox}>
-          <Text style={styles.info}>Quiz ID: {quizid}</Text>
+        <View style={styles.infoCard}>
+          {/* Thời gian */}
 
-          {/* Thời gian làm bài lấy từ timelimit */}
-          <Text style={styles.info}>
-            Thời gian: {formatTimeLimit(timelimit)}
-          </Text>
+          <View style={styles.infoItem}>
+            <View style={styles.infoIcon}>
+              <Ionicons name="time-outline" size={21} color={COLORS.primary} />
+            </View>
 
-          {/* Số câu hỏi */}
-          <Text style={styles.info}>
-            Số câu hỏi:{" "}
-            {questionCount !== undefined
-              ? `${questionCount} câu`
-              : "Chưa xác định"}
-          </Text>
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Thời gian làm bài</Text>
 
-          {/* Số lần đã làm */}
-          <Text style={styles.info}>
-            Số lần đã làm:{" "}
-            {attempts.length > 0 ? `${attempts.length} lần` : "Chưa làm"}
-          </Text>
+              <Text style={styles.infoValue}>{formatTimeLimit(timelimit)}</Text>
+            </View>
+          </View>
+
+          <View style={styles.divider} />
+
+          {/* Số câu */}
+
+          <View style={styles.infoItem}>
+            <View style={styles.infoIcon}>
+              <Ionicons
+                name="help-circle-outline"
+                size={21}
+                color={COLORS.primary}
+              />
+            </View>
+
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Số câu hỏi</Text>
+
+              <Text style={styles.infoValue}>
+                {questionCount !== undefined
+                  ? `${questionCount} câu`
+                  : "Chưa xác định"}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.divider} />
+
+          {/* Số lần làm */}
+
+          <View style={styles.infoItem}>
+            <View style={styles.infoIcon}>
+              <Ionicons
+                name="repeat-outline"
+                size={21}
+                color={COLORS.primary}
+              />
+            </View>
+
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Số lần đã làm</Text>
+
+              <Text style={styles.infoValue}>
+                {attempts.length > 0 ? `${attempts.length} lần` : "Chưa làm"}
+              </Text>
+            </View>
+          </View>
         </View>
 
-        {/* 
-            QUYỀN TRUY CẬP - API 6
-         */}
+        {/* =====================================
+            QUYỀN TRUY CẬP
+        ===================================== */}
 
         <Text style={styles.sectionTitle}>Quyền truy cập</Text>
 
-        <View style={styles.infoBox}>
-          {/* Trạng thái */}
-          <Text style={canAttempt ? styles.success : styles.error}>
-            {canAttempt ? "✓ Có thể làm bài" : "✕ Không thể làm bài"}
-          </Text>
+        <View
+          style={[
+            styles.accessCard,
+            canAttempt ? styles.accessCardSuccess : styles.accessCardError,
+          ]}
+        >
+          <View
+            style={[
+              styles.accessIcon,
+              canAttempt ? styles.accessIconSuccess : styles.accessIconError,
+            ]}
+          >
+            <Ionicons
+              name={canAttempt ? "checkmark-circle" : "close-circle"}
+              size={27}
+              color={canAttempt ? COLORS.primary : COLORS.error}
+            />
+          </View>
 
-          <Text style={styles.info}>
-            Trạng thái:{" "}
-            {canAttempt ? "Được phép truy cập" : "Không được phép truy cập"}
-          </Text>
+          <View style={styles.accessContent}>
+            <Text
+              style={[
+                styles.accessTitle,
+                {
+                  color: canAttempt ? COLORS.primary : COLORS.error,
+                },
+              ]}
+            >
+              {canAttempt ? "Có thể làm bài" : "Không thể làm bài"}
+            </Text>
 
-          {/* Lý do không được truy cập */}
-          {!canAttempt && preventAccessReasons.length > 0 && (
-            <View style={styles.warningBox}>
-              <Text style={styles.warningTitle}>Lý do:</Text>
-
-              {preventAccessReasons.map((reason, index) => (
-                <Text key={index} style={styles.reason}>
-                  • {reason}
-                </Text>
-              ))}
-            </View>
-          )}
+            <Text style={styles.accessText}>
+              {canAttempt
+                ? "Bạn được phép truy cập bài thi này."
+                : "Bạn hiện không được phép truy cập bài thi."}
+            </Text>
+          </View>
         </View>
 
-        {/* 
-            LỊCH SỬ LÀM BÀI - API 7
-         */}
+        {/* =====================================
+            LÝ DO KHÔNG ĐƯỢC TRUY CẬP
+        ===================================== */}
 
-        <Text style={styles.sectionTitle}>Lịch sử làm bài</Text>
+        {!canAttempt && preventAccessReasons.length > 0 && (
+          <View style={styles.warningCard}>
+            <View style={styles.warningHeader}>
+              <Ionicons
+                name="information-circle-outline"
+                size={20}
+                color={COLORS.error}
+              />
 
-        <View style={styles.infoBox}>
-          {/* Chưa có lịch sử */}
+              <Text style={styles.warningTitle}>Lý do không thể truy cập</Text>
+            </View>
+
+            {preventAccessReasons.map((reason, index) => (
+              <View key={index} style={styles.reasonRow}>
+                <View style={styles.reasonDot} />
+
+                <Text style={styles.reasonText}>{reason}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* =====================================
+            LỊCH SỬ LÀM BÀI
+        ===================================== */}
+
+        <View style={styles.historyHeader}>
+          <Text style={styles.sectionTitle}>Lịch sử làm bài</Text>
+
+          <View style={styles.countBadge}>
+            <Text style={styles.countText}>{attempts.length}</Text>
+          </View>
+        </View>
+
+        <View style={styles.historyCard}>
           {attempts.length === 0 ? (
-            <Text style={styles.info}>Chưa có lịch sử làm bài</Text>
+            <View style={styles.emptyHistory}>
+              <View style={styles.emptyIcon}>
+                <Ionicons
+                  name="document-outline"
+                  size={30}
+                  color={COLORS.primary}
+                />
+              </View>
+
+              <Text style={styles.emptyTitle}>Chưa có lịch sử làm bài</Text>
+
+              <Text style={styles.emptyText}>
+                Bạn chưa thực hiện bài thi này.
+              </Text>
+            </View>
           ) : (
             attempts.map((attempt, index) => (
-              <View key={attempt.id ?? index} style={styles.attemptItem}>
-                {/* Lần làm */}
-                <Text style={styles.attemptTitle}>
-                  Lần {attempt.attempt ?? index + 1}
-                </Text>
+              <View
+                key={attempt.id ?? index}
+                style={[
+                  styles.attemptItem,
+                  index === attempts.length - 1 && styles.lastAttempt,
+                ]}
+              >
+                {/* Icon */}
 
-                {/* Trạng thái */}
-                <Text style={styles.info}>
-                  Trạng thái: {getAttemptStatus(attempt.state)}
-                </Text>
+                <View
+                  style={[
+                    styles.attemptIcon,
+                    attempt.state === "finished"
+                      ? styles.attemptIconSuccess
+                      : attempt.state === "inprogress"
+                        ? styles.attemptIconProgress
+                        : styles.attemptIconDefault,
+                  ]}
+                >
+                  <Ionicons
+                    name={
+                      attempt.state === "finished"
+                        ? "checkmark-outline"
+                        : attempt.state === "inprogress"
+                          ? "time-outline"
+                          : "document-outline"
+                    }
+                    size={20}
+                    color={
+                      attempt.state === "finished"
+                        ? COLORS.primary
+                        : attempt.state === "inprogress"
+                          ? COLORS.warning
+                          : COLORS.textSecondary
+                    }
+                  />
+                </View>
 
-                {/* Điểm */}
-                {attempt.sumgrades !== undefined &&
-                  attempt.sumgrades !== null && (
-                    <Text style={styles.info}>Điểm: {attempt.sumgrades}</Text>
-                  )}
+                {/* Content */}
 
-                {/* Thời gian bắt đầu */}
-                {attempt.timestart ? (
-                  <Text style={styles.info}>
-                    Bắt đầu: {formatDate(attempt.timestart)}
+                <View style={styles.attemptContent}>
+                  <Text style={styles.attemptTitle}>
+                    Lần {attempt.attempt ?? index + 1}
                   </Text>
-                ) : null}
 
-                {/* Thời gian kết thúc */}
-                {attempt.timefinish && attempt.timefinish !== 0 ? (
-                  <Text style={styles.info}>
-                    Kết thúc: {formatDate(attempt.timefinish)}
-                  </Text>
-                ) : null}
+                  <View style={styles.statusRow}>
+                    <Text style={styles.statusLabel}>Trạng thái:</Text>
+
+                    <Text style={styles.statusValue}>
+                      {getAttemptStatus(attempt.state)}
+                    </Text>
+                  </View>
+
+                  {attempt.sumgrades !== undefined &&
+                    attempt.sumgrades !== null && (
+                      <View style={styles.detailRow}>
+                        <Ionicons
+                          name="star-outline"
+                          size={14}
+                          color={COLORS.textLight}
+                        />
+
+                        <Text style={styles.detailText}>
+                          Điểm: {attempt.sumgrades}
+                        </Text>
+                      </View>
+                    )}
+
+                  {attempt.timestart ? (
+                    <View style={styles.detailRow}>
+                      <Ionicons
+                        name="play-outline"
+                        size={14}
+                        color={COLORS.textLight}
+                      />
+
+                      <Text style={styles.detailText}>
+                        Bắt đầu: {formatDate(attempt.timestart)}
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  {attempt.timefinish && attempt.timefinish !== 0 ? (
+                    <View style={styles.detailRow}>
+                      <Ionicons
+                        name="checkmark-outline"
+                        size={14}
+                        color={COLORS.textLight}
+                      />
+
+                      <Text style={styles.detailText}>
+                        Kết thúc: {formatDate(attempt.timefinish)}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
               </View>
             ))
           )}
         </View>
 
-        {/* 
-            BUTTON BẮT ĐẦU
-         */}
+        {/* =====================================
+            START BUTTON
+            KHÔNG DISABLED
+            GIỮ NGUYÊN BUSINESS FLOW
+        ===================================== */}
 
         <TouchableOpacity
-          style={[styles.button, !canAttempt && styles.buttonDisabled]}
-          disabled={!canAttempt}
+          style={[
+            styles.startButton,
+            !canAttempt && styles.startButtonDisabled,
+          ]}
           onPress={handleStartQuiz}
+          activeOpacity={0.85}
         >
-          <Text style={styles.buttonText}>Bắt đầu làm bài</Text>
+          <View style={styles.startButtonContent}>
+            <Ionicons
+              name="play-circle-outline"
+              size={23}
+              color={COLORS.white}
+            />
+
+            <Text style={styles.startButtonText}>Bắt đầu làm bài</Text>
+
+            <Ionicons name="arrow-forward" size={20} color={COLORS.white} />
+          </View>
         </TouchableOpacity>
-      </View>
-    </ScrollView>
+
+        {!canAttempt && (
+          <Text style={styles.disabledHint}>
+            Nhấn nút để xem lý do bạn chưa thể làm bài.
+          </Text>
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
+// =========================================
 // STYLES
+// =========================================
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.backgroundSoft,
   },
 
   scrollContent: {
-    paddingBottom: 30,
+    padding: 20,
+    paddingBottom: 40,
   },
 
-  // LOADING
+  // =======================================
+  // QUIZ CARD
+  // =======================================
 
-  loadingContainer: {
-    flex: 1,
+  quizCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.white,
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+
+    shadowColor: COLORS.black,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.04,
+    shadowRadius: 7,
+    elevation: 2,
+  },
+
+  quizIcon: {
+    width: 58,
+    height: 58,
+    borderRadius: 17,
+    backgroundColor: "#EAF6EE",
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    marginRight: 14,
   },
 
-  loadingText: {
-    marginTop: 10,
-    fontSize: 14,
-    color: "#555555",
+  quizInfo: {
+    flex: 1,
   },
 
-  // HEADER
-
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#DDDDDD",
+  quizName: {
+    fontSize: 18,
+    lineHeight: 25,
+    fontWeight: "700",
+    color: COLORS.text,
   },
 
-  back: {
-    fontSize: 15,
-    color: "#2563EB",
-    marginBottom: 15,
+  quizIdRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 7,
   },
 
-  title: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "#111827",
+  quizId: {
+    marginLeft: 5,
+    fontSize: 12,
+    color: COLORS.textLight,
   },
 
-  // CONTENT
-
-  content: {
-    padding: 20,
-  },
+  // =======================================
+  // SECTION
+  // =======================================
 
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#111827",
-    marginTop: 15,
+    marginTop: 25,
     marginBottom: 10,
+    fontSize: 17,
+    fontWeight: "700",
+    color: COLORS.text,
   },
 
-  // INFO
+  // =======================================
+  // INFO CARD
+  // =======================================
 
-  infoBox: {
-    padding: 15,
+  infoCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 18,
+    paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: "#DDDDDD",
-    borderRadius: 8,
-    backgroundColor: "#FAFAFA",
-    gap: 10,
+    borderColor: COLORS.border,
   },
 
-  info: {
-    fontSize: 14,
-    color: "#555555",
+  infoItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 15,
   },
 
-  // SUCCESS / ERROR
+  infoIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: COLORS.backgroundSoft,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 13,
+  },
 
-  success: {
-    fontSize: 14,
-    color: "#16A34A",
+  infoContent: {
+    flex: 1,
+  },
+
+  infoLabel: {
+    fontSize: 12,
+    color: COLORS.textLight,
+    marginBottom: 4,
+  },
+
+  infoValue: {
+    fontSize: 15,
     fontWeight: "600",
+    color: COLORS.text,
   },
 
-  error: {
-    fontSize: 14,
-    color: "#DC2626",
-    fontWeight: "600",
+  divider: {
+    height: 1,
+    backgroundColor: COLORS.border,
   },
 
+  // =======================================
+  // ACCESS
+  // =======================================
+
+  accessCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 17,
+    borderWidth: 1,
+  },
+
+  accessCardSuccess: {
+    backgroundColor: "#F0F9F3",
+    borderColor: "#CBE8D4",
+  },
+
+  accessCardError: {
+    backgroundColor: "#FFF5F5",
+    borderColor: "#F3D1D1",
+  },
+
+  accessIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 13,
+  },
+
+  accessIconSuccess: {
+    backgroundColor: "#DDF2E4",
+  },
+
+  accessIconError: {
+    backgroundColor: "#FFE2E2",
+  },
+
+  accessContent: {
+    flex: 1,
+  },
+
+  accessTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+
+  accessText: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: COLORS.textSecondary,
+  },
+
+  // =======================================
   // WARNING
+  // =======================================
 
-  warningBox: {
-    marginTop: 5,
-    padding: 10,
-    backgroundColor: "#FEF2F2",
-    borderRadius: 8,
+  warningCard: {
+    marginTop: 10,
+    padding: 15,
+    borderRadius: 15,
+    backgroundColor: "#FFF5F5",
+    borderWidth: 1,
+    borderColor: "#F3D1D1",
+  },
+
+  warningHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 7,
   },
 
   warningTitle: {
+    marginLeft: 7,
     fontSize: 14,
-    fontWeight: "600",
-    color: "#DC2626",
-    marginBottom: 5,
+    fontWeight: "700",
+    color: COLORS.error,
   },
 
-  reason: {
-    fontSize: 14,
-    color: "#555555",
+  reasonRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginTop: 7,
+  },
+
+  reasonDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: COLORS.error,
+    marginTop: 7,
+    marginRight: 9,
+  },
+
+  reasonText: {
+    flex: 1,
+    fontSize: 13,
     lineHeight: 20,
-    marginTop: 3,
+    color: COLORS.textSecondary,
   },
 
-  // ATTEMPT
+  // =======================================
+  // HISTORY
+  // =======================================
+
+  historyHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  countBadge: {
+    minWidth: 25,
+    height: 25,
+    paddingHorizontal: 7,
+    borderRadius: 13,
+    backgroundColor: COLORS.primary,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 15,
+    marginLeft: 8,
+  },
+
+  countText: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  historyCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    overflow: "hidden",
+  },
 
   attemptItem: {
-    paddingBottom: 10,
-    marginBottom: 5,
+    flexDirection: "row",
+    padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#EEEEEE",
-    gap: 5,
+    borderBottomColor: COLORS.border,
+  },
+
+  lastAttempt: {
+    borderBottomWidth: 0,
+  },
+
+  attemptIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+
+  attemptIconSuccess: {
+    backgroundColor: "#EAF6EE",
+  },
+
+  attemptIconProgress: {
+    backgroundColor: "#FFF7E8",
+  },
+
+  attemptIconDefault: {
+    backgroundColor: COLORS.backgroundSoft,
+  },
+
+  attemptContent: {
+    flex: 1,
   },
 
   attemptTitle: {
     fontSize: 15,
-    fontWeight: "600",
-    color: "#111827",
+    fontWeight: "700",
+    color: COLORS.text,
+    marginBottom: 5,
   },
 
-  // BUTTON
-
-  button: {
-    marginTop: 30,
-    paddingVertical: 15,
-    backgroundColor: "#2563EB",
-    borderRadius: 8,
+  statusRow: {
+    flexDirection: "row",
     alignItems: "center",
+    marginBottom: 5,
   },
 
-  buttonDisabled: {
-    backgroundColor: "#9CA3AF",
+  statusLabel: {
+    fontSize: 12,
+    color: COLORS.textLight,
+    marginRight: 4,
   },
 
-  buttonText: {
-    color: "#FFFFFF",
+  statusValue: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: COLORS.textSecondary,
+  },
+
+  detailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+  },
+
+  detailText: {
+    flex: 1,
+    marginLeft: 6,
+    fontSize: 12,
+    lineHeight: 17,
+    color: COLORS.textSecondary,
+  },
+
+  // =======================================
+  // EMPTY
+  // =======================================
+
+  emptyHistory: {
+    alignItems: "center",
+    paddingVertical: 35,
+    paddingHorizontal: 20,
+  },
+
+  emptyIcon: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    backgroundColor: COLORS.backgroundSoft,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: COLORS.text,
+    marginBottom: 5,
+  },
+
+  emptyText: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    textAlign: "center",
+  },
+
+  // =======================================
+  // START BUTTON
+  // =======================================
+
+  startButton: {
+    height: 56,
+    marginTop: 28,
+    borderRadius: 17,
+    backgroundColor: COLORS.primaryDark,
+    justifyContent: "center",
+    alignItems: "center",
+
+    shadowColor: COLORS.primaryDark,
+    shadowOffset: {
+      width: 0,
+      height: 7,
+    },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+
+  startButtonDisabled: {
+    backgroundColor: "#AEB9B3",
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+
+  startButtonContent: {
+    width: "100%",
+    paddingHorizontal: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  startButtonText: {
+    marginHorizontal: 10,
     fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: "700",
+    color: COLORS.white,
+  },
+
+  disabledHint: {
+    marginTop: 9,
+    fontSize: 12,
+    color: COLORS.textLight,
+    textAlign: "center",
+  },
+
+  // =======================================
+  // LOADING
+  // =======================================
+
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: COLORS.backgroundSoft,
   },
 });
-

@@ -30,4 +30,13 @@ export type AppStackParamList = {
     quizid: number;
     quizName: string;
   };
+
+  MainTabs: undefined;
+};
+
+export type MainTabParamList = {
+  Home: undefined;
+  Courses: undefined;
+  History: undefined;
+  Settings: undefined;
 };

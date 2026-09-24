@@ -1,15 +1,21 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
 import axiosInstance from "./axiosInstance";
 
-// LẤY THÔNG TIN USER
-// API: core_webservice_get_site_info
-
-export const getSiteInfo = async () => {
+// Lấy token Moodle
+const getToken = async () => {
   const token = await AsyncStorage.getItem("wstoken");
 
   if (!token) {
     throw new Error("Không tìm thấy token");
   }
+
+  return token;
+};
+
+// Lấy thông tin user
+export const getSiteInfo = async () => {
+  const token = await getToken();
 
   const response = await axiosInstance.post(
     "/webservice/rest/server.php",
@@ -23,18 +29,18 @@ export const getSiteInfo = async () => {
     },
   );
 
+  if (response.data?.exception) {
+    throw new Error(
+      response.data.message || "Không thể lấy thông tin người dùng.",
+    );
+  }
+
   return response.data;
 };
 
-// LẤY KHÓA HỌC CỦA USER
-// API: core_enrol_get_users_courses
-
+// Lấy khóa học của user
 export const getUserCourses = async (userid: number) => {
-  const token = await AsyncStorage.getItem("wstoken");
-
-  if (!token) {
-    throw new Error("Không tìm thấy token");
-  }
+  const token = await getToken();
 
   const response = await axiosInstance.post(
     "/webservice/rest/server.php",
@@ -44,54 +50,54 @@ export const getUserCourses = async (userid: number) => {
         wstoken: token,
         wsfunction: "core_enrol_get_users_courses",
         moodlewsrestformat: "json",
-        userid: userid,
+        userid: Number(userid),
       },
     },
   );
 
+  if (response.data?.exception) {
+    throw new Error(
+      response.data.message || "Không thể lấy danh sách khóa học.",
+    );
+  }
+
   return response.data;
 };
 
-// LẤY QUIZ THEO CÁC KHÓA HỌC
-// API: mod_quiz_get_quizzes_by_courses
-
+// Lấy quiz theo khóa học
 export const getQuizzesByCourses = async (courseIds: number[]) => {
-  const token = await AsyncStorage.getItem("wstoken");
+  const token = await getToken();
 
-  if (!token) {
-    throw new Error("Không tìm thấy token");
-  }
-
-  const params: any = {
+  const params: Record<string, any> = {
     wstoken: token,
     wsfunction: "mod_quiz_get_quizzes_by_courses",
     moodlewsrestformat: "json",
   };
 
-  // Thêm từng course ID
   courseIds.forEach((courseId, index) => {
-    params[`courseids[${index}]`] = courseId;
+    params[`courseids[${index}]`] = Number(courseId);
   });
 
   const response = await axiosInstance.post(
     "/webservice/rest/server.php",
     null,
     {
-      params: params,
+      params,
     },
   );
 
+  if (response.data?.exception) {
+    throw new Error(
+      response.data.message || "Không thể lấy danh sách bài thi.",
+    );
+  }
+
   return response.data;
 };
-// KIỂM TRA QUYỀN TRUY CẬP QUIZ
-// API: mod_quiz_get_quiz_access_information
 
+// Kiểm tra quyền truy cập quiz
 export const getQuizAccessInformation = async (quizid: number) => {
-  const token = await AsyncStorage.getItem("wstoken");
-
-  if (!token) {
-    throw new Error("Không tìm thấy token");
-  }
+  const token = await getToken();
 
   const response = await axiosInstance.post(
     "/webservice/rest/server.php",
@@ -101,26 +107,27 @@ export const getQuizAccessInformation = async (quizid: number) => {
         wstoken: token,
         wsfunction: "mod_quiz_get_quiz_access_information",
         moodlewsrestformat: "json",
-        quizid: quizid,
+        quizid: Number(quizid),
       },
     },
   );
 
+  if (response.data?.exception) {
+    throw new Error(
+      response.data.message || "Không thể kiểm tra quyền truy cập.",
+    );
+  }
+
   return response.data;
 };
-// LẤY LỊCH SỬ LÀM QUIZ CỦA USER
-// API: mod_quiz_get_user_attempts
 
+// Lấy lịch sử attempt
 export const getUserAttempts = async (
   quizid: number,
   userid: number,
   status: string = "all",
 ) => {
-  const token = await AsyncStorage.getItem("wstoken");
-
-  if (!token) {
-    throw new Error("Không tìm thấy token");
-  }
+  const token = await getToken();
 
   const response = await axiosInstance.post(
     "/webservice/rest/server.php",
@@ -130,24 +137,23 @@ export const getUserAttempts = async (
         wstoken: token,
         wsfunction: "mod_quiz_get_user_attempts",
         moodlewsrestformat: "json",
-        quizid: quizid,
-        userid: userid,
-        status: status,
+        quizid: Number(quizid),
+        userid: Number(userid),
+        status,
       },
     },
   );
 
+  if (response.data?.exception) {
+    throw new Error(response.data.message || "Không thể lấy lịch sử làm bài.");
+  }
+
   return response.data;
 };
-// BẮT ĐẦU LÀM QUIZ
-// API: mod_quiz_start_attempt
 
+// Bắt đầu attempt mới
 export const startQuizAttempt = async (quizid: number): Promise<number> => {
-  const token = await AsyncStorage.getItem("wstoken");
-
-  if (!token) {
-    throw new Error("Không tìm thấy token");
-  }
+  const token = await getToken();
 
   const response = await axiosInstance.post(
     "/webservice/rest/server.php",
@@ -163,28 +169,21 @@ export const startQuizAttempt = async (quizid: number): Promise<number> => {
   );
 
   if (response.data?.exception) {
-    throw new Error(response.data.message || "Không thể bắt đầu bài thi");
+    throw new Error(response.data.message || "Không thể bắt đầu bài thi.");
   }
 
   const attemptId = Number(response.data?.attempt?.id);
 
   if (!Number.isFinite(attemptId) || attemptId <= 0) {
-    throw new Error("API không trả về attempt ID hợp lệ");
+    throw new Error("API không trả về Attempt ID hợp lệ.");
   }
 
   return attemptId;
 };
 
-// API 9
-// LẤY CÂU HỎI BÀI THI
-// mod_quiz_get_attempt_data
-
+// Lấy dữ liệu câu hỏi
 export const getAttemptData = async (attemptid: number, page: number = 0) => {
-  const token = await AsyncStorage.getItem("wstoken");
-
-  if (!token) {
-    throw new Error("Không tìm thấy token");
-  }
+  const token = await getToken();
 
   const response = await axiosInstance.post(
     "/webservice/rest/server.php",
@@ -192,46 +191,34 @@ export const getAttemptData = async (attemptid: number, page: number = 0) => {
     {
       params: {
         wstoken: token,
-
         wsfunction: "mod_quiz_get_attempt_data",
-
         moodlewsrestformat: "json",
-
-        attemptid: attemptid,
-
-        page: page,
+        attemptid: Number(attemptid),
+        page: Number(page),
       },
     },
   );
 
+  if (response.data?.exception) {
+    throw new Error(response.data.message || "Không thể lấy dữ liệu bài thi.");
+  }
+
   return response.data;
 };
 
-// API 10
-// LƯU CÂU TRẢ LỜI
-// mod_quiz_save_attempt
-
+// Lưu câu trả lời
 export const saveQuizAttempt = async (attemptid: number, data: any[]) => {
-  const token = await AsyncStorage.getItem("wstoken");
+  const token = await getToken();
 
-  if (!token) {
-    throw new Error("Không tìm thấy token");
-  }
-
-  const params: any = {
+  const params: Record<string, any> = {
     wstoken: token,
-
     wsfunction: "mod_quiz_save_attempt",
-
     moodlewsrestformat: "json",
-
-    attemptid: attemptid,
+    attemptid: Number(attemptid),
   };
 
-  // Thêm câu trả lời
   data.forEach((item, index) => {
     params[`data[${index}][name]`] = item.name;
-
     params[`data[${index}][value]`] = item.value;
   });
 
@@ -243,35 +230,28 @@ export const saveQuizAttempt = async (attemptid: number, data: any[]) => {
     },
   );
 
+  if (response.data?.exception) {
+    throw new Error(response.data.message || "Không thể lưu câu trả lời.");
+  }
+
   return response.data;
 };
-// API 11 - NỘP VÀ XỬ LÝ BÀI THI
-// mod_quiz_process_attempt
 
+// Nộp và xử lý bài thi
 export const processQuizAttempt = async (
   attemptid: number,
   data: any[] = [],
   finishattempt: number = 1,
 ) => {
-  const token = await AsyncStorage.getItem("wstoken");
+  const token = await getToken();
 
-  if (!token) {
-    throw new Error("Không tìm thấy token");
-  }
-
-  const params: any = {
+  const params: Record<string, any> = {
     wstoken: token,
     wsfunction: "mod_quiz_process_attempt",
     moodlewsrestformat: "json",
-
-    // Attempt hiện tại
-    attemptid: attemptid,
-
-    // 1 = kết thúc/nộp attempt
-    finishattempt: finishattempt,
+    attemptid: Number(attemptid),
+    finishattempt: Number(finishattempt),
   };
-
-  // DATA
 
   data.forEach((item, index) => {
     params[`data[${index}][name]`] = item.name;
@@ -286,10 +266,8 @@ export const processQuizAttempt = async (
     },
   );
 
-  // KIỂM TRA ERROR
-
   if (response.data?.exception) {
-    throw new Error(response.data.message || "Không thể nộp bài");
+    throw new Error(response.data.message || "Không thể nộp bài.");
   }
 
   return response.data;

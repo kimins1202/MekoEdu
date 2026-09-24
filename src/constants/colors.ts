@@ -1,28 +1,30 @@
 const COLORS = {
-  // Primary
-  primary: "#61CE70",
-  primaryDark: "#3EAF7C",
+  // BRAND COLORS
+  primary: "#006E27",
+  primaryDark: "#006C46",
+  text: "#223241",
 
-  // Text
-  text: "#415161",
-  textSecondary: "#6B7785",
-  textLight: "#9AA5B1",
+  // TEXT
+  textSecondary: "#5F6F7B",
+  textLight: "#94A0AA",
 
-  // Background
+  // BACKGROUND
   background: "#FFFFFF",
-  backgroundSoft: "#F5FAF6",
+  backgroundSoft: "#F3F8F5",
+
+  // SURFACE
   surface: "#FFFFFF",
 
-  // Border
-  border: "#E5EAE7",
+  // BORDER
+  border: "#DDE7E1",
 
-  // Status
-  success: "#3EAF7C",
-  error: "#E05252",
-  warning: "#F2B84B",
-  info: "#5B9BD5",
+  // STATUS
+  success: "#006E27",
+  error: "#D64545",
+  warning: "#D99A24",
+  info: "#4A7C9B",
 
-  // Common
+  // BASIC
   white: "#FFFFFF",
   black: "#000000",
   transparent: "transparent",

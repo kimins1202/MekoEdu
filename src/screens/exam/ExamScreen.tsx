@@ -1,9 +1,8 @@
-// src/screens/ExamScreen.tsx
-
+import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { useEffect, useState } from "react";
-
 import {
-  ActivityIndicator,
   Alert,
   ScrollView,
   StyleSheet,
@@ -12,9 +11,9 @@ import {
   View,
 } from "react-native";
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
-import { useNavigation, useRoute } from "@react-navigation/native";
+import AppHeader from "@/components/common/AppHeader";
+import Loading from "@/components/common/Loading";
+import COLORS from "@/constants/colors";
 
 import {
   getAttemptData,
@@ -23,8 +22,6 @@ import {
   saveQuizAttempt,
   startQuizAttempt,
 } from "../../api/quizApi";
-
-// TYPES
 
 type AnswerOption = {
   name: string;
@@ -50,51 +47,33 @@ type QuizQuestion = {
   settings?: string;
 };
 
-// EXAM SCREEN
-
 export default function ExamScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
 
   const { quizid, quizName } = route.params;
 
-  // ATTEMPT
-
   const [attemptId, setAttemptId] = useState<number | null>(null);
-
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
-
   const [selectedAnswers, setSelectedAnswers] = useState<
     Record<string, string>
   >({});
 
-  // PAGE
-
   const [currentPage, setCurrentPage] = useState(0);
-
   const [nextPage, setNextPage] = useState(-1);
 
-  // LOADING
-
   const [loading, setLoading] = useState(true);
-
   const [saving, setSaving] = useState(false);
-
   const [submitting, setSubmitting] = useState(false);
 
-  // INITIALIZE
-
+  // Khởi tạo bài thi
   useEffect(() => {
     initializeExam();
   }, []);
 
-  // API 7 → API 8 → API 9
-
   const initializeExam = async () => {
     try {
       setLoading(true);
-
-      // LẤY USER ID
 
       const userId = await AsyncStorage.getItem("userid");
 
@@ -102,68 +81,92 @@ export default function ExamScreen() {
         throw new Error("Không tìm thấy User ID. Vui lòng đăng nhập lại.");
       }
 
-      // API 7
-      // mod_quiz_get_user_attempts
+      const numericQuizId = Number(quizid);
+      const numericUserId = Number(userId);
 
-      const attemptsResponse = await getUserAttempts(
-        Number(quizid),
-        Number(userId),
-        "all",
-      );
-
-      if (attemptsResponse?.exception) {
-        throw new Error(
-          attemptsResponse.message || "Không thể lấy danh sách attempt.",
+      // Lấy attempt hiện tại
+      const getCurrentAttempt = async () => {
+        const response = await getUserAttempts(
+          numericQuizId,
+          numericUserId,
+          "all",
         );
-      }
 
-      const attempts = attemptsResponse?.attempts ?? [];
+        if (response?.exception) {
+          throw new Error(
+            response.message || "Không thể lấy danh sách attempt.",
+          );
+        }
 
-      // TÌM ATTEMPT ĐANG LÀM
+        const attempts = Array.isArray(response?.attempts)
+          ? response.attempts
+          : [];
 
-      const inProgressAttempt = attempts.find(
-        (attempt: any) => attempt.state === "inprogress",
-      );
+        const currentAttempt = attempts.find(
+          (attempt: any) =>
+            Number(attempt.id) > 0 &&
+            String(attempt.state).toLowerCase() === "inprogress",
+        );
+
+        return currentAttempt;
+      };
+
+      // Kiểm tra attempt đang làm
+      let currentAttempt = await getCurrentAttempt();
 
       let currentAttemptId: number;
 
-      // CÓ ATTEMPT ĐANG LÀM
-
-      if (inProgressAttempt) {
-        currentAttemptId = Number(inProgressAttempt.id);
+      // Dùng lại attempt cũ
+      if (currentAttempt?.id) {
+        currentAttemptId = Number(currentAttempt.id);
       } else {
-        // API 8
-        // mod_quiz_start_attempt
+        try {
+          // Tạo attempt mới
+          currentAttemptId = await startQuizAttempt(numericQuizId);
+        } catch (error: any) {
+          const message = error?.message?.toLowerCase() || "";
 
-        currentAttemptId = await startQuizAttempt(Number(quizid));
+          // Moodle báo đã có attempt đang làm
+          if (message.includes("attempt still in progress")) {
+            currentAttempt = await getCurrentAttempt();
+
+            if (!currentAttempt?.id) {
+              throw new Error(
+                "Moodle báo đang có attempt nhưng không tìm thấy Attempt ID.",
+              );
+            }
+
+            currentAttemptId = Number(currentAttempt.id);
+          } else {
+            throw error;
+          }
+        }
+      }
+
+      if (!Number.isFinite(currentAttemptId) || currentAttemptId <= 0) {
+        throw new Error("Attempt ID không hợp lệ.");
       }
 
       setAttemptId(currentAttemptId);
 
-      // API 9
-      // mod_quiz_get_attempt_data
-
+      // Lấy câu hỏi
       await loadQuestion(currentAttemptId, 0);
     } catch (error: any) {
-      console.error("INITIALIZE EXAM ERROR:", error);
-
-      Alert.alert("Lỗi", error?.message || "Không thể mở bài thi.", [
-        {
-          text: "Quay lại",
-          onPress: () => {
-            navigation.goBack();
+      Alert.alert(
+        "Không thể mở bài thi",
+        error?.message || "Đã xảy ra lỗi khi mở bài thi.",
+        [
+          {
+            text: "Quay lại",
+            onPress: () => navigation.goBack(),
           },
-        },
-      ]);
+        ],
+      );
     } finally {
       setLoading(false);
     }
   };
-
-  // API 9
-  // mod_quiz_get_attempt_data
-  // Moodle quyết định số câu trên page.
-
+  // Tải câu hỏi
   const loadQuestion = async (currentAttemptId: number, page: number) => {
     try {
       setLoading(true);
@@ -174,49 +177,27 @@ export default function ExamScreen() {
         throw new Error(response.message || "Không thể lấy dữ liệu bài thi.");
       }
 
-      // LẤY TOÀN BỘ QUESTIONS CỦA PAGE
-
       const pageQuestions = response?.questions ?? [];
 
       if (pageQuestions.length === 0) {
         throw new Error("Không tìm thấy câu hỏi.");
       }
 
-      // LƯU TOÀN BỘ QUESTIONS
-
       setQuestions(pageQuestions);
-
-      // KHÔI PHỤC ANSWER
-      //
-      // Mỗi câu có HTML riêng.
-      // Moodle trả checked nếu câu đó đã được lưu.
-      // =================================================
+      setCurrentPage(page);
+      setNextPage(response?.nextpage ?? -1);
 
       pageQuestions.forEach((question: QuizQuestion) => {
         restoreSelectedAnswer(question.html);
       });
-
-      // PAGE
-
-      setCurrentPage(page);
-
-      setNextPage(response?.nextpage ?? -1);
-    } catch (error: any) {
-      console.error("LOAD QUESTION ERROR:", error);
-
-      Alert.alert("Lỗi", error?.message || "Không thể tải câu hỏi.");
     } finally {
       setLoading(false);
     }
   };
 
-  // PARSE ANSWERS
-  // Lấy radio input từ HTML của TỪNG CÂU.
-
+  // Phân tích đáp án
   const parseQuestionHtml = (html: string): AnswerOption[] => {
     const result: AnswerOption[] = [];
-
-    // Tìm tất cả radio input
 
     const radioRegex = /<input\b[^>]*type=["']radio["'][^>]*>/gi;
 
@@ -225,11 +206,7 @@ export default function ExamScreen() {
     radioMatches.forEach((match, index) => {
       const input = match[0];
 
-      // Lấy name
-
       const nameMatch = input.match(/name=["']([^"']+)["']/i);
-
-      // Lấy value
 
       const valueMatch = input.match(/value=["']([^"']*)["']/i);
 
@@ -238,42 +215,19 @@ export default function ExamScreen() {
       }
 
       const name = nameMatch[1];
-
       const value = valueMatch[1];
 
-      // Chỉ nhận radio của answer
-
-      if (!name.endsWith("_answer")) {
+      if (!name.endsWith("_answer") || value === "-1") {
         return;
       }
-
-      // BỎ QUA "CLEAR MY CHOICE"
-
-      if (value === "-1") {
-        return;
-      }
-
-      // Vị trí radio hiện tại
 
       const startIndex = match.index ?? 0;
-
-      // Vị trí radio tiếp theo
-
       const nextMatch = radioMatches[index + 1];
-
       const endIndex = nextMatch?.index ?? html.length;
-
-      // Lấy HTML từ radio hiện tại
-      // đến radio tiếp theo
 
       const answerHtml = html.substring(startIndex, endIndex);
 
-      // TÌM NỘI DUNG ĐÁP ÁN
-
       let label = "";
-
-      // Cách 1:
-      // tìm answernumber + nội dung
 
       const answerNumberMatch = answerHtml.match(
         /<span[^>]*class=["'][^"']*answernumber[^"']*["'][^>]*>[\s\S]*?<\/span>([\s\S]*?)(?:<\/div>|<\/label>)/i,
@@ -282,9 +236,6 @@ export default function ExamScreen() {
       if (answerNumberMatch) {
         label = cleanHtmlText(answerNumberMatch[1]);
       }
-
-      // Cách 2:
-      // lấy p đầu tiên có nội dung
 
       if (!label) {
         const pMatches = answerHtml.match(/<p[^>]*>([\s\S]*?)<\/p>/gi) ?? [];
@@ -299,13 +250,9 @@ export default function ExamScreen() {
         }
       }
 
-      // NẾU KHÔNG CÓ NỘI DUNG
-
       if (!label) {
         return;
       }
-
-      // THÊM ANSWER
 
       result.push({
         name,
@@ -314,56 +261,41 @@ export default function ExamScreen() {
       });
     });
 
-    // DEBUG
-
     return result;
   };
 
-  // CLEAN HTML TEXT
-
+  // Làm sạch HTML
   const cleanHtmlText = (html: string): string => {
-    return html // Xóa script và style
+    return html
       .replace(/<script[\s\S]*?<\/script>/gi, "")
-      .replace(/<style[\s\S]*?<\/style>/gi, "") // Giữ cấu trúc xuống dòng của Moodle
-
+      .replace(/<style[\s\S]*?<\/style>/gi, "")
       .replace(/<br\s*\/?>/gi, "\n")
       .replace(/<\/p>/gi, "\n")
       .replace(/<\/div>/gi, "\n")
-      .replace(/<\/li>/gi, "\n") // Xóa các HTML tag còn lại
-
-      .replace(/<[^>]+>/g, "") // Decode HTML entities
-
+      .replace(/<\/li>/gi, "\n")
+      .replace(/<[^>]+>/g, "")
       .replace(/&nbsp;/gi, " ")
       .replace(/&amp;/gi, "&")
       .replace(/&lt;/gi, "<")
       .replace(/&gt;/gi, ">")
       .replace(/&#39;/gi, "'")
-      .replace(/&quot;/gi, '"') // Chuẩn hóa khoảng trắng nhưng KHÔNG phá \n
-
+      .replace(/&quot;/gi, '"')
       .replace(/[ \t]+/g, " ")
       .replace(/ *\n */g, "\n")
       .replace(/\n{3,}/g, "\n\n")
-
       .trim();
   };
 
-  // LẤY NỘI DUNG CÂU HỎI
-
+  // Lấy nội dung câu hỏi
   const extractQuestionText = (html: string): string => {
     const qtextMatch = html.match(
       /<div[^>]*class=["'][^"']*qtext[^"']*["'][^>]*>([\s\S]*?)<\/div>/i,
     );
 
-    let text = qtextMatch?.[1] ?? "";
-
-    text = cleanHtmlText(text);
-
-    return text;
+    return cleanHtmlText(qtextMatch?.[1] ?? "");
   };
 
-  // KHÔI PHỤC ANSWER
-  // Nếu Moodle trả checked thì lấy value đó.
-
+  // Khôi phục đáp án
   const restoreSelectedAnswer = (html: string) => {
     const checkedRegex = /<input[^>]*type=["']radio["'][^>]*checked[^>]*>/gi;
 
@@ -374,9 +306,7 @@ export default function ExamScreen() {
     }
 
     setSelectedAnswers((previous) => {
-      const restored = {
-        ...previous,
-      };
+      const restored = { ...previous };
 
       checkedInputs.forEach((input) => {
         const nameMatch = input.match(/name=["']([^"']+)["']/i);
@@ -388,24 +318,18 @@ export default function ExamScreen() {
         }
 
         const name = nameMatch[1];
-
         const value = valueMatch[1];
 
-        // Bỏ "Clear my choice"
-
-        if (value === "-1") {
-          return;
+        if (value !== "-1") {
+          restored[name] = value;
         }
-
-        restored[name] = value;
       });
 
       return restored;
     });
   };
 
-  // CHỌN ANSWER
-
+  // Chọn đáp án
   const handleSelectAnswer = (answer: AnswerOption) => {
     if (saving || submitting) {
       return;
@@ -413,16 +337,11 @@ export default function ExamScreen() {
 
     setSelectedAnswers((previous) => ({
       ...previous,
-
-      // Dùng chính name Moodle trả về
-
       [answer.name]: answer.value,
     }));
   };
 
-  // BUILD DATA
-  // Chuyển selectedAnswers thành format API 10/11.
-
+  // Chuẩn bị dữ liệu
   const buildSaveData = () => {
     return Object.entries(selectedAnswers).map(([name, value]) => ({
       name,
@@ -430,17 +349,13 @@ export default function ExamScreen() {
     }));
   };
 
-  // API 10
-  // mod_quiz_save_attempt
-
+  // Lưu đáp án
   const saveAnswers = async () => {
     if (!attemptId) {
       throw new Error("Không tìm thấy Attempt ID.");
     }
 
     const data = buildSaveData();
-
-    // Không có đáp án thì không gọi API
 
     if (data.length === 0) {
       return;
@@ -453,8 +368,7 @@ export default function ExamScreen() {
     }
   };
 
-  // CÂU / PAGE TIẾP THEO
-
+  // Sang trang tiếp theo
   const handleNext = async () => {
     if (!attemptId) {
       return;
@@ -463,68 +377,43 @@ export default function ExamScreen() {
     try {
       setSaving(true);
 
-      // API 10
-      // Lưu toàn bộ đáp án trước khi sang page khác
-
       await saveAnswers();
-
-      // CÒN PAGE TIẾP THEO
 
       if (nextPage !== -1) {
         await loadQuestion(attemptId, nextPage);
-
         return;
       }
-
-      // ĐÃ TỚI PAGE CUỐI
 
       Alert.alert(
         "Thông báo",
         "Đây là trang cuối cùng. Bạn có thể kiểm tra lại đáp án rồi nộp bài.",
       );
     } catch (error: any) {
-      console.error("NEXT ERROR:", error);
-
       Alert.alert("Lỗi", error?.message || "Không thể chuyển trang.");
     } finally {
       setSaving(false);
     }
   };
 
-  // PAGE TRƯỚC
-
+  // Quay lại trang trước
   const handlePrevious = async () => {
-    if (!attemptId) {
-      return;
-    }
-
-    if (currentPage <= 0) {
+    if (!attemptId || currentPage <= 0) {
       return;
     }
 
     try {
       setSaving(true);
 
-      // API 10
-      // Lưu đáp án hiện tại
-
       await saveAnswers();
-
-      // API 9
-      // Load page trước
-
       await loadQuestion(attemptId, currentPage - 1);
     } catch (error: any) {
-      console.error("PREVIOUS ERROR:", error);
-
       Alert.alert("Lỗi", error?.message || "Không thể quay lại trang trước.");
     } finally {
       setSaving(false);
     }
   };
 
-  // XÁC NHẬN NỘP
-
+  // Xác nhận nộp bài
   const handleSubmit = () => {
     Alert.alert("Nộp bài", "Bạn có chắc chắn muốn nộp bài không?", [
       {
@@ -538,101 +427,110 @@ export default function ExamScreen() {
     ]);
   };
 
-  // API 10 → API 11
-
+  // Nộp và xử lý bài thi
   const submitExam = async () => {
     if (!attemptId) {
       Alert.alert("Lỗi", "Không tìm thấy Attempt ID.");
-
       return;
     }
 
     try {
       setSubmitting(true);
 
-      // API 10
-      // LƯU ĐÁP ÁN CUỐI
-
       await saveAnswers();
-
-      // DATA
 
       const data = buildSaveData();
 
-      // API 11
-      // mod_quiz_process_attempt
-
       const response = await processQuizAttempt(attemptId, data, 1);
-
-      // ERROR
 
       if (response?.exception) {
         throw new Error(response.message || "Không thể nộp bài.");
       }
 
-      // SUCCESS
-
       Alert.alert("Nộp bài thành công", "Bài thi đã được nộp và xử lý.", [
         {
           text: "OK",
-          onPress: () => {
-            navigation.goBack();
-          },
+          onPress: () => navigation.goBack(),
         },
       ]);
     } catch (error: any) {
-      console.error("SUBMIT EXAM ERROR:", error);
-
       Alert.alert("Lỗi nộp bài", error?.message || "Không thể nộp bài.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  // LAST PAGE
-
   const isLastQuestion = nextPage === -1;
-
-  // INITIAL LOADING
 
   if (loading && questions.length === 0) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" />
-
-        <Text style={styles.loadingText}>Đang tải bài thi...</Text>
+        <Loading message="Đang tải bài thi..." />
       </View>
     );
   }
-
-  // NO QUESTION
 
   if (questions.length === 0) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text>Không có câu hỏi.</Text>
+      <View style={styles.emptyContainer}>
+        <View style={styles.emptyIcon}>
+          <Ionicons
+            name="document-text-outline"
+            size={38}
+            color={COLORS.primary}
+          />
+        </View>
+
+        <Text style={styles.emptyTitle}>Không có câu hỏi</Text>
+
+        <Text style={styles.emptyText}>
+          Không tìm thấy câu hỏi cho bài thi này.
+        </Text>
+
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.backButtonText}>Quay lại</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
-  // UI
-
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <Text style={styles.quizName}>{quizName}</Text>
+      <AppHeader title="Bài thi" subtitle={quizName} showBack />
 
-          <Text style={styles.questionCounter}>
-            Trang {currentPage + 1} · {questions.length} câu
-          </Text>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.quizHeader}>
+          <View style={styles.quizHeaderIcon}>
+            <Ionicons name="document-text" size={24} color={COLORS.primary} />
+          </View>
+
+          <View style={styles.quizHeaderContent}>
+            <Text style={styles.quizName} numberOfLines={2}>
+              {quizName}
+            </Text>
+
+            <View style={styles.counterRow}>
+              <Ionicons
+                name="layers-outline"
+                size={15}
+                color={COLORS.primary}
+              />
+
+              <Text style={styles.questionCounter}>
+                Trang {currentPage + 1} · {questions.length} câu
+              </Text>
+            </View>
+          </View>
         </View>
 
         {questions.map((questionItem, questionIndex) => {
-          // -----------------------------------------
-          // Mỗi câu tự lấy danh sách đáp án
-          // -----------------------------------------
-
           const answers = parseQuestionHtml(questionItem.html);
 
           return (
@@ -641,9 +539,15 @@ export default function ExamScreen() {
               style={styles.questionContainer}
             >
               <View style={styles.questionBox}>
-                <Text style={styles.questionTitle}>
-                  Câu {questionItem.questionnumber || questionIndex + 1}
-                </Text>
+                <View style={styles.questionHeader}>
+                  <View style={styles.questionNumber}>
+                    <Text style={styles.questionNumberText}>
+                      {questionItem.questionnumber || questionIndex + 1}
+                    </Text>
+                  </View>
+
+                  <Text style={styles.questionLabel}>Câu hỏi</Text>
+                </View>
 
                 <Text style={styles.questionText}>
                   {extractQuestionText(questionItem.html)}
@@ -651,7 +555,7 @@ export default function ExamScreen() {
               </View>
 
               <View style={styles.answerBox}>
-                <Text style={styles.answerTitle}>Chọn đáp án:</Text>
+                <Text style={styles.answerTitle}>Chọn đáp án</Text>
 
                 {answers.map((answer, answerIndex) => {
                   const isSelected =
@@ -666,9 +570,8 @@ export default function ExamScreen() {
                       ]}
                       onPress={() => handleSelectAnswer(answer)}
                       disabled={saving || submitting}
+                      activeOpacity={0.75}
                     >
-                      {/* RADIO */}
-
                       <View
                         style={[
                           styles.radioOuter,
@@ -677,8 +580,6 @@ export default function ExamScreen() {
                       >
                         {isSelected && <View style={styles.radioInner} />}
                       </View>
-
-                      {/* TEXT */}
 
                       <Text
                         style={[
@@ -697,27 +598,61 @@ export default function ExamScreen() {
         })}
 
         <View style={styles.attemptInfo}>
-          <Text style={styles.attemptText}>Attempt ID: {attemptId}</Text>
+          <View style={styles.attemptHeader}>
+            <Ionicons
+              name="information-circle-outline"
+              size={19}
+              color={COLORS.primary}
+            />
 
-          <Text style={styles.attemptText}>Trang: {currentPage + 1}</Text>
+            <Text style={styles.attemptTitle}>Thông tin bài làm</Text>
+          </View>
 
-          <Text style={styles.attemptText}>
-            Số câu trên trang: {questions.length}
-          </Text>
+          <View style={styles.attemptDivider} />
 
-          <Text style={styles.attemptText}>Trạng thái: Đang làm bài</Text>
+          <View style={styles.attemptRow}>
+            <Text style={styles.attemptLabel}>Attempt ID</Text>
+
+            <Text style={styles.attemptValue}>{attemptId}</Text>
+          </View>
+
+          <View style={styles.attemptRow}>
+            <Text style={styles.attemptLabel}>Trang hiện tại</Text>
+
+            <Text style={styles.attemptValue}>{currentPage + 1}</Text>
+          </View>
+
+          <View style={styles.attemptRow}>
+            <Text style={styles.attemptLabel}>Số câu trên trang</Text>
+
+            <Text style={styles.attemptValue}>{questions.length}</Text>
+          </View>
+
+          <View style={styles.attemptRow}>
+            <Text style={styles.attemptLabel}>Trạng thái</Text>
+
+            <View style={styles.statusBadge}>
+              <View style={styles.statusDot} />
+
+              <Text style={styles.statusText}>Đang làm bài</Text>
+            </View>
+          </View>
         </View>
 
         <View style={styles.navigation}>
           <TouchableOpacity
             style={[
               styles.navButton,
+              styles.previousButton,
               currentPage === 0 && styles.navButtonDisabled,
             ]}
             disabled={currentPage === 0 || saving || submitting}
             onPress={handlePrevious}
+            activeOpacity={0.8}
           >
-            <Text style={styles.navButtonText}>← Trang trước</Text>
+            <Ionicons name="arrow-back" size={18} color={COLORS.text} />
+
+            <Text style={styles.previousButtonText}>Trang trước</Text>
           </TouchableOpacity>
 
           {!isLastQuestion ? (
@@ -729,10 +664,15 @@ export default function ExamScreen() {
               ]}
               disabled={saving || submitting}
               onPress={handleNext}
+              activeOpacity={0.8}
             >
-              <Text style={styles.navButtonText}>
-                {saving ? "Đang lưu..." : "Trang tiếp →"}
+              <Text style={styles.nextButtonText}>
+                {saving ? "Đang lưu..." : "Trang tiếp"}
               </Text>
+
+              {!saving && (
+                <Ionicons name="arrow-forward" size={18} color={COLORS.white} />
+              )}
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
@@ -743,8 +683,15 @@ export default function ExamScreen() {
               ]}
               disabled={saving || submitting}
               onPress={handleSubmit}
+              activeOpacity={0.8}
             >
-              <Text style={styles.navButtonText}>
+              <Ionicons
+                name="checkmark-circle-outline"
+                size={19}
+                color={COLORS.white}
+              />
+
+              <Text style={styles.submitButtonText}>
                 {submitting ? "Đang nộp..." : "Nộp bài"}
               </Text>
             </TouchableOpacity>
@@ -753,9 +700,11 @@ export default function ExamScreen() {
 
         {loading && (
           <View style={styles.loadingMore}>
-            <ActivityIndicator size="small" />
-
-            <Text style={styles.loadingMoreText}>Đang tải câu hỏi...</Text>
+            <Loading
+              message="Đang tải câu hỏi..."
+              size="small"
+              fullScreen={false}
+            />
           </View>
         )}
       </ScrollView>
@@ -763,231 +712,370 @@ export default function ExamScreen() {
   );
 }
 
-// ANSWER LABEL
-
+// Hiển thị nhãn đáp án
 const getAnswerLabel = (index: number, label: string) => {
   const letters = ["A", "B", "C", "D", "E", "F"];
-
   const prefix = letters[index] ?? `${index + 1}`;
 
   return `${prefix}. ${label}`;
 };
 
-// STYLES
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.backgroundSoft,
   },
 
   scrollContent: {
+    padding: 20,
     paddingBottom: 40,
   },
 
-  // LOADING
-
   loadingContainer: {
     flex: 1,
+    backgroundColor: COLORS.backgroundSoft,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-  },
-
-  loadingText: {
-    marginTop: 10,
-    fontSize: 14,
-    color: "#555555",
   },
 
   loadingMore: {
+    marginTop: 12,
+  },
+
+  quizHeader: {
     flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.white,
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: 16,
+    shadowColor: COLORS.black,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+
+  quizHeaderIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 15,
+    backgroundColor: COLORS.backgroundSoft,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 20,
+    marginRight: 13,
   },
 
-  loadingMoreText: {
-    marginLeft: 8,
-    fontSize: 13,
-    color: "#666666",
-  },
-
-  // HEADER
-
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#DDDDDD",
+  quizHeaderContent: {
+    flex: 1,
   },
 
   quizName: {
-    fontSize: 21,
-    fontWeight: "bold",
-    color: "#111827",
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: "700",
+    color: COLORS.text,
+  },
+
+  counterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 7,
   },
 
   questionCounter: {
-    marginTop: 8,
-    fontSize: 15,
+    marginLeft: 6,
+    fontSize: 12,
     fontWeight: "600",
-    color: "#2563EB",
+    color: COLORS.primaryDark,
   },
-
-  // QUESTION CONTAINER
 
   questionContainer: {
-    marginBottom: 5,
+    marginBottom: 4,
   },
-
-  // QUESTION
 
   questionBox: {
-    margin: 20,
-    marginBottom: 10,
+    backgroundColor: COLORS.white,
+    borderRadius: 18,
     padding: 18,
+    marginBottom: 12,
     borderWidth: 1,
-    borderColor: "#DDDDDD",
-    borderRadius: 10,
-    backgroundColor: "#FAFAFA",
+    borderColor: COLORS.border,
+    shadowColor: COLORS.black,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.035,
+    shadowRadius: 6,
+    elevation: 1,
   },
 
-  questionTitle: {
+  questionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 15,
-    fontSize: 17,
-    fontWeight: "bold",
-    color: "#111827",
+  },
+
+  questionNumber: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    backgroundColor: COLORS.primary,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
+  },
+
+  questionNumberText: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+
+  questionLabel: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: COLORS.text,
   },
 
   questionText: {
     fontSize: 16,
     lineHeight: 25,
-    color: "#222222",
+    color: COLORS.text,
   },
 
-  // ANSWERS
-
   answerBox: {
-    marginHorizontal: 20,
-    marginBottom: 15,
+    marginBottom: 14,
   },
 
   answerTitle: {
-    marginBottom: 12,
-    fontSize: 17,
-    fontWeight: "bold",
-    color: "#111827",
+    marginBottom: 10,
+    fontSize: 14,
+    fontWeight: "700",
+    color: COLORS.text,
   },
 
   answerOption: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 15,
-    marginBottom: 12,
+    minHeight: 56,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 9,
     borderWidth: 1,
-    borderColor: "#DDDDDD",
-    borderRadius: 10,
-    backgroundColor: "#FFFFFF",
+    borderColor: COLORS.border,
+    borderRadius: 15,
+    backgroundColor: COLORS.white,
   },
 
   answerSelected: {
-    borderColor: "#2563EB",
-    backgroundColor: "#EFF6FF",
+    borderColor: COLORS.primary,
+    backgroundColor: "#EFF8F2",
   },
-
-  // RADIO
 
   radioOuter: {
     width: 22,
     height: 22,
     marginRight: 12,
     borderWidth: 2,
-    borderColor: "#9CA3AF",
+    borderColor: "#AAB6B0",
     borderRadius: 11,
     justifyContent: "center",
     alignItems: "center",
   },
 
   radioOuterSelected: {
-    borderColor: "#2563EB",
+    borderColor: COLORS.primary,
   },
 
   radioInner: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: "#2563EB",
+    backgroundColor: COLORS.primary,
   },
-
-  // ANSWER TEXT
 
   answerText: {
     flex: 1,
     fontSize: 15,
     lineHeight: 22,
-    color: "#333333",
+    color: COLORS.textSecondary,
   },
 
   answerTextSelected: {
-    color: "#1D4ED8",
+    color: COLORS.primaryDark,
     fontWeight: "600",
   },
 
-  // ===================================================
-  // ATTEMPT INFO
-  // ===================================================
-
   attemptInfo: {
-    marginHorizontal: 20,
-    marginTop: 10,
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: "#F3F4F6",
+    marginTop: 8,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: "#EEF6F1",
+    borderWidth: 1,
+    borderColor: "#D6E7DC",
   },
 
-  attemptText: {
-    marginBottom: 3,
-    fontSize: 13,
-    color: "#6B7280",
+  attemptHeader: {
+    flexDirection: "row",
+    alignItems: "center",
   },
 
-  // ===================================================
-  // NAVIGATION
-  // ===================================================
+  attemptTitle: {
+    marginLeft: 7,
+    fontSize: 14,
+    fontWeight: "700",
+    color: COLORS.text,
+  },
+
+  attemptDivider: {
+    height: 1,
+    backgroundColor: "#D9E7DE",
+    marginVertical: 12,
+  },
+
+  attemptRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    minHeight: 27,
+  },
+
+  attemptLabel: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+  },
+
+  attemptValue: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: COLORS.text,
+  },
+
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: "#DDF1E4",
+  },
+
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.primary,
+    marginRight: 5,
+  },
+
+  statusText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: COLORS.primaryDark,
+  },
 
   navigation: {
     flexDirection: "row",
     gap: 10,
-    marginHorizontal: 20,
-    marginTop: 25,
+    marginTop: 20,
   },
 
   navButton: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 8,
+    minHeight: 50,
+    borderRadius: 15,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#6B7280",
+    flexDirection: "row",
+    gap: 7,
+  },
+
+  previousButton: {
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+
+  previousButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.text,
   },
 
   nextButton: {
-    backgroundColor: "#2563EB",
+    backgroundColor: COLORS.primaryDark,
+  },
+
+  nextButtonText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: COLORS.white,
   },
 
   submitButton: {
-    backgroundColor: "#16A34A",
+    backgroundColor: COLORS.primary,
+  },
+
+  submitButtonText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: COLORS.white,
   },
 
   navButtonDisabled: {
-    backgroundColor: "#D1D5DB",
+    opacity: 0.45,
   },
 
-  navButtonText: {
-    fontSize: 15,
+  emptyContainer: {
+    flex: 1,
+    backgroundColor: COLORS.backgroundSoft,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 30,
+  },
+
+  emptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.white,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 18,
+  },
+
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: COLORS.text,
+    marginBottom: 7,
+  },
+
+  emptyText: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: COLORS.textSecondary,
+    textAlign: "center",
+    marginBottom: 20,
+  },
+
+  backButton: {
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: COLORS.primaryDark,
+  },
+
+  backButtonText: {
+    color: COLORS.white,
+    fontSize: 14,
     fontWeight: "600",
-    color: "#FFFFFF",
   },
 });
