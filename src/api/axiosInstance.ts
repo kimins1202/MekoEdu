@@ -1,8 +1,9 @@
 import axios from "axios";
+import { API_CONFIG } from "../constants/config";
 
 const axiosInstance = axios.create({
-  baseURL: "http://192.168.2.169:8080",
-  timeout: 10000,
+  baseURL: API_CONFIG.BASE_URL,
+  timeout: API_CONFIG.TIMEOUT,
   headers: {
     "Content-Type": "application/x-www-form-urlencoded",
   },

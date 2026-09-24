@@ -1,4 +1,5 @@
 // src/screens/LoginScreen.tsx
+
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useState } from "react";
 import {
@@ -6,12 +7,14 @@ import {
   DeviceEventEmitter,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 
 import AppButton from "@/components/common/AppButton";
+import AppInput from "@/components/common/AppInput";
 import Loading from "@/components/common/Loading";
+import COLORS from "@/constants/colors";
+
 import { loginApi } from "../../api/authApi";
 
 export default function LoginScreen() {
@@ -19,13 +22,14 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // =========================
   // ĐĂNG NHẬP
-
+  // =========================
   const handleLogin = async () => {
     const cleanUsername = username.trim();
     const cleanPassword = password.trim();
 
-    // Kiểm tra input
+    // Kiểm tra dữ liệu nhập
     if (!cleanUsername || !cleanPassword) {
       Alert.alert(
         "Thông báo",
@@ -37,12 +41,10 @@ export default function LoginScreen() {
     try {
       setLoading(true);
 
-      // 1. GỌI API LOGIN
-
+      // 1. Gọi API đăng nhập Moodle
       const data = await loginApi(cleanUsername, cleanPassword);
 
-      // 2. KIỂM TRA LOGIN
-
+      // 2. Kiểm tra kết quả đăng nhập
       if (!data?.token) {
         const errorMessage =
           data?.error ||
@@ -50,24 +52,20 @@ export default function LoginScreen() {
           "Tài khoản hoặc mật khẩu không chính xác.";
 
         Alert.alert("Lỗi đăng nhập", errorMessage);
-
         return;
       }
 
-      // 3. LƯU TOKEN
-
+      // 3. Lưu token Moodle
       await AsyncStorage.setItem("wstoken", data.token);
 
-      // 4. XÓA USERID CŨ
+      // 4. Xóa userid cũ
       // Tránh trường hợp đổi tài khoản
-      // nhưng vẫn giữ userid của tài khoản trước.
-
+      // nhưng vẫn sử dụng userid của tài khoản trước
       await AsyncStorage.removeItem("userid");
 
-      // 5. BÁO APP ĐÃ ĐĂNG NHẬP
-
+      // 5. Thông báo app đã đăng nhập
       DeviceEventEmitter.emit("authChange");
-    } catch (error: any) {
+    } catch (error) {
       Alert.alert(
         "Lỗi kết nối",
         "Không thể kết nối đến máy chủ Moodle. Vui lòng kiểm tra kết nối mạng hoặc server.",
@@ -77,93 +75,108 @@ export default function LoginScreen() {
     }
   };
 
-  // Nếu đang loading thì hiển thị màn hình Loading thay vì form đăng nhập
+  // =========================
+  // LOADING
+  // =========================
   if (loading) {
     return <Loading message="Đang kết nối tới hệ thống Moodle..." />;
   }
 
+  // =========================
   // UI
-
+  // =========================
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>MekoEdu</Text>
+      {/* Logo / tên ứng dụng */}
+      <View style={styles.header}>
+        <Text style={styles.logo}>MekoEdu</Text>
 
-      <Text style={styles.subtitle}>Đăng nhập tài khoản Moodle</Text>
+        <Text style={styles.title}>Chào mừng bạn trở lại!</Text>
 
-      {/* USERNAME */}
+        <Text style={styles.subtitle}>Đăng nhập để tiếp tục học tập</Text>
+      </View>
 
-      <Text style={styles.label}>Tên đăng nhập</Text>
+      {/* Form đăng nhập */}
+      <View style={styles.form}>
+        <AppInput
+          label="Tên đăng nhập"
+          placeholder="Nhập tên đăng nhập"
+          value={username}
+          onChangeText={setUsername}
+          autoCapitalize="none"
+          autoCorrect={false}
+          editable={!loading}
+        />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Nhập tên đăng nhập"
-        value={username}
-        onChangeText={setUsername}
-        autoCapitalize="none"
-        autoCorrect={false}
-        editable={!loading}
-      />
+        <AppInput
+          label="Mật khẩu"
+          placeholder="Nhập mật khẩu"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          editable={!loading}
+        />
 
-      {/* PASSWORD */}
+        <AppButton onPress={handleLogin} loading={loading} />
+      </View>
 
-      <Text style={styles.label}>Mật khẩu</Text>
-
-      <TextInput
-        style={styles.input}
-        placeholder="Nhập mật khẩu"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        editable={!loading}
-      />
-
-      {/* LOGIN BUTTON */}
-
-      <AppButton onPress={handleLogin} loading={loading} />
+      {/* Footer */}
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>Đăng nhập bằng tài khoản Moodle</Text>
+      </View>
     </View>
   );
 }
 
+// =========================
 // STYLE
+// =========================
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: "center",
     paddingHorizontal: 24,
-    backgroundColor: "#ffffff",
+    backgroundColor: COLORS.background,
+  },
+
+  header: {
+    alignItems: "center",
+    marginBottom: 32,
+  },
+
+  logo: {
+    fontSize: 32,
+    fontWeight: "800",
+    color: COLORS.primary,
+    marginBottom: 20,
   },
 
   title: {
-    fontSize: 28,
-    fontWeight: "bold",
+    fontSize: 24,
+    fontWeight: "700",
+    color: COLORS.text,
     textAlign: "center",
-    color: "#2563EB",
     marginBottom: 8,
   },
 
   subtitle: {
-    fontSize: 14,
+    fontSize: 15,
+    color: COLORS.textSecondary,
     textAlign: "center",
-    color: "#6B7280",
-    marginBottom: 32,
   },
 
-  label: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#374151",
-    marginBottom: 6,
+  form: {
+    width: "100%",
   },
 
-  input: {
-    height: 48,
-    borderWidth: 1,
-    borderColor: "#D1D5DB",
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    marginBottom: 16,
-    backgroundColor: "#F9FAFB",
+  footer: {
+    alignItems: "center",
+    marginTop: 24,
+  },
+
+  footerText: {
+    fontSize: 13,
+    color: COLORS.textLight,
   },
 });

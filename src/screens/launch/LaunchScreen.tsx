@@ -1,3 +1,8 @@
+// src/screens/launch/LaunchScreen.tsx
+
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   Dimensions,
   StyleSheet,
@@ -6,12 +11,35 @@ import {
   View,
 } from "react-native";
 
+import COLORS from "../../constants/colors";
+import { RootStackParamList } from "../../types/navigation";
+
 const { width } = Dimensions.get("window");
 
-export default function LaunchScreen({ navigation }: any) {
-  const handleStart = () => {
-    // AuthStack sẽ mở LoginScreen
-    navigation.replace("Auth");
+type NavigationProp = NativeStackNavigationProp<RootStackParamList, "Launch">;
+
+export default function LaunchScreen() {
+  const navigation = useNavigation<NavigationProp>();
+
+  const handleStart = async () => {
+    try {
+      // Kiểm tra người dùng đã đăng nhập chưa
+      const token = await AsyncStorage.getItem("wstoken");
+
+      console.log("LAUNCH: Token:", token ? "Có" : "Không có");
+
+      if (token) {
+        navigation.replace("AppInit");
+      } else {
+        // Chưa đăng nhập
+        // → AuthStack → LoginScreen
+
+        navigation.replace("Auth");
+      }
+    } catch (error) {
+      // Nếu không đọc được token thì cho đăng nhập lại
+      navigation.replace("Auth");
+    }
   };
 
   return (
@@ -36,8 +64,7 @@ export default function LaunchScreen({ navigation }: any) {
         <Text style={styles.appName}>MekoEdu</Text>
 
         <Text style={styles.description}>
-          Nền tảng học tập trực tuyến
-          {"\n"}
+          Nền tảng học tập trực tuyến{"\n"}
           đơn giản và thuận tiện.
         </Text>
       </View>
@@ -92,7 +119,7 @@ const styles = StyleSheet.create({
     width: 300,
     height: 300,
     borderRadius: 150,
-    backgroundColor: "#61CE70",
+    backgroundColor: COLORS.primary,
     opacity: 0.15,
     top: -170,
     right: -120,
@@ -103,7 +130,7 @@ const styles = StyleSheet.create({
     width: 350,
     height: 350,
     borderRadius: 175,
-    backgroundColor: "#3EAF7C",
+    backgroundColor: COLORS.primaryDark,
     opacity: 0.12,
     bottom: -220,
     left: -170,
@@ -123,11 +150,11 @@ const styles = StyleSheet.create({
     width: 115,
     height: 115,
     borderRadius: 35,
-    backgroundColor: "#3EAF7C",
+    backgroundColor: COLORS.primaryDark,
     alignItems: "center",
     justifyContent: "center",
 
-    shadowColor: "#3EAF7C",
+    shadowColor: COLORS.primaryDark,
     shadowOffset: {
       width: 0,
       height: 8,
@@ -140,14 +167,14 @@ const styles = StyleSheet.create({
   logoText: {
     fontSize: 64,
     fontWeight: "800",
-    color: "#FFFFFF",
+    color: COLORS.white,
   },
 
   logoDot: {
     width: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: "#61CE70",
+    backgroundColor: COLORS.primary,
     position: "absolute",
     right: -5,
     bottom: 8,
@@ -165,7 +192,7 @@ const styles = StyleSheet.create({
   welcomeText: {
     fontSize: 21,
     fontWeight: "600",
-    color: "#415161",
+    color: COLORS.text,
     textAlign: "center",
   },
 
@@ -173,7 +200,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 42,
     fontWeight: "800",
-    color: "#3EAF7C",
+    color: COLORS.primaryDark,
     textAlign: "center",
   },
 
@@ -200,12 +227,11 @@ const styles = StyleSheet.create({
     width: "30%",
     minHeight: 85,
     borderRadius: 18,
-    backgroundColor: "#FFFFFF",
-
+    backgroundColor: COLORS.white,
     alignItems: "center",
     justifyContent: "center",
 
-    shadowColor: "#415161",
+    shadowColor: COLORS.text,
     shadowOffset: {
       width: 0,
       height: 3,
@@ -223,7 +249,7 @@ const styles = StyleSheet.create({
     marginTop: 7,
     fontSize: 12,
     fontWeight: "600",
-    color: "#415161",
+    color: COLORS.text,
   },
 
   // =========================
@@ -233,18 +259,15 @@ const styles = StyleSheet.create({
   startButton: {
     position: "absolute",
     bottom: 45,
-
     width: width * 0.82,
     height: 58,
-
     borderRadius: 19,
-    backgroundColor: "#3EAF7C",
-
+    backgroundColor: COLORS.primaryDark,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
 
-    shadowColor: "#3EAF7C",
+    shadowColor: COLORS.primaryDark,
     shadowOffset: {
       width: 0,
       height: 6,
@@ -255,14 +278,14 @@ const styles = StyleSheet.create({
   },
 
   buttonText: {
-    color: "#FFFFFF",
+    color: COLORS.white,
     fontSize: 16,
     fontWeight: "700",
   },
 
   arrow: {
     marginLeft: 12,
-    color: "#FFFFFF",
+    color: COLORS.white,
     fontSize: 22,
     fontWeight: "600",
   },

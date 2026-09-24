@@ -22,11 +22,12 @@ export default function RootNavigator() {
     try {
       const token = await AsyncStorage.getItem("wstoken");
 
-      console.log("Token hiện tại:", token);
+      console.log("ROOT - Token hiện tại:", token);
 
       setUserToken(token);
     } catch (error) {
-      console.error("Lỗi khi đọc token:", error);
+      console.error("ROOT - Lỗi khi đọc token:", error);
+      setUserToken(null);
     } finally {
       setIsLoading(false);
     }
@@ -35,12 +36,14 @@ export default function RootNavigator() {
   useEffect(() => {
     checkToken();
 
-    const subscription = DeviceEventEmitter.addListener(
-      "authChange",
-      checkToken,
-    );
+    const subscription = DeviceEventEmitter.addListener("authChange", () => {
+      console.log("ROOT - Nhận authChange");
+      checkToken();
+    });
 
-    return () => subscription.remove();
+    return () => {
+      subscription.remove();
+    };
   }, []);
 
   if (isLoading) {
@@ -63,20 +66,28 @@ export default function RootNavigator() {
         headerShown: false,
       }}
     >
-      <Stack.Screen name="Splash" component={SplashScreen} />
+      {!userToken ? (
+        // =========================
+        // CHƯA ĐĂNG NHẬP
+        // =========================
+        <Stack.Group navigationKey="guest">
+          <Stack.Screen name="Splash" component={SplashScreen} />
 
-      <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
 
-      <Stack.Screen name="Launch" component={LaunchScreen} />
+          <Stack.Screen name="Launch" component={LaunchScreen} />
 
-      <Stack.Screen name="Auth" component={AuthStack} />
-
-      {userToken != null && (
-        <>
+          <Stack.Screen name="Auth" component={AuthStack} />
+        </Stack.Group>
+      ) : (
+        // =========================
+        // ĐÃ ĐĂNG NHẬP
+        // =========================
+        <Stack.Group navigationKey="user">
           <Stack.Screen name="AppInit" component={AppInitScreen} />
 
           <Stack.Screen name="App" component={AppStack} />
-        </>
+        </Stack.Group>
       )}
     </Stack.Navigator>
   );

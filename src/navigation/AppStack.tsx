@@ -1,8 +1,8 @@
-import ExamScreen from "../screens/exam/ExamScreen";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import CourseListScreen from "../screens/course/CourseListScreen";
 import { default as ExamDetailScreen } from "../screens/exam/ExamDetailScreen";
 import ExamListScreen from "../screens/exam/ExamListScreen";
+import ExamScreen from "../screens/exam/ExamScreen";
 import { AppStackParamList } from "../types/navigation";
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
