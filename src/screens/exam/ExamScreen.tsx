@@ -322,17 +322,28 @@ export default function ExamScreen() {
   // CLEAN HTML TEXT
 
   const cleanHtmlText = (html: string): string => {
-    return html
+    return html // Xóa script và style
       .replace(/<script[\s\S]*?<\/script>/gi, "")
-      .replace(/<style[\s\S]*?<\/style>/gi, "")
-      .replace(/<[^>]+>/g, "")
-      .replace(/&nbsp;/g, " ")
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&#39;/g, "'")
-      .replace(/&quot;/g, '"')
-      .replace(/\s+/g, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, "") // Giữ cấu trúc xuống dòng của Moodle
+
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/p>/gi, "\n")
+      .replace(/<\/div>/gi, "\n")
+      .replace(/<\/li>/gi, "\n") // Xóa các HTML tag còn lại
+
+      .replace(/<[^>]+>/g, "") // Decode HTML entities
+
+      .replace(/&nbsp;/gi, " ")
+      .replace(/&amp;/gi, "&")
+      .replace(/&lt;/gi, "<")
+      .replace(/&gt;/gi, ">")
+      .replace(/&#39;/gi, "'")
+      .replace(/&quot;/gi, '"') // Chuẩn hóa khoảng trắng nhưng KHÔNG phá \n
+
+      .replace(/[ \t]+/g, " ")
+      .replace(/ *\n */g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+
       .trim();
   };
 
@@ -980,4 +991,3 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
 });
-
