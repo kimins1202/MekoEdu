@@ -5,9 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import COLORS from "../../constants/colors";
 
 export default function SplashScreen({ navigation }: any) {
-  // =========================
   // ANIMATION VALUES
-  // =========================
 
   const logoScale = useRef(new Animated.Value(0.75)).current;
 
@@ -25,9 +23,7 @@ export default function SplashScreen({ navigation }: any) {
 
   const circleBottomAnim = useRef(new Animated.Value(0)).current;
 
-  // =========================
   // START ANIMATION
-  // =========================
 
   useEffect(() => {
     // Logo xuất hiện
@@ -141,9 +137,7 @@ export default function SplashScreen({ navigation }: any) {
     };
   }, []);
 
-  // =========================
   // DECORATIVE TRANSFORMS
-  // =========================
 
   const topCircleTranslate = circleTopAnim.interpolate({
     inputRange: [0, 1],
@@ -158,9 +152,9 @@ export default function SplashScreen({ navigation }: any) {
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       <View style={styles.container}>
-        {/* =========================
+        {/* 
             BACKGROUND DECORATION
-        ========================= */}
+         */}
 
         <Animated.View
           style={[
@@ -183,9 +177,9 @@ export default function SplashScreen({ navigation }: any) {
         <View style={styles.smallCircle1} />
         <View style={styles.smallCircle2} />
 
-        {/* =========================
+        {/* 
             MAIN CONTENT
-        ========================= */}
+         */}
 
         <View style={styles.content}>
           {/* Logo */}
@@ -235,9 +229,9 @@ export default function SplashScreen({ navigation }: any) {
           </Animated.View>
         </View>
 
-        {/* =========================
+        {/* 
             FOOTER
-        ========================= */}
+         */}
 
         <Animated.Text
           style={[
@@ -255,9 +249,7 @@ export default function SplashScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  // =========================
   // CONTAINER
-  // =========================
 
   safeArea: {
     flex: 1,
@@ -272,9 +264,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
 
-  // =========================
   // MAIN CONTENT
-  // =========================
 
   content: {
     alignItems: "center",
@@ -318,9 +308,7 @@ const styles = StyleSheet.create({
     letterSpacing: -2,
   },
 
-  // =========================
   // GLOW RING
-  // =========================
 
   logoRing: {
     position: "absolute",
@@ -336,9 +324,7 @@ const styles = StyleSheet.create({
     opacity: 0,
   },
 
-  // =========================
   // APP NAME
-  // =========================
 
   appName: {
     fontSize: 38,
@@ -367,9 +353,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
 
-  // =========================
   // FOOTER
-  // =========================
 
   footer: {
     position: "absolute",
@@ -383,9 +367,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
 
-  // =========================
   // DECORATIVE SHAPES
-  // =========================
 
   circleTop: {
     position: "absolute",

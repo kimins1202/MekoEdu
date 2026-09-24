@@ -174,7 +174,7 @@ export default function CourseListScreen() {
 
   return (
     <View style={styles.container}>
-      <AppHeader title="Khóa học" subtitle={`${totalCount} khóa học`} />
+      <AppHeader title="Khóa học" />
 
       <FlatList
         data={filteredCourses}

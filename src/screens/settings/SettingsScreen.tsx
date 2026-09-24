@@ -1,4 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   ScrollView,
   StyleSheet,
@@ -6,8 +8,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import AppHeader from "../../components/common/AppHeader";
 import COLORS from "../../constants/colors";
@@ -58,19 +58,20 @@ function SettingItem({
 }
 
 export default function SettingsScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<AppStackParamList>>();
 
   return (
     <View style={styles.container}>
-      <AppHeader title="Cài đặt" subtitle="Quản lý tài khoản và ứng dụng" />
+      <AppHeader title="Cài đặt" />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
         {/* Profile */}
-        <TouchableOpacity 
-          style={styles.profileCard} 
+        <TouchableOpacity
+          style={styles.profileCard}
           activeOpacity={0.7}
           onPress={() => navigation.navigate("Profile")}
         >
@@ -129,7 +130,7 @@ export default function SettingsScreen() {
             subtitle="Thông tin ứng dụng"
             onPress={() => navigation.navigate("Help")}
           />
-          
+
           <SettingItem
             icon="call-outline"
             title="Liên hệ"

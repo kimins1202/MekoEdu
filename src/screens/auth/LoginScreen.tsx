@@ -29,9 +29,9 @@ export default function LoginScreen() {
 
   const [loading, setLoading] = useState(false);
 
-  // =========================
+  //
   // ĐỌC THÔNG TIN ĐĂNG NHẬP ĐÃ LƯU
-  // =========================
+  //
   useEffect(() => {
     loadRememberedAccount();
   }, []);
@@ -59,9 +59,9 @@ export default function LoginScreen() {
     }
   };
 
-  // =========================
+  //
   // ĐĂNG NHẬP
-  // =========================
+  //
   const handleLogin = async () => {
     const cleanUsername = username.trim();
     const cleanPassword = password.trim();
@@ -122,25 +122,25 @@ export default function LoginScreen() {
     }
   };
 
-  // =========================
+  //
   // LOADING
-  // =========================
+  //
   if (loading) {
     return <Loading message="Đang kết nối tới hệ thống Moodle..." />;
   }
 
-  // =========================
+  //
   // UI
-  // =========================
+  //
   return (
     <View style={styles.container}>
       {/* Decorative background */}
       <View style={styles.backgroundCircleTop} />
       <View style={styles.backgroundCircleBottom} />
 
-      {/* =========================
+      {/* 
           HEADER
-      ========================= */}
+       */}
       <View style={styles.header}>
         {/* Logo */}
         <View style={styles.logoWrapper}>
@@ -154,17 +154,11 @@ export default function LoginScreen() {
         <Text style={styles.logoName}>
           Meko<Text style={styles.logoEdu}>Edu</Text>
         </Text>
-
-        <Text style={styles.title}>Chào mừng bạn trở lại!</Text>
-
-        <Text style={styles.subtitle}>
-          Đăng nhập để tiếp tục hành trình học tập
-        </Text>
       </View>
 
-      {/* =========================
+      {/* 
           FORM
-      ========================= */}
+       */}
       <View style={styles.form}>
         <AppInput
           label="Tên đăng nhập"
@@ -224,9 +218,9 @@ export default function LoginScreen() {
         <AppButton onPress={handleLogin} loading={loading} title="Đăng nhập" />
       </View>
 
-      {/* =========================
+      {/* 
           FOOTER
-      ========================= */}
+       */}
       <View style={styles.footer}>
         <View style={styles.footerLine} />
 
@@ -244,9 +238,9 @@ export default function LoginScreen() {
   );
 }
 
-// =========================
+//
 // STYLE
-// =========================
+//
 
 const styles = StyleSheet.create({
   container: {
@@ -257,9 +251,9 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
 
-  // =========================
+  //
   // BACKGROUND
-  // =========================
+  //
 
   backgroundCircleTop: {
     position: "absolute",
@@ -283,9 +277,9 @@ const styles = StyleSheet.create({
     left: -160,
   },
 
-  // =========================
+  //
   // HEADER
-  // =========================
+  //
 
   header: {
     alignItems: "center",
@@ -364,17 +358,17 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  // =========================
+  //
   // FORM
-  // =========================
+  //
 
   form: {
     width: "100%",
   },
 
-  // =========================
+  //
   // PASSWORD
-  // =========================
+  //
 
   passwordWrapper: {
     position: "relative",
@@ -396,9 +390,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  // =========================
+  //
   // REMEMBER
-  // =========================
+  //
 
   rememberRow: {
     flexDirection: "row",
@@ -438,9 +432,9 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
 
-  // =========================
+  //
   // FOOTER
-  // =========================
+  //
 
   footer: {
     alignItems: "center",

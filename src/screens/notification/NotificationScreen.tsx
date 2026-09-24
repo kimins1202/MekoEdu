@@ -1,13 +1,12 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { StyleSheet, Text, View } from "react-native";
 
-import AppHeader from '../../components/common/AppHeader';
-import COLORS from '../../constants/colors';
+import AppHeader from "../../components/common/AppHeader";
+import COLORS from "../../constants/colors";
 
 export default function NotificationScreen() {
   return (
     <View style={styles.container}>
-      <AppHeader title="Thông báo" subtitle="Các thông báo mới nhất" />
+      <AppHeader title="Thông báo" />
       <View style={styles.content}>
         <Text style={styles.text}>Tính năng đang phát triển</Text>
       </View>
@@ -22,8 +21,8 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
   },
   text: {
