@@ -25,7 +25,7 @@ const results = [
 export default function HistoryScreen() {
   return (
     <View style={styles.container}>
-      <AppHeader title="Kết quả" subtitle="Lịch sử bài kiểm tra của bạn" />
+      <AppHeader title="Lịch sử làm bài" />
 
       <ScrollView
         showsVerticalScrollIndicator={false}

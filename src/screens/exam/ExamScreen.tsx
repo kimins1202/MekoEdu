@@ -450,7 +450,7 @@ export default function ExamScreen() {
       Alert.alert("Nộp bài thành công", "Bài thi đã được nộp và xử lý.", [
         {
           text: "OK",
-          onPress: () => navigation.goBack(),
+          onPress: () => navigation.replace("Result", { attemptId, quizid }),
         },
       ]);
     } catch (error: any) {

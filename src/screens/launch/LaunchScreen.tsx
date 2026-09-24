@@ -23,32 +23,31 @@ export default function LaunchScreen() {
 
   const handleStart = async () => {
     try {
-      // Kiểm tra người dùng đã đăng nhập chưa
       const token = await AsyncStorage.getItem("wstoken");
-
-      console.log("LAUNCH: Token:", token ? "Có" : "Không có");
 
       if (token) {
         navigation.replace("AppInit");
       } else {
-        // Chưa đăng nhập
-        // → AuthStack → LoginScreen
-
         navigation.replace("Auth");
       }
     } catch (error) {
-      // Nếu không đọc được token thì cho đăng nhập lại
       navigation.replace("Auth");
     }
   };
 
   return (
     <View style={styles.container}>
-      {/* Decorative background */}
+      {/* =========================
+          Decorative Background
+      ========================= */}
+
       <View style={styles.topCircle} />
       <View style={styles.bottomCircle} />
 
-      {/* Logo */}
+      {/* =========================
+          Logo
+      ========================= */}
+
       <View style={styles.logoContainer}>
         <View style={styles.logo}>
           <Text style={styles.logoText}>M</Text>
@@ -57,7 +56,10 @@ export default function LaunchScreen() {
         <View style={styles.logoDot} />
       </View>
 
-      {/* App name */}
+      {/* =========================
+          App Information
+      ========================= */}
+
       <View style={styles.content}>
         <Text style={styles.welcomeText}>Chào mừng đến với</Text>
 
@@ -69,7 +71,10 @@ export default function LaunchScreen() {
         </Text>
       </View>
 
-      {/* Feature cards */}
+      {/* =========================
+          Features
+      ========================= */}
+
       <View style={styles.features}>
         <View style={styles.featureCard}>
           <Text style={styles.featureIcon}>📚</Text>
@@ -87,7 +92,10 @@ export default function LaunchScreen() {
         </View>
       </View>
 
-      {/* Start button */}
+      {/* =========================
+          Start Button
+      ========================= */}
+
       <TouchableOpacity
         style={styles.startButton}
         activeOpacity={0.8}
@@ -102,6 +110,8 @@ export default function LaunchScreen() {
 }
 
 const styles = StyleSheet.create({
+  // Container
+
   container: {
     flex: 1,
     backgroundColor: "#F7FFF9",
@@ -110,9 +120,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
 
-  // =========================
-  // Background
-  // =========================
+  // Decorative Background
 
   topCircle: {
     position: "absolute",
@@ -136,9 +144,7 @@ const styles = StyleSheet.create({
     left: -170,
   },
 
-  // =========================
   // Logo
-  // =========================
 
   logoContainer: {
     alignItems: "center",
@@ -171,18 +177,16 @@ const styles = StyleSheet.create({
   },
 
   logoDot: {
+    position: "absolute",
     width: 16,
     height: 16,
     borderRadius: 8,
     backgroundColor: COLORS.primary,
-    position: "absolute",
     right: -5,
     bottom: 8,
   },
 
-  // =========================
   // Content
-  // =========================
 
   content: {
     width: width * 0.85,
@@ -212,9 +216,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  // =========================
   // Features
-  // =========================
 
   features: {
     flexDirection: "row",
@@ -252,9 +254,7 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
 
-  // =========================
-  // Button
-  // =========================
+  // Start Button
 
   startButton: {
     position: "absolute",
@@ -263,6 +263,7 @@ const styles = StyleSheet.create({
     height: 58,
     borderRadius: 19,
     backgroundColor: COLORS.primaryDark,
+
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",

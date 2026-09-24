@@ -4,10 +4,10 @@ import { View, Text, StyleSheet } from 'react-native';
 import AppHeader from '../../components/common/AppHeader';
 import COLORS from '../../constants/colors';
 
-export default function HelpScreen() {
+export default function NotificationScreen() {
   return (
     <View style={styles.container}>
-      <AppHeader title="Trợ giúp" subtitle="Trung tâm hỗ trợ" />
+      <AppHeader title="Thông báo" subtitle="Các thông báo mới nhất" />
       <View style={styles.content}>
         <Text style={styles.text}>Tính năng đang phát triển</Text>
       </View>

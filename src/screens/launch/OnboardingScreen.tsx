@@ -37,10 +37,14 @@ export default function OnboardingScreen({ navigation }: any) {
 
   const handleNext = () => {
     if (currentIndex < onboardingData.length - 1) {
-      setCurrentIndex(currentIndex + 1);
+      setCurrentIndex((prev) => prev + 1);
     } else {
       navigation.replace("Launch");
     }
+  };
+
+  const handleSkip = () => {
+    navigation.replace("Launch");
   };
 
   return (
@@ -48,7 +52,8 @@ export default function OnboardingScreen({ navigation }: any) {
       {/* Skip */}
       <TouchableOpacity
         style={styles.skipButton}
-        onPress={() => navigation.replace("Launch")}
+        onPress={handleSkip}
+        activeOpacity={0.7}
       >
         <Text style={styles.skipText}>Bỏ qua</Text>
       </TouchableOpacity>
@@ -78,7 +83,11 @@ export default function OnboardingScreen({ navigation }: any) {
       </View>
 
       {/* Button */}
-      <TouchableOpacity style={styles.button} onPress={handleNext}>
+      <TouchableOpacity
+        style={styles.button}
+        onPress={handleNext}
+        activeOpacity={0.85}
+      >
         <Text style={styles.buttonText}>
           {currentIndex === onboardingData.length - 1 ? "Bắt đầu" : "Tiếp tục"}
         </Text>
@@ -99,11 +108,14 @@ const styles = StyleSheet.create({
     top: 55,
     right: 24,
     zIndex: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
   },
 
   skipText: {
     color: "#415161",
     fontSize: 14,
+    fontWeight: "500",
   },
 
   illustrationContainer: {
@@ -148,6 +160,7 @@ const styles = StyleSheet.create({
 
   dots: {
     flexDirection: "row",
+    alignItems: "center",
     marginTop: 35,
     gap: 7,
   },

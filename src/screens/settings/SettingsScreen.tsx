@@ -6,9 +6,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import AppHeader from "../../components/common/AppHeader";
 import COLORS from "../../constants/colors";
+import { AppStackParamList } from "../../types/navigation";
 
 interface SettingItemProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -55,6 +58,8 @@ function SettingItem({
 }
 
 export default function SettingsScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
+
   return (
     <View style={styles.container}>
       <AppHeader title="Cài đặt" subtitle="Quản lý tài khoản và ứng dụng" />
@@ -64,7 +69,11 @@ export default function SettingsScreen() {
         contentContainerStyle={styles.content}
       >
         {/* Profile */}
-        <View style={styles.profileCard}>
+        <TouchableOpacity 
+          style={styles.profileCard} 
+          activeOpacity={0.7}
+          onPress={() => navigation.navigate("Profile")}
+        >
           <View style={styles.avatar}>
             <Ionicons name="person" size={30} color={COLORS.primaryDark} />
           </View>
@@ -76,7 +85,7 @@ export default function SettingsScreen() {
           </View>
 
           <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
-        </View>
+        </TouchableOpacity>
 
         {/* Account */}
         <Text style={styles.sectionTitle}>Tài khoản</Text>
@@ -86,12 +95,14 @@ export default function SettingsScreen() {
             icon="person-outline"
             title="Thông tin cá nhân"
             subtitle="Xem và chỉnh sửa thông tin"
+            onPress={() => navigation.navigate("Profile")}
           />
 
           <SettingItem
             icon="lock-closed-outline"
             title="Đổi mật khẩu"
             subtitle="Cập nhật mật khẩu tài khoản"
+            onPress={() => navigation.navigate("Profile")}
           />
         </View>
 
@@ -103,6 +114,7 @@ export default function SettingsScreen() {
             icon="notifications-outline"
             title="Thông báo"
             subtitle="Quản lý thông báo"
+            onPress={() => navigation.navigate("SettingsNotification")}
           />
 
           <SettingItem
@@ -115,6 +127,14 @@ export default function SettingsScreen() {
             icon="information-circle-outline"
             title="Về MekoEdu"
             subtitle="Thông tin ứng dụng"
+            onPress={() => navigation.navigate("Help")}
+          />
+          
+          <SettingItem
+            icon="call-outline"
+            title="Liên hệ"
+            subtitle="Hỗ trợ và góp ý"
+            onPress={() => navigation.navigate("Contact")}
           />
         </View>
 
