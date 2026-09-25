@@ -1,7 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
+  Alert,
+  DeviceEventEmitter,
   ScrollView,
   StyleSheet,
   Text,
@@ -30,7 +33,7 @@ function SettingItem({
 }: SettingItemProps) {
   return (
     <TouchableOpacity
-      style={styles.settingItem}
+      style={[styles.settingItem, danger && styles.dangerItem]}
       activeOpacity={0.7}
       onPress={onPress}
     >
@@ -61,6 +64,37 @@ export default function SettingsScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<AppStackParamList>>();
 
+  // Đăng xuất tài khoản
+  const handleLogout = () => {
+    Alert.alert(
+      "Đăng xuất",
+      "Bạn có chắc chắn muốn đăng xuất khỏi MekoEdu không?",
+      [
+        {
+          text: "Hủy",
+          style: "cancel",
+        },
+        {
+          text: "Đăng xuất",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              // Xóa thông tin phiên đăng nhập
+              await AsyncStorage.multiRemove(["wstoken", "userid"]);
+
+              // Báo cho RootNavigator biết trạng thái đăng nhập đã thay đổi
+              DeviceEventEmitter.emit("authChange");
+            } catch (error) {
+              console.error("LOGOUT - Lỗi:", error);
+
+              Alert.alert("Lỗi", "Không thể đăng xuất. Vui lòng thử lại.");
+            }
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <View style={styles.container}>
       <AppHeader title="Cài đặt" />
@@ -81,7 +115,6 @@ export default function SettingsScreen() {
 
           <View style={styles.profileInfo}>
             <Text style={styles.name}>Nguyễn Kim Yến</Text>
-
             <Text style={styles.email}>Sinh viên MekoEdu</Text>
           </View>
 
@@ -141,7 +174,12 @@ export default function SettingsScreen() {
 
         {/* Logout */}
         <View style={styles.settingsGroup}>
-          <SettingItem icon="log-out-outline" title="Đăng xuất" danger />
+          <SettingItem
+            icon="log-out-outline"
+            title="Đăng xuất"
+            danger
+            onPress={handleLogout}
+          />
         </View>
 
         <Text style={styles.version}>MekoEdu v1.0.0</Text>
@@ -230,7 +268,9 @@ const styles = StyleSheet.create({
   },
 
   dangerIcon: {
-    backgroundColor: "#FFF1F1",
+    backgroundColor: "#FFF0F0",
+    borderWidth: 1,
+    borderColor: "#FFD6D6",
   },
 
   settingInfo: {
@@ -247,6 +287,10 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.textSecondary,
     marginTop: 4,
+  },
+
+  dangerItem: {
+    backgroundColor: "#FFF8F8",
   },
 
   dangerText: {

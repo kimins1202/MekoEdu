@@ -47,6 +47,8 @@ interface SiteInfo {
   firstname?: string;
   lastname?: string;
   fullname?: string;
+  username?: string;
+  email?: string;
 }
 
 interface Quiz {
@@ -85,6 +87,10 @@ export default function HomeScreen() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // =====================================================
+  // LOAD HOME DATA
+  // =====================================================
 
   const loadHomeData = useCallback(async () => {
     try {
@@ -129,6 +135,7 @@ export default function HomeScreen() {
 
       setCourses(sortedCourses);
 
+      // Không có khóa học
       if (courseData.length === 0) {
         setQuizCount(0);
         setRecentAttempts([]);
@@ -145,6 +152,7 @@ export default function HomeScreen() {
         return;
       }
 
+      // Lấy danh sách bài kiểm tra
       const quizzesResponse = await getQuizzesByCourses(courseIds);
 
       if (quizzesResponse?.exception) {
@@ -164,6 +172,7 @@ export default function HomeScreen() {
         return;
       }
 
+      // Lấy lịch sử làm bài
       const attemptResults = await Promise.all(
         quizzes.map(async (quiz) => {
           try {
@@ -218,6 +227,10 @@ export default function HomeScreen() {
     loadHomeData();
   }, [loadHomeData]);
 
+  // =====================================================
+  // HELPERS
+  // =====================================================
+
   const handleRefresh = () => {
     setRefreshing(true);
     loadHomeData();
@@ -235,6 +248,16 @@ export default function HomeScreen() {
     const fullname = [user.firstname, user.lastname].filter(Boolean).join(" ");
 
     return fullname || "Bạn";
+  };
+
+  const getUserInitial = () => {
+    const name = getUserName();
+
+    if (!name || name === "Bạn") {
+      return "U";
+    }
+
+    return name.charAt(0).toUpperCase();
   };
 
   const getCourseProgress = (course: Course): number | null => {
@@ -281,6 +304,10 @@ export default function HomeScreen() {
     }
   };
 
+  // =====================================================
+  // NAVIGATION
+  // =====================================================
+
   const goToCourses = () => {
     navigation.navigate("Courses");
   };
@@ -310,6 +337,10 @@ export default function HomeScreen() {
     });
   };
 
+  // =====================================================
+  // LOADING
+  // =====================================================
+
   if (loading) {
     return <Loading message="Đang tải trang chủ..." />;
   }
@@ -322,9 +353,17 @@ export default function HomeScreen() {
     ? getCourseProgress(firstCourse)
     : null;
 
+  // =====================================================
+  // RENDER
+  // =====================================================
+
   return (
     <View style={styles.container}>
-      <AppHeader title="Trang chủ" />
+      {/* APP HEADER */}
+      <AppHeader
+        title="MekoEdu"
+        onNotificationPress={() => navigation.navigate("Notification")}
+      />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -337,44 +376,54 @@ export default function HomeScreen() {
           />
         }
       >
-        {/* Greeting */}
-        <View style={styles.greeting}>
-          <View style={styles.greetingContent}>
-            <Text style={styles.hello}>Xin chào 👋</Text>
+        {/* =================================================
+            USER WELCOME
+        ================================================= */}
 
-            <Text style={styles.name} numberOfLines={1}>
+        <View style={styles.userCard}>
+          <View style={styles.userAvatar}>
+            <Text style={styles.userAvatarText}>{getUserInitial()}</Text>
+          </View>
+
+          <View style={styles.userInfo}>
+            <Text style={styles.welcomeText}>Xin chào,</Text>
+
+            <Text style={styles.userName} numberOfLines={1}>
               {getUserName()}
             </Text>
+
+            {user?.username ? (
+              <View style={styles.usernameRow}>
+                <Ionicons
+                  name="person-outline"
+                  size={12}
+                  color={COLORS.textLight}
+                />
+
+                <Text style={styles.username} numberOfLines={1}>
+                  {user.username}
+                </Text>
+              </View>
+            ) : (
+              <Text style={styles.userDescription}>
+                Chúc bạn có một ngày học tập hiệu quả.
+              </Text>
+            )}
           </View>
 
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            <TouchableOpacity
-              style={styles.avatar}
-              onPress={() => navigation.navigate("Notification")}
-              activeOpacity={0.8}
-            >
-              <Ionicons
-                name="notifications-outline"
-                size={22}
-                color={COLORS.primaryDark}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.avatar}
-              onPress={goToSettings}
-              activeOpacity={0.8}
-            >
-              <Ionicons
-                name="person-outline"
-                size={22}
-                color={COLORS.primaryDark}
-              />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={styles.profileButton}
+            onPress={goToSettings}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="chevron-forward" size={19} color={COLORS.primary} />
+          </TouchableOpacity>
         </View>
 
-        {/* Statistics */}
+        {/* =================================================
+            STATISTICS
+        ================================================= */}
+
         <View style={styles.statsRow}>
           <StatisticCard
             icon="book-outline"
@@ -406,9 +455,16 @@ export default function HomeScreen() {
           />
         </View>
 
-        {/* Recent Courses */}
+        {/* =================================================
+            RECENT COURSES
+        ================================================= */}
+
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Khóa học gần đây</Text>
+          <View style={styles.sectionTitleRow}>
+            <Ionicons name="school-outline" size={19} color={COLORS.primary} />
+
+            <Text style={styles.sectionTitle}>Khóa học gần đây</Text>
+          </View>
 
           <TouchableOpacity onPress={goToCourses} activeOpacity={0.7}>
             <Text style={styles.seeAll}>Xem tất cả</Text>
@@ -435,7 +491,9 @@ export default function HomeScreen() {
                   return (
                     <View style={styles.progressContainer}>
                       <View style={styles.progressHeader}>
-                        <Text style={styles.progressLabel}>Tiến độ</Text>
+                        <Text style={styles.progressLabel}>
+                          Tiến độ học tập
+                        </Text>
 
                         <Text style={styles.progressValue}>{progress}%</Text>
                       </View>
@@ -466,9 +524,16 @@ export default function HomeScreen() {
           />
         )}
 
-        {/* Recent History */}
+        {/* =================================================
+            RECENT HISTORY
+        ================================================= */}
+
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Lịch sử làm bài</Text>
+          <View style={styles.sectionTitleRow}>
+            <Ionicons name="time-outline" size={19} color={COLORS.primary} />
+
+            <Text style={styles.sectionTitle}>Lịch sử làm bài</Text>
+          </View>
 
           <TouchableOpacity onPress={goToHistory} activeOpacity={0.7}>
             <Text style={styles.seeAll}>Xem tất cả</Text>
@@ -487,7 +552,7 @@ export default function HomeScreen() {
                 <View style={styles.historyIcon}>
                   <Ionicons
                     name="document-text-outline"
-                    size={22}
+                    size={21}
                     color={COLORS.primary}
                   />
                 </View>
@@ -498,6 +563,12 @@ export default function HomeScreen() {
                   </Text>
 
                   <View style={styles.historyMeta}>
+                    <Ionicons
+                      name="calendar-outline"
+                      size={12}
+                      color={COLORS.textLight}
+                    />
+
                     <Text style={styles.historyDate}>
                       {formatDate(
                         attempt.timemodified ||
@@ -516,24 +587,37 @@ export default function HomeScreen() {
 
                 <Ionicons
                   name="chevron-forward"
-                  size={19}
-                  color={COLORS.textSecondary}
+                  size={18}
+                  color={COLORS.textLight}
                 />
               </TouchableOpacity>
             ))}
           </View>
         ) : (
           <View style={styles.emptyHistory}>
-            <Ionicons name="time-outline" size={32} color={COLORS.textLight} />
+            <View style={styles.emptyHistoryIcon}>
+              <Ionicons
+                name="time-outline"
+                size={25}
+                color={COLORS.textLight}
+              />
+            </View>
 
             <Text style={styles.emptyHistoryText}>Chưa có lịch sử làm bài</Text>
           </View>
         )}
 
-        {/* Quick actions */}
-        <Text style={[styles.sectionTitle, styles.quickTitle]}>
-          Truy cập nhanh
-        </Text>
+        {/* =================================================
+            QUICK ACTIONS
+        ================================================= */}
+
+        <View style={styles.quickHeader}>
+          <View style={styles.sectionTitleRow}>
+            <Ionicons name="apps-outline" size={19} color={COLORS.primary} />
+
+            <Text style={styles.sectionTitle}>Truy cập nhanh</Text>
+          </View>
+        </View>
 
         <View style={styles.quickGrid}>
           <QuickAction
@@ -561,7 +645,7 @@ export default function HomeScreen() {
           />
 
           <QuickAction
-            icon="person-outline"
+            icon="settings-outline"
             title="Cài đặt"
             onPress={goToSettings}
           />
@@ -570,6 +654,10 @@ export default function HomeScreen() {
     </View>
   );
 }
+
+// =====================================================
+// QUICK ACTION
+// =====================================================
 
 interface QuickActionProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -585,13 +673,19 @@ function QuickAction({ icon, title, onPress }: QuickActionProps) {
       activeOpacity={0.75}
     >
       <View style={styles.quickIcon}>
-        <Ionicons name={icon} size={24} color={COLORS.primaryDark} />
+        <Ionicons name={icon} size={21} color={COLORS.primary} />
       </View>
 
       <Text style={styles.quickText}>{title}</Text>
+
+      <Ionicons name="chevron-forward" size={16} color={COLORS.textLight} />
     </TouchableOpacity>
   );
 }
+
+// =====================================================
+// STYLES
+// =====================================================
 
 const styles = StyleSheet.create({
   container: {
@@ -600,50 +694,94 @@ const styles = StyleSheet.create({
   },
 
   content: {
-    padding: 20,
-    paddingBottom: 30,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 35,
   },
 
-  greeting: {
+  // ================= USER =================
+
+  userCard: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
-  },
-
-  greetingContent: {
-    flex: 1,
-    marginRight: 15,
-  },
-
-  hello: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-  },
-
-  name: {
-    marginTop: 4,
-    fontSize: 22,
-    fontWeight: "700",
-    color: COLORS.text,
-  },
-
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
     backgroundColor: COLORS.white,
-    justifyContent: "center",
-    alignItems: "center",
+    borderRadius: 20,
+    padding: 15,
+    marginBottom: 22,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
 
+  userAvatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 17,
+    backgroundColor: COLORS.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  userAvatarText: {
+    color: COLORS.white,
+    fontSize: 21,
+    fontWeight: "800",
+  },
+
+  userInfo: {
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 10,
+  },
+
+  welcomeText: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+  },
+
+  userName: {
+    marginTop: 2,
+    fontSize: 18,
+    lineHeight: 23,
+    fontWeight: "700",
+    color: COLORS.text,
+  },
+
+  usernameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+  },
+
+  username: {
+    marginLeft: 4,
+    fontSize: 10,
+    color: COLORS.textLight,
+  },
+
+  userDescription: {
+    marginTop: 4,
+    fontSize: 10,
+    color: COLORS.textLight,
+  },
+
+  profileButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: COLORS.backgroundSoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  // ================= STATISTICS =================
+
   statsRow: {
     flexDirection: "row",
     gap: 10,
-    marginBottom: 25,
+    marginBottom: 27,
   },
+
+  // ================= SECTION =================
 
   sectionHeader: {
     flexDirection: "row",
@@ -652,20 +790,28 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
+  sectionTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: "700",
     color: COLORS.text,
   },
 
   seeAll: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.primaryDark,
+    fontSize: 12,
+    fontWeight: "700",
+    color: COLORS.primary,
   },
 
+  // ================= COURSES =================
+
   courseList: {
-    marginBottom: 25,
+    marginBottom: 26,
   },
 
   courseWrapper: {
@@ -683,18 +829,18 @@ const styles = StyleSheet.create({
 
   progressHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 7,
   },
 
   progressLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: COLORS.textSecondary,
   },
 
   progressValue: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "700",
     color: COLORS.primary,
   },
@@ -712,8 +858,10 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
 
+  // ================= HISTORY =================
+
   historyList: {
-    marginBottom: 25,
+    marginBottom: 26,
   },
 
   historyItem: {
@@ -722,29 +870,29 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderWidth: 1,
     borderColor: COLORS.border,
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 10,
+    borderRadius: 17,
+    padding: 13,
+    marginBottom: 9,
   },
 
   historyIcon: {
-    width: 46,
-    height: 46,
+    width: 45,
+    height: 45,
     borderRadius: 13,
     backgroundColor: COLORS.backgroundSoft,
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "center",
     marginRight: 12,
   },
 
   historyContent: {
     flex: 1,
-    marginRight: 10,
+    marginRight: 8,
   },
 
   historyTitle: {
-    fontSize: 14,
-    lineHeight: 19,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: "700",
     color: COLORS.text,
   },
@@ -756,71 +904,84 @@ const styles = StyleSheet.create({
   },
 
   historyDate: {
-    fontSize: 11,
+    marginLeft: 4,
+    fontSize: 10,
     color: COLORS.textSecondary,
   },
 
   historyDot: {
-    width: 4,
-    height: 4,
+    width: 3,
+    height: 3,
     borderRadius: 2,
     backgroundColor: COLORS.textLight,
     marginHorizontal: 7,
   },
 
   historyStatus: {
-    fontSize: 11,
-    color: COLORS.primary,
+    fontSize: 10,
     fontWeight: "600",
+    color: COLORS.primary,
   },
 
   emptyHistory: {
+    minHeight: 110,
     backgroundColor: COLORS.white,
     borderWidth: 1,
     borderColor: COLORS.border,
-    borderRadius: 16,
-    minHeight: 110,
-    justifyContent: "center",
+    borderRadius: 17,
     alignItems: "center",
-    marginBottom: 25,
+    justifyContent: "center",
+    marginBottom: 26,
+  },
+
+  emptyHistoryIcon: {
+    width: 43,
+    height: 43,
+    borderRadius: 13,
+    backgroundColor: COLORS.backgroundSoft,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   emptyHistoryText: {
     marginTop: 8,
-    fontSize: 13,
+    fontSize: 12,
     color: COLORS.textSecondary,
   },
 
-  quickTitle: {
+  // ================= QUICK ACTIONS =================
+
+  quickHeader: {
     marginBottom: 12,
   },
 
   quickGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
+    gap: 10,
   },
 
   quickCard: {
-    width: "48%",
-    backgroundColor: COLORS.white,
-    borderRadius: 16,
-    padding: 16,
+    minHeight: 58,
     flexDirection: "row",
     alignItems: "center",
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 12,
   },
 
   quickIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
+    width: 38,
+    height: 38,
+    borderRadius: 11,
     backgroundColor: COLORS.backgroundSoft,
-    justifyContent: "center",
     alignItems: "center",
-    marginRight: 10,
+    justifyContent: "center",
+    marginRight: 11,
   },
 
   quickText: {
+    flex: 1,
     fontSize: 13,
     fontWeight: "600",
     color: COLORS.text,
