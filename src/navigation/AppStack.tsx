@@ -1,4 +1,5 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import useOfflineExamSync from "@/hooks/useOfflineExamSync";
 
 import MainTabNavigator from "./MainTabNavigator";
 
@@ -21,6 +22,7 @@ import { AppStackParamList } from "../types/navigation";
 const Stack = createNativeStackNavigator<AppStackParamList>();
 
 export default function AppStack() {
+  useOfflineExamSync();
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {/* Main application */}

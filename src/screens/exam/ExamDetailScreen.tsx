@@ -16,6 +16,8 @@ import {
 import AppHeader from "@/components/common/AppHeader";
 import Loading from "@/components/common/Loading";
 import COLORS from "@/constants/colors";
+import { listOfflineExams } from "@/services/examStorageService";
+import { isOfflineError } from "@/services/syncService";
 
 import { getQuizAccessInformation, getUserAttempts } from "../../api/quizApi";
 
@@ -34,6 +36,7 @@ export default function ExamDetailScreen() {
   // =========================================
 
   const [loading, setLoading] = useState(true);
+  const [offlineResume, setOfflineResume] = useState(false);
 
   // API 6
   const [canAttempt, setCanAttempt] = useState(false);
@@ -91,6 +94,19 @@ export default function ExamDetailScreen() {
 
       setAttempts(attemptsResponse?.attempts ?? []);
     } catch (error) {
+      if (isOfflineError(error)) {
+        try {
+          const userid = Number(await AsyncStorage.getItem("userid"));
+          const cached = (await listOfflineExams(userid)).some((exam) =>
+            exam.quizid === Number(quizid) && !exam.submitted && Object.keys(exam.pages).length > 0,
+          );
+          if (cached) {
+            setOfflineResume(true);
+            setCanAttempt(true);
+            return;
+          }
+        } catch { /* Fall through to the visible load error. */ }
+      }
       console.error("EXAM DETAIL ERROR:", error);
 
       Alert.alert("Lỗi", "Không thể tải thông tin bài thi.");
@@ -535,7 +551,7 @@ export default function ExamDetailScreen() {
               color={COLORS.white}
             />
 
-            <Text style={styles.startButtonText}>Bắt đầu làm bài</Text>
+            <Text style={styles.startButtonText}>{offlineResume ? "Tiếp tục bài đã lưu offline" : "Bắt đầu làm bài"}</Text>
 
             <Ionicons name="arrow-forward" size={20} color={COLORS.white} />
           </View>

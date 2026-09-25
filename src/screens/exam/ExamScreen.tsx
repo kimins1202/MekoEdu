@@ -17,13 +17,13 @@ import COLORS from "@/constants/colors";
 import useExamMonitoring from "@/hooks/useExamMonitoring";
 import useExamCountdown from "@/hooks/useExamCountdown";
 import ExamTimer from "@/components/exam/ExamTimer";
+import { ExamContext, OfflineExam, listOfflineExams, queueExamAnswers, readOfflineExam, subscribeExamSync, updateOfflineExam } from "@/services/examStorageService";
+import { isOfflineError, syncExam } from "@/services/syncService";
 
 import {
   getAttemptData,
   getAttemptDeadline,
   getUserAttempts,
-  processQuizAttempt,
-  saveQuizAttempt,
   startQuizAttempt,
 } from "../../api/quizApi";
 
@@ -77,18 +77,30 @@ export default function ExamScreen() {
   const submissionLock = useRef(false);
   const autoSubmitStarted = useRef(false);
   const [examUserId, setExamUserId] = useState<number | null>(null);
+  const contextRef = useRef<ExamContext | null>(null);
+  const answerRef = useRef<Record<string, string>>({});
+  const [offlineExam, setOfflineExam] = useState<OfflineExam | null>(null);
+  const [localSaveError, setLocalSaveError] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const answersLocked = !!offlineExam?.submitRequested;
   const isFocused = useIsFocused();
   const monitoring = useExamMonitoring(
     attemptId && examUserId ? { userid: examUserId, quizid: Number(quizid), attemptid: attemptId } : null,
     isFocused && !examFinished,
   );
-  usePreventRemove(!!attemptId && questions.length > 0 && !examFinished, () => {
+  usePreventRemove(!!attemptId && questions.length > 0 && !examFinished && !answersLocked, () => {
     Alert.alert("Bài thi đang được giám sát", "Vui lòng nộp bài trước khi rời màn hình thi.");
   });
 
   // Khởi tạo bài thi
   useEffect(() => {
+    const unsubscribe = subscribeExamSync((exam) => {
+      const context = contextRef.current;
+      if (context && exam.userid === context.userid && exam.attemptid === context.attemptid && exam.quizid === context.quizid) setOfflineExam(exam);
+    });
     initializeExam();
+    return () => { unsubscribe(); if (syncTimer.current) clearTimeout(syncTimer.current); };
   }, []);
 
   const initializeExam = async () => {
@@ -104,6 +116,18 @@ export default function ExamScreen() {
       const numericQuizId = Number(quizid);
       const numericUserId = Number(userId);
       setExamUserId(numericUserId);
+      const cached = (await listOfflineExams(numericUserId))
+        .filter((exam) => exam.quizid === numericQuizId && !exam.submitted)
+        .sort((a, b) => b.updatedAt - a.updatedAt)[0];
+      // Resume a queued submission before creating another Moodle attempt.
+      if (cached && (cached.submitRequested || (cached.deadline !== null && Date.now() >= cached.deadline))) {
+        restoreOfflineExam(cached);
+        if (cached.submitRequested) void syncExam(cached).then(async () => {
+          const latest = await readOfflineExam(cached);
+          if (latest) setOfflineExam(latest);
+        }).catch(() => setLocalSaveError(true));
+        return;
+      }
 
       // Lấy attempt hiện tại
       const getCurrentAttempt = async () => {
@@ -133,7 +157,14 @@ export default function ExamScreen() {
       };
 
       // Kiểm tra attempt đang làm
-      let currentAttempt = await getCurrentAttempt();
+      let currentAttempt;
+      try {
+        currentAttempt = await getCurrentAttempt();
+      } catch (error) {
+        if (!isOfflineError(error) || !cached) throw error;
+        restoreOfflineExam(cached);
+        return;
+      }
 
       let currentAttemptId: number;
 
@@ -169,12 +200,26 @@ export default function ExamScreen() {
       }
 
       setAttemptId(currentAttemptId);
-
-      setDeadline(await getAttemptDeadline(numericQuizId, currentAttemptId));
+      const context = { userid: numericUserId, quizid: numericQuizId, attemptid: currentAttemptId };
+      contextRef.current = context;
+      const previous = await readOfflineExam(context);
+      if (previous) {
+        answerRef.current = previous.answers;
+        setSelectedAnswers(previous.answers);
+        setOfflineExam(previous);
+      }
+      let currentDeadline;
+      try { currentDeadline = await getAttemptDeadline(numericQuizId, currentAttemptId); }
+      catch (error) {
+        if (!isOfflineError(error) || !previous) throw error;
+        currentDeadline = previous.deadline;
+      }
+      await updateOfflineExam(context, (exam) => ({ ...exam, deadline: currentDeadline }));
+      setDeadline(currentDeadline);
       setDeadlineLoaded(true);
 
       // Lấy câu hỏi
-      await loadQuestion(currentAttemptId, 0);
+      await loadQuestion(currentAttemptId, previous?.currentPage ?? 0);
     } catch (error: any) {
       Alert.alert(
         "Không thể mở bài thi",
@@ -190,12 +235,35 @@ export default function ExamScreen() {
       setLoading(false);
     }
   };
+  const restoreOfflineExam = (exam: OfflineExam) => {
+    const pageNumber = exam.pages[exam.currentPage] ? exam.currentPage : Number(Object.keys(exam.pages)[0]);
+    const page = exam.pages[pageNumber];
+    if (!page) throw new Error("Chưa có câu hỏi lưu trên thiết bị. Hãy kết nối mạng để tải bài thi.");
+    contextRef.current = { userid: exam.userid, quizid: exam.quizid, attemptid: exam.attemptid };
+    answerRef.current = exam.answers;
+    setSelectedAnswers(exam.answers);
+    setAttemptId(exam.attemptid);
+    setOfflineExam(exam);
+    setDeadline(exam.deadline);
+    setDeadlineLoaded(true);
+    setQuestions(page.questions);
+    page.questions.forEach((question: QuizQuestion) => restoreSelectedAnswer(question.html));
+    setCurrentPage(pageNumber);
+    setNextPage(page.nextpage);
+  };
   // Tải câu hỏi
   const loadQuestion = async (currentAttemptId: number, page: number) => {
     try {
       setLoading(true);
 
-      const response = await getAttemptData(currentAttemptId, page);
+      let response;
+      try { response = await getAttemptData(currentAttemptId, page); }
+      catch (error) {
+        if (!isOfflineError(error) || !contextRef.current) throw error;
+        const cached = await readOfflineExam(contextRef.current);
+        response = cached?.pages[page];
+        if (!response) throw new Error("Trang này chưa được tải. Hãy kết nối mạng để xem câu hỏi mới; đáp án hiện tại đã được giữ lại.");
+      }
 
       if (response?.exception) {
         throw new Error(response.message || "Không thể lấy dữ liệu bài thi.");
@@ -206,6 +274,9 @@ export default function ExamScreen() {
       if (pageQuestions.length === 0) {
         throw new Error("Không tìm thấy câu hỏi.");
       }
+      if (contextRef.current) await updateOfflineExam(contextRef.current, (exam) => ({
+        ...exam, currentPage: page, pages: { ...exam.pages, [page]: { questions: pageQuestions, nextpage: response.nextpage ?? -1 } },
+      }));
 
       setQuestions(pageQuestions);
       setCurrentPage(page);
@@ -344,52 +415,44 @@ export default function ExamScreen() {
         const name = nameMatch[1];
         const value = valueMatch[1];
 
-        if (value !== "-1") {
+        if (value !== "-1" && !(name in answerRef.current)) {
           restored[name] = value;
         }
       });
 
-      return restored;
+      answerRef.current = { ...restored, ...answerRef.current };
+      return answerRef.current;
     });
   };
 
   // Chọn đáp án
   const handleSelectAnswer = (answer: AnswerOption) => {
-    if (saving || submitting || examFinished || (deadline !== null && Date.now() >= deadline)) {
+    if (saving || submitting || submissionLock.current || examFinished || answersLocked || (deadline !== null && Date.now() >= deadline)) {
       return;
     }
 
-    setSelectedAnswers((previous) => ({
-      ...previous,
-      [answer.name]: answer.value,
-    }));
-  };
-
-  // Chuẩn bị dữ liệu
-  const buildSaveData = () => {
-    return Object.entries(selectedAnswers).map(([name, value]) => ({
-      name,
-      value,
-    }));
+    const answers = { ...answerRef.current, [answer.name]: answer.value };
+    answerRef.current = answers;
+    setSelectedAnswers(answers);
+    if (contextRef.current) {
+      const context = contextRef.current;
+      void queueExamAnswers(context, answers).then(() => {
+        setLocalSaveError(false);
+        if (syncTimer.current) clearTimeout(syncTimer.current);
+        syncTimer.current = setTimeout(() => { void syncExam(context).catch(() => setLocalSaveError(true)); }, 1500);
+      }).catch(() => setLocalSaveError(true));
+    }
   };
 
   // Lưu đáp án
   const saveAnswers = async () => {
-    if (!attemptId) {
+    if (!contextRef.current) {
       throw new Error("Không tìm thấy Attempt ID.");
     }
 
-    const data = buildSaveData();
-
-    if (data.length === 0) {
-      return;
-    }
-
-    const response = await saveQuizAttempt(attemptId, data);
-
-    if (response?.exception) {
-      throw new Error(response.message || "Không thể lưu câu trả lời.");
-    }
+    await queueExamAnswers(contextRef.current, answerRef.current);
+    setLocalSaveError(false);
+    void syncExam(contextRef.current).catch(() => setLocalSaveError(true));
   };
 
   // Sang trang tiếp theo
@@ -463,30 +526,10 @@ export default function ExamScreen() {
      submissionLock.current = true;
      setSubmitting(true);
 
-     const data = buildSaveData();
-
-     const response = await processQuizAttempt(attemptId, data, 1);
-
-     if (response?.exception) {
-       throw new Error(response.message || "Không thể nộp bài.");
-     }
-
-     // kết thúc monitoring trước
-     monitoring.complete();
-
-     // tắt chặn navigation
-     setExamFinished(true);
-
-     const submittedAttemptId = attemptId;
-     const submittedQuizId = Number(quizid);
-
-     // để React render lại examFinished = true
-     setTimeout(() => {
-       navigation.replace("Result", {
-         attemptId: submittedAttemptId,
-         quizid: submittedQuizId,
-       });
-     }, 100);
+     if (!contextRef.current) throw new Error("Không tìm thấy dữ liệu lượt thi.");
+     await queueExamAnswers(contextRef.current, answerRef.current, true);
+     setLocalSaveError(false);
+     await syncExam(contextRef.current, true);
    } catch (error: any) {
      Alert.alert("Lỗi nộp bài", error?.message || "Không thể nộp bài.");
    } finally {
@@ -494,6 +537,27 @@ export default function ExamScreen() {
      setSubmitting(false);
    }
  };
+
+  useEffect(() => {
+    if (!offlineExam?.submitted || examFinished) return;
+    monitoring.complete();
+    setExamFinished(true);
+  }, [offlineExam?.submitted, examFinished]);
+
+  useEffect(() => {
+    if (examFinished) navigation.replace("Result", { attemptId, quizid: Number(quizid) });
+  }, [examFinished, navigation, attemptId, quizid]);
+
+  const retrySync = async () => {
+    if (!contextRef.current || syncing) return;
+    setSyncing(true);
+    try {
+      await queueExamAnswers(contextRef.current, answerRef.current, !!offlineExam?.submitRequested);
+      setLocalSaveError(false);
+      await syncExam(contextRef.current, true);
+    } catch { setLocalSaveError(true); }
+    finally { setSyncing(false); }
+  };
 
   useEffect(() => {
     if (!timeExpired || loading || saving || submitting || examFinished || autoSubmitStarted.current) return;
@@ -542,6 +606,25 @@ export default function ExamScreen() {
   return (
     <View style={styles.container}>
       <AppHeader title="Bài thi" subtitle={quizName} showBack />
+
+      <View style={styles.monitoringBanner} accessibilityLiveRegion="polite">
+        <Text style={[styles.monitoringTitle, { color: localSaveError || offlineExam?.status === "Failed" ? COLORS.error : offlineExam?.status === "Pending" ? COLORS.warning : COLORS.primary }]}>
+          Đồng bộ: {localSaveError ? "Failed" : offlineExam?.status ?? "Pending"}{syncing ? " · Đang gửi…" : ""}
+        </Text>
+        <Text style={styles.monitoringText}>
+          {localSaveError ? "Chưa lưu được trên thiết bị. Hãy thử lại trước khi đóng ứng dụng."
+            : offlineExam?.status === "Failed" ? "Đồng bộ thất bại. Bài làm vẫn được giữ trên thiết bị; nhấn Đồng bộ lại để thử gửi."
+            : offlineExam?.submitRequested && !offlineExam.submitted ? "Đã lưu yêu cầu nộp bài trên thiết bị, đang chờ Moodle xác nhận."
+            : offlineExam?.status === "Synced" ? "Moodle đã xác nhận bản lưu gần nhất."
+            : "Bài làm được giữ trên thiết bị và sẽ gửi lại khi kết nối phục hồi."}
+        </Text>
+        {!!offlineExam?.error && <Text style={styles.monitoringError}>{offlineExam.error}</Text>}
+        {(localSaveError || offlineExam?.status !== "Synced") && (
+          <TouchableOpacity onPress={retrySync} disabled={syncing || submitting} accessibilityRole="button">
+            <Text style={styles.monitoringTitle}>Đồng bộ lại</Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       {deadlineLoaded && !examFinished && (
         <View style={{ paddingHorizontal: 20, paddingVertical: 8 }}>
@@ -639,7 +722,7 @@ export default function ExamScreen() {
                         isSelected && styles.answerSelected,
                       ]}
                       onPress={() => handleSelectAnswer(answer)}
-                      disabled={saving || submitting || examFinished || timeExpired}
+                      disabled={saving || submitting || examFinished || timeExpired || answersLocked}
                       activeOpacity={0.75}
                     >
                       <View
@@ -716,7 +799,7 @@ export default function ExamScreen() {
               styles.previousButton,
               currentPage === 0 && styles.navButtonDisabled,
             ]}
-            disabled={currentPage === 0 || saving || submitting || examFinished || timeExpired}
+            disabled={currentPage === 0 || saving || submitting || examFinished || timeExpired || answersLocked}
             onPress={handlePrevious}
             activeOpacity={0.8}
           >
@@ -732,7 +815,7 @@ export default function ExamScreen() {
                 styles.nextButton,
                 saving && styles.navButtonDisabled,
               ]}
-              disabled={saving || submitting || examFinished || timeExpired}
+              disabled={saving || submitting || examFinished || timeExpired || answersLocked}
               onPress={handleNext}
               activeOpacity={0.8}
             >
@@ -751,7 +834,7 @@ export default function ExamScreen() {
                 styles.submitButton,
                 submitting && styles.navButtonDisabled,
               ]}
-              disabled={saving || submitting || examFinished}
+              disabled={saving || submitting || examFinished || answersLocked}
               onPress={handleSubmit}
               activeOpacity={0.8}
             >
