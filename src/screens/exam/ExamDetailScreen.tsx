@@ -175,10 +175,14 @@ export default function ExamDetailScreen() {
       return;
     }
 
-    navigation.navigate("Exam", {
-      quizid: quizid,
-      quizName: quizName,
-    });
+    Alert.alert(
+      "Giám sát màn hình khi thi",
+      "Ứng dụng ghi nhận số lần rời màn hình và lưu nhật ký trên thiết bị. Chụp/quay màn hình sẽ bị chặn trên điện thoại được hỗ trợ. Bạn cần nộp bài trước khi quay lại màn hình khác.",
+      [
+        { text: "Hủy", style: "cancel" },
+        { text: "Bắt đầu", onPress: () => navigation.navigate("Exam", { quizid, quizName }) },
+      ],
+    );
   };
 
   // =========================================

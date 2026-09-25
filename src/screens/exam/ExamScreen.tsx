@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { useIsFocused, useNavigation, usePreventRemove, useRoute } from "@react-navigation/native";
 import { useEffect, useState } from "react";
 import {
   Alert,
@@ -14,6 +14,7 @@ import {
 import AppHeader from "@/components/common/AppHeader";
 import Loading from "@/components/common/Loading";
 import COLORS from "@/constants/colors";
+import useExamMonitoring from "@/hooks/useExamMonitoring";
 
 import {
   getAttemptData,
@@ -65,6 +66,16 @@ export default function ExamScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [examFinished, setExamFinished] = useState(false);
+  const [examUserId, setExamUserId] = useState<number | null>(null);
+  const isFocused = useIsFocused();
+  const monitoring = useExamMonitoring(
+    attemptId && examUserId ? { userid: examUserId, quizid: Number(quizid), attemptid: attemptId } : null,
+    isFocused && !examFinished,
+  );
+  usePreventRemove(!!attemptId && questions.length > 0 && !examFinished, () => {
+    Alert.alert("Bài thi đang được giám sát", "Vui lòng nộp bài trước khi rời màn hình thi.");
+  });
 
   // Khởi tạo bài thi
   useEffect(() => {
@@ -83,6 +94,7 @@ export default function ExamScreen() {
 
       const numericQuizId = Number(quizid);
       const numericUserId = Number(userId);
+      setExamUserId(numericUserId);
 
       // Lấy attempt hiện tại
       const getCurrentAttempt = async () => {
@@ -447,6 +459,8 @@ export default function ExamScreen() {
         throw new Error(response.message || "Không thể nộp bài.");
       }
 
+      monitoring.complete();
+      setExamFinished(true);
       Alert.alert("Nộp bài thành công", "Bài thi đã được nộp và xử lý.", [
         {
           text: "OK",
@@ -501,6 +515,17 @@ export default function ExamScreen() {
   return (
     <View style={styles.container}>
       <AppHeader title="Bài thi" subtitle={quizName} showBack />
+
+      <View style={styles.monitoringBanner} accessibilityLiveRegion="polite">
+        <Text style={styles.monitoringTitle}>
+          {examFinished ? "Đã kết thúc giám sát" : "Đang giám sát màn hình thi"}
+        </Text>
+        {!examFinished && <Text style={styles.monitoringText}>{monitoring.protection}</Text>}
+        <Text style={styles.monitoringText}>
+          Số lần rời màn hình: {monitoring.departures} · Nhật ký lưu trên thiết bị
+        </Text>
+        {monitoring.storageError && <Text style={styles.monitoringError}>Không thể lưu nhật ký giám sát trên thiết bị.</Text>}
+      </View>
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -569,7 +594,7 @@ export default function ExamScreen() {
                         isSelected && styles.answerSelected,
                       ]}
                       onPress={() => handleSelectAnswer(answer)}
-                      disabled={saving || submitting}
+                      disabled={saving || submitting || examFinished}
                       activeOpacity={0.75}
                     >
                       <View
@@ -646,7 +671,7 @@ export default function ExamScreen() {
               styles.previousButton,
               currentPage === 0 && styles.navButtonDisabled,
             ]}
-            disabled={currentPage === 0 || saving || submitting}
+            disabled={currentPage === 0 || saving || submitting || examFinished}
             onPress={handlePrevious}
             activeOpacity={0.8}
           >
@@ -662,7 +687,7 @@ export default function ExamScreen() {
                 styles.nextButton,
                 saving && styles.navButtonDisabled,
               ]}
-              disabled={saving || submitting}
+              disabled={saving || submitting || examFinished}
               onPress={handleNext}
               activeOpacity={0.8}
             >
@@ -681,7 +706,7 @@ export default function ExamScreen() {
                 styles.submitButton,
                 submitting && styles.navButtonDisabled,
               ]}
-              disabled={saving || submitting}
+              disabled={saving || submitting || examFinished}
               onPress={handleSubmit}
               activeOpacity={0.8}
             >
@@ -708,6 +733,13 @@ export default function ExamScreen() {
           </View>
         )}
       </ScrollView>
+      {monitoring.hidden && (
+        <View style={styles.privacyOverlay}>
+          <Ionicons name="shield-checkmark" size={40} color={COLORS.primary} />
+          <Text style={styles.monitoringTitle}>Nội dung bài thi đã được che</Text>
+          <Text style={styles.monitoringText}>Quay lại ứng dụng để tiếp tục làm bài.</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -721,6 +753,11 @@ const getAnswerLabel = (index: number, label: string) => {
 };
 
 const styles = StyleSheet.create({
+  monitoringBanner: { paddingHorizontal: 20, paddingVertical: 12, backgroundColor: "#EAF6EE", gap: 4 },
+  monitoringTitle: { fontSize: 14, fontWeight: "700", color: COLORS.primary },
+  monitoringText: { fontSize: 12, lineHeight: 18, color: COLORS.textSecondary },
+  monitoringError: { fontSize: 12, color: COLORS.error },
+  privacyOverlay: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: COLORS.background, alignItems: "center", justifyContent: "center", gap: 12, zIndex: 10 },
   container: {
     flex: 1,
     backgroundColor: COLORS.backgroundSoft,
