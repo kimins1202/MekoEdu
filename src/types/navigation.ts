@@ -1,13 +1,54 @@
+export type RootStackParamList = {
+  Splash: undefined;
+  Onboarding: undefined;
+  Launch: undefined;
+
+  Auth: undefined;
+  AppInit: undefined;
+  App: undefined;
+};
+
 export type AuthStackParamList = {
   Login: undefined;
 };
 
 export type AppStackParamList = {
-  ExamList: undefined;
-  Quiz: { quizId?: string };
+  CourseList: undefined;
+  CourseDetail: undefined;
+  Notifications: undefined;
+
+  ExamList: {
+    courseid: number;
+  };
+
+  ExamDetail: {
+    quizid: number;
+    quizName: string;
+    questionCount?: number;
+    timelimit?: number;
+  };
+
+  Exam: {
+    quizid: number;
+    quizName: string;
+    attemptid?: number;
+  };
+
+  MainTabs: undefined;
+
+  Profile: undefined;
+  Notification: undefined;
+  SettingsNotification: undefined;
+  Contact: undefined;
+  Help: undefined;
+  Result: undefined;
+  AnswerReview: undefined;
+  Statistics: undefined;
 };
 
-export type RootStackParamList = {
-  Auth: undefined;
-  App: undefined;
+export type MainTabParamList = {
+  Home: undefined;
+  Courses: undefined;
+  History: undefined;
+  Settings: undefined;
 };
