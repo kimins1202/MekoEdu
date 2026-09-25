@@ -13,8 +13,8 @@ import {
 import AppButton from "@/components/common/AppButton";
 import AppInput from "@/components/common/AppInput";
 import Loading from "@/components/common/Loading";
+import MekoLogo from "@/components/common/MekoLogo";
 import COLORS from "@/constants/colors";
-
 import { loginApi } from "../../api/authApi";
 
 const REMEMBER_USERNAME_KEY = "rememberUsername";
@@ -23,15 +23,11 @@ const REMEMBER_PASSWORD_KEY = "rememberPassword";
 export default function LoginScreen() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-
   const [showPassword, setShowPassword] = useState(false);
   const [rememberPassword, setRememberPassword] = useState(false);
-
   const [loading, setLoading] = useState(false);
 
-  //
-  // ĐỌC THÔNG TIN ĐĂNG NHẬP ĐÃ LƯU
-  //
+  // Đọc thông tin đăng nhập đã lưu
   useEffect(() => {
     loadRememberedAccount();
   }, []);
@@ -59,14 +55,11 @@ export default function LoginScreen() {
     }
   };
 
-  //
-  // ĐĂNG NHẬP
-  //
+  // Đăng nhập
   const handleLogin = async () => {
     const cleanUsername = username.trim();
     const cleanPassword = password.trim();
 
-    // Kiểm tra dữ liệu nhập
     if (!cleanUsername || !cleanPassword) {
       Alert.alert(
         "Thông báo",
@@ -78,10 +71,10 @@ export default function LoginScreen() {
     try {
       setLoading(true);
 
-      // 1. Gọi API đăng nhập Moodle
+      // Gọi API đăng nhập Moodle
       const data = await loginApi(cleanUsername, cleanPassword);
 
-      // 2. Kiểm tra kết quả đăng nhập
+      // Kiểm tra kết quả đăng nhập
       if (!data?.token) {
         const errorMessage =
           data?.error ||
@@ -92,15 +85,13 @@ export default function LoginScreen() {
         return;
       }
 
-      // 3. Lưu token Moodle
+      // Lưu token Moodle
       await AsyncStorage.setItem("wstoken", data.token);
 
-      // 4. Xóa userid cũ
-      // Tránh trường hợp đổi tài khoản
-      // nhưng vẫn sử dụng userid của tài khoản trước
+      // Xóa userid cũ khi đổi tài khoản
       await AsyncStorage.removeItem("userid");
 
-      // 5. Xử lý ghi nhớ tài khoản
+      // Xử lý ghi nhớ tài khoản
       if (rememberPassword) {
         await AsyncStorage.setItem(REMEMBER_USERNAME_KEY, cleanUsername);
 
@@ -110,7 +101,7 @@ export default function LoginScreen() {
         await AsyncStorage.removeItem(REMEMBER_PASSWORD_KEY);
       }
 
-      // 6. Thông báo app đã đăng nhập
+      // Báo cho RootNavigator cập nhật trạng thái đăng nhập
       DeviceEventEmitter.emit("authChange");
     } catch (error) {
       Alert.alert(
@@ -122,43 +113,28 @@ export default function LoginScreen() {
     }
   };
 
-  //
-  // LOADING
-  //
+  // Loading
   if (loading) {
     return <Loading message="Đang kết nối tới hệ thống Moodle..." />;
   }
 
-  //
-  // UI
-  //
   return (
     <View style={styles.container}>
-      {/* Decorative background */}
+      {/* Background decoration */}
       <View style={styles.backgroundCircleTop} />
       <View style={styles.backgroundCircleBottom} />
 
-      {/* 
-          HEADER
-       */}
+      {/* Header */}
       <View style={styles.header}>
-        {/* Logo */}
-        <View style={styles.logoWrapper}>
-          <View style={styles.logoGlow} />
+        <MekoLogo size={78} />
 
-          <View style={styles.logo}>
-            <Text style={styles.logoLetter}>M</Text>
-          </View>
+        <View style={styles.brandName}>
+          <Text style={styles.mekoText}>Meko</Text>
+          <Text style={styles.eduText}>Edu</Text>
         </View>
-
-        <Text style={styles.logoName}>
-          Meko<Text style={styles.logoEdu}>Edu</Text>
-        </Text>
       </View>
 
-      {/* 
-          FORM
-       */}
+      {/* Form */}
       <View style={styles.form}>
         <AppInput
           label="Tên đăng nhập"
@@ -214,13 +190,11 @@ export default function LoginScreen() {
           <Text style={styles.rememberText}>Ghi nhớ mật khẩu</Text>
         </TouchableOpacity>
 
-        {/* Login button */}
+        {/* Login */}
         <AppButton onPress={handleLogin} loading={loading} title="Đăng nhập" />
       </View>
 
-      {/* 
-          FOOTER
-       */}
+      {/* Footer */}
       <View style={styles.footer}>
         <View style={styles.footerLine} />
 
@@ -238,137 +212,85 @@ export default function LoginScreen() {
   );
 }
 
-//
-// STYLE
-//
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: "center",
     paddingHorizontal: 24,
-    backgroundColor: "#F7FBF8",
+    backgroundColor: COLORS.backgroundSoft,
     overflow: "hidden",
   },
 
-  //
-  // BACKGROUND
-  //
-
+  // Background
   backgroundCircleTop: {
     position: "absolute",
-    width: 280,
-    height: 280,
-    borderRadius: 140,
+    width: 290,
+    height: 290,
+    borderRadius: 145,
     backgroundColor: COLORS.primary,
-    opacity: 0.055,
-    top: -150,
-    right: -100,
+    opacity: 0.05,
+    top: -175,
+    right: -120,
   },
 
   backgroundCircleBottom: {
     position: "absolute",
-    width: 320,
-    height: 320,
-    borderRadius: 160,
+    width: 330,
+    height: 330,
+    borderRadius: 165,
     backgroundColor: COLORS.primaryDark,
-    opacity: 0.045,
-    bottom: -190,
-    left: -160,
+    opacity: 0.04,
+    bottom: -205,
+    left: -175,
   },
 
-  //
-  // HEADER
-  //
-
+  // Header
   header: {
     alignItems: "center",
     marginBottom: 30,
   },
 
-  logoWrapper: {
-    width: 92,
-    height: 92,
-    justifyContent: "center",
+  brandName: {
+    flexDirection: "row",
     alignItems: "center",
-    marginBottom: 10,
+    marginTop: 10,
   },
 
-  logoGlow: {
-    position: "absolute",
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: COLORS.primary,
-    opacity: 0.08,
-  },
-
-  logo: {
-    width: 68,
-    height: 68,
-    borderRadius: 21,
-
-    backgroundColor: COLORS.primaryDark,
-
-    justifyContent: "center",
-    alignItems: "center",
-
-    shadowColor: COLORS.primaryDark,
-    shadowOffset: {
-      width: 0,
-      height: 7,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-
-    elevation: 6,
-  },
-
-  logoLetter: {
-    color: COLORS.white,
-    fontSize: 39,
+  mekoText: {
+    fontSize: 25,
     fontWeight: "800",
-    letterSpacing: -1,
-  },
-
-  logoName: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: COLORS.text,
-    letterSpacing: 0.2,
-    marginBottom: 18,
-  },
-
-  logoEdu: {
     color: COLORS.primary,
+    letterSpacing: -0.5,
+  },
+
+  eduText: {
+    fontSize: 25,
+    fontWeight: "800",
+    color: COLORS.primaryLight,
+    letterSpacing: -0.5,
   },
 
   title: {
+    marginTop: 20,
     fontSize: 24,
+    lineHeight: 30,
     fontWeight: "700",
     color: COLORS.text,
     textAlign: "center",
-    marginBottom: 7,
   },
 
   subtitle: {
-    fontSize: 14,
-    lineHeight: 20,
+    marginTop: 7,
+    fontSize: 13,
+    lineHeight: 19,
     color: COLORS.textSecondary,
     textAlign: "center",
   },
 
-  //
-  // FORM
-  //
-
+  // Form
   form: {
     width: "100%",
   },
-
-  //
-  // PASSWORD
-  //
 
   passwordWrapper: {
     position: "relative",
@@ -382,42 +304,30 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 13,
     top: 34,
-
     width: 38,
     height: 38,
-
     justifyContent: "center",
     alignItems: "center",
   },
 
-  //
-  // REMEMBER
-  //
-
+  // Remember
   rememberRow: {
     flexDirection: "row",
     alignItems: "center",
-
     alignSelf: "flex-start",
-
     marginTop: -2,
-    marginBottom: 14,
+    marginBottom: 16,
   },
 
   checkbox: {
     width: 20,
     height: 20,
-
     borderRadius: 6,
-
     borderWidth: 1.5,
     borderColor: COLORS.border,
-
     backgroundColor: COLORS.white,
-
     justifyContent: "center",
     alignItems: "center",
-
     marginRight: 9,
   },
 
@@ -432,10 +342,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
 
-  //
-  // FOOTER
-  //
-
+  // Footer
   footer: {
     alignItems: "center",
     marginTop: 27,
@@ -444,9 +351,7 @@ const styles = StyleSheet.create({
   footerLine: {
     width: 45,
     height: 1,
-
     backgroundColor: COLORS.border,
-
     marginBottom: 11,
   },
 

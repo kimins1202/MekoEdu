@@ -8,6 +8,8 @@ import {
   ViewStyle,
 } from "react-native";
 
+import COLORS from "../../constants/colors";
+
 interface LoadingProps {
   message?: string;
   size?: "small" | "large";
@@ -19,7 +21,7 @@ interface LoadingProps {
 export default function Loading({
   message = "Đang tải...",
   size = "large",
-  color = "#006E27",
+  color = COLORS.primary,
   fullScreen = true,
   style,
 }: LoadingProps) {
@@ -29,7 +31,7 @@ export default function Loading({
     const animation = Animated.loop(
       Animated.timing(rotateAnim, {
         toValue: 1,
-        duration: 900,
+        duration: 800,
         easing: Easing.linear,
         useNativeDriver: true,
       }),
@@ -65,15 +67,25 @@ export default function Loading({
             height: spinnerSize,
             borderRadius: spinnerSize / 2,
             borderWidth,
-            borderColor: `${color}25`,
+            borderColor: `${color}20`,
             borderTopColor: color,
-            borderRightColor: color,
             transform: [{ rotate: spin }],
           },
         ]}
       />
 
-      {message ? <Text style={styles.text}>{message}</Text> : null}
+      {message ? (
+        <Text
+          style={[
+            styles.text,
+            {
+              fontSize: size === "large" ? 14 : 12,
+            },
+          ]}
+        >
+          {message}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -81,7 +93,7 @@ export default function Loading({
 const styles = StyleSheet.create({
   fullScreenContainer: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.white,
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
@@ -101,7 +113,7 @@ const styles = StyleSheet.create({
   text: {
     marginTop: 14,
     fontSize: 14,
-    color: "#5F6F7B",
+    color: COLORS.textSecondary,
     fontWeight: "500",
   },
 });

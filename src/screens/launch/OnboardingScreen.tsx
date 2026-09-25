@@ -1,7 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useRef, useState } from "react";
 import {
+  Animated,
   Dimensions,
+  Easing,
+  Image,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -9,30 +13,18 @@ import {
 } from "react-native";
 
 import AppButton from "../../components/common/AppButton";
+import COLORS from "../../constants/colors";
+import { RootStackParamList } from "../../types/navigation";
 
 const { width, height } = Dimensions.get("window");
 
-const COLORS = {
-  primary: "#008A3D",
-  secondary: "#3EAF7C",
-
-  greenLight: "#DDF7E5",
-  greenPale: "#E8F9ED",
-  greenSoft: "#C9F2D5",
-
-  dark: "#26352E",
-  text: "#52625A",
-  textSecondary: "#718078",
-
-  white: "#FFFFFF",
-  dot: "#D5E5DC",
-};
+type Props = NativeStackScreenProps<RootStackParamList, "Onboarding">;
 
 const onboardingData = [
   {
     title: "Học tập không giới hạn",
     description:
-      "Tiếp cận hàng trăm khóa học đại học chất lượng cao, bài giảng tương tác và tài liệu ôn tập chuẩn trên thiết bị của bạn.",
+      "Tiếp cận khóa học, bài giảng và tài liệu học tập ngay trên thiết bị của bạn.",
     icon: "book-outline" as keyof typeof Ionicons.glyphMap,
     smallIcon: "desktop-outline" as keyof typeof Ionicons.glyphMap,
     badgeTitle: "120+ Học phần",
@@ -42,7 +34,7 @@ const onboardingData = [
   {
     title: "Làm bài thi trực tuyến",
     description:
-      "Thực hiện các bài thi trực tuyến nhanh chóng, theo dõi thời gian và quản lý câu trả lời ngay trên ứng dụng.",
+      "Thực hiện bài thi nhanh chóng, theo dõi thời gian và quản lý câu trả lời ngay trên ứng dụng.",
     icon: "create-outline" as keyof typeof Ionicons.glyphMap,
     smallIcon: "checkmark-circle-outline" as keyof typeof Ionicons.glyphMap,
     badgeTitle: "Thi trực tuyến",
@@ -61,17 +53,57 @@ const onboardingData = [
   },
 ];
 
-export default function OnboardingScreen({ navigation }: any) {
+export default function OnboardingScreen({ navigation }: Props) {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   const current = onboardingData[currentIndex];
 
+  const contentOpacity = useRef(new Animated.Value(1)).current;
+  const contentTranslateY = useRef(new Animated.Value(0)).current;
+
   const handleNext = () => {
-    if (currentIndex < onboardingData.length - 1) {
-      setCurrentIndex((prev) => prev + 1);
-    } else {
+    if (currentIndex >= onboardingData.length - 1) {
       navigation.replace("Launch");
+      return;
     }
+
+    // Ẩn slide hiện tại
+    Animated.parallel([
+      Animated.timing(contentOpacity, {
+        toValue: 0,
+        duration: 150,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+
+      Animated.timing(contentTranslateY, {
+        toValue: -8,
+        duration: 150,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setCurrentIndex((prev) => prev + 1);
+
+      contentTranslateY.setValue(8);
+
+      // Hiện slide mới
+      Animated.parallel([
+        Animated.timing(contentOpacity, {
+          toValue: 1,
+          duration: 250,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+
+        Animated.timing(contentTranslateY, {
+          toValue: 0,
+          duration: 250,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    });
   };
 
   const handleSkip = () => {
@@ -82,6 +114,16 @@ export default function OnboardingScreen({ navigation }: any) {
     <View style={styles.container}>
       {/* ================= HEADER ================= */}
       <View style={styles.header}>
+        {/* Logo MekoSoft */}
+        <View style={styles.headerLogoContainer}>
+          <Image
+            source={require("../../../assets/images/meko-logo-dark-rmbg.png")}
+            style={styles.headerLogo}
+            resizeMode="contain"
+          />
+        </View>
+
+        {/* Bỏ qua */}
         <TouchableOpacity
           style={styles.skipButton}
           onPress={handleSkip}
@@ -91,52 +133,71 @@ export default function OnboardingScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      {/* ================= ILLUSTRATION ================= */}
-      <View style={styles.illustrationContainer}>
-        <View style={styles.illustrationBackground}>
-          {/* Background decorations */}
-          <View style={styles.circleTop} />
-          <View style={styles.circleBottom} />
+      {/* ================= CONTENT ================= */}
+      <Animated.View
+        style={[
+          styles.animatedContent,
+          {
+            opacity: contentOpacity,
+            transform: [{ translateY: contentTranslateY }],
+          },
+        ]}
+      >
+        {/* ================= ILLUSTRATION ================= */}
+        <View style={styles.illustrationContainer}>
+          <View style={styles.illustrationBackground}>
+            {/* Background decorations */}
+            <View style={styles.circleTop} />
+            <View style={styles.circleBottom} />
 
-          {/* Main white card */}
-          <View style={styles.mainCard}>
-            <View style={styles.iconCircle}>
-              <Ionicons name={current.icon} size={48} color={COLORS.primary} />
+            {/* Main card */}
+            <View style={styles.mainCard}>
+              <View style={styles.iconCircle}>
+                <Ionicons
+                  name={current.icon}
+                  size={46}
+                  color={COLORS.primary}
+                />
+              </View>
+
+              <Text style={styles.cardTitle}>{current.badgeTitle}</Text>
+
+              <Text style={styles.cardSubtitle}>{current.badgeSubtitle}</Text>
             </View>
 
-            <Text style={styles.cardTitle}>{current.badgeTitle}</Text>
+            {/* Top-right badge */}
+            <View style={styles.topBadge}>
+              <Ionicons
+                name={current.smallIcon}
+                size={24}
+                color={COLORS.primary}
+              />
+            </View>
 
-            <Text style={styles.cardSubtitle}>{current.badgeSubtitle}</Text>
-          </View>
+            {/* Bottom-left badge */}
+            <View style={styles.accessBadge}>
+              <Ionicons
+                name="checkmark-circle"
+                size={14}
+                color={COLORS.white}
+              />
 
-          {/* Top-right icon */}
-          <View style={styles.topBadge}>
-            <Ionicons
-              name={current.smallIcon}
-              size={25}
-              color={COLORS.primary}
-            />
-          </View>
-
-          {/* Bottom-left badge */}
-          <View style={styles.accessBadge}>
-            <Ionicons name="checkmark-circle" size={14} color={COLORS.white} />
-
-            <Text style={styles.accessBadgeText}>{current.accessText}</Text>
+              <Text style={styles.accessBadgeText}>{current.accessText}</Text>
+            </View>
           </View>
         </View>
-      </View>
 
-      {/* ================= CONTENT ================= */}
-      <View style={styles.content}>
-        <Text style={styles.title}>{current.title}</Text>
+        {/* ================= TEXT ================= */}
+        <View style={styles.content}>
+          <Text style={styles.title}>{current.title}</Text>
 
-        <Text style={styles.description}>{current.description}</Text>
-      </View>
+          <Text style={styles.description}>{current.description}</Text>
+        </View>
+      </Animated.View>
 
       {/* ================= BOTTOM ================= */}
       <View style={styles.bottomSection}>
-        {/* Pagination dots */}
+        {/* Pagination */}
         <View style={styles.dots}>
           {onboardingData.map((_, index) => {
             const isActive = index === currentIndex;
@@ -150,7 +211,7 @@ export default function OnboardingScreen({ navigation }: any) {
           })}
         </View>
 
-        {/* System Button */}
+        {/* App Button */}
         <AppButton
           title={
             currentIndex === onboardingData.length - 1
@@ -165,21 +226,56 @@ export default function OnboardingScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  // ================= CONTAINER =================
+  // =========================
+  // CONTAINER
+  // =========================
 
   container: {
     flex: 1,
     backgroundColor: COLORS.white,
   },
 
-  // ================= HEADER =================
+  // =========================
+  // HEADER
+  // =========================
 
   header: {
-    height: 75,
-    paddingTop: 38,
-    paddingHorizontal: 25,
-    alignItems: "flex-end",
+    height: 76,
+
+    paddingTop: 36,
+    paddingHorizontal: 24,
+
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  // Nền xanh đồng nhất với hệ thống
+  headerLogoContainer: {
+    width: 44,
+    height: 44,
+
+    borderRadius: 13,
+
+    backgroundColor: COLORS.primary,
+
+    alignItems: "center",
     justifyContent: "center",
+
+    shadowColor: COLORS.primary,
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+
+  // Logo M trắng đã được tách nền
+  headerLogo: {
+    width: 40,
+    height: 40,
   },
 
   skipButton: {
@@ -193,34 +289,53 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
 
-  // ================= ILLUSTRATION =================
+  // =========================
+  // ANIMATED CONTENT
+  // =========================
+
+  animatedContent: {
+    flex: 1,
+  },
+
+  // =========================
+  // ILLUSTRATION
+  // =========================
 
   illustrationContainer: {
     width: width * 0.82,
     height: height * 0.38,
+
     alignSelf: "center",
+
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 5,
+
+    marginTop: 4,
   },
 
   illustrationBackground: {
     width: width * 0.66,
     height: width * 0.66,
+
     maxWidth: 250,
     maxHeight: 250,
 
     borderRadius: 30,
 
-    backgroundColor: COLORS.greenLight,
+    backgroundColor: COLORS.backgroundSoft,
 
     alignItems: "center",
     justifyContent: "center",
 
     position: "relative",
+
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
 
-  // ================= DECORATION =================
+  // =========================
+  // DECORATIONS
+  // =========================
 
   circleTop: {
     position: "absolute",
@@ -230,12 +345,10 @@ const styles = StyleSheet.create({
 
     borderRadius: 38,
 
-    backgroundColor: COLORS.greenSoft,
+    backgroundColor: "rgba(125,186,24,0.18)",
 
     top: -25,
     left: -20,
-
-    opacity: 0.8,
   },
 
   circleBottom: {
@@ -246,21 +359,21 @@ const styles = StyleSheet.create({
 
     borderRadius: 48,
 
-    backgroundColor: COLORS.greenPale,
+    backgroundColor: "rgba(0,108,70,0.08)",
 
     bottom: -35,
     right: -30,
-
-    opacity: 0.9,
   },
 
-  // ================= MAIN CARD =================
+  // =========================
+  // MAIN CARD
+  // =========================
 
   mainCard: {
-    width: 135,
-    height: 145,
+    width: 140,
+    height: 150,
 
-    borderRadius: 16,
+    borderRadius: 18,
 
     backgroundColor: COLORS.white,
 
@@ -269,11 +382,13 @@ const styles = StyleSheet.create({
 
     paddingHorizontal: 12,
 
-    shadowColor: "#000",
+    shadowColor: COLORS.black,
+
     shadowOffset: {
       width: 0,
       height: 7,
     },
+
     shadowOpacity: 0.1,
     shadowRadius: 15,
 
@@ -281,12 +396,15 @@ const styles = StyleSheet.create({
   },
 
   iconCircle: {
-    width: 54,
-    height: 54,
+    width: 56,
+    height: 56,
 
-    borderRadius: 27,
+    borderRadius: 28,
 
-    backgroundColor: COLORS.greenPale,
+    backgroundColor: COLORS.backgroundSoft,
+
+    borderWidth: 1,
+    borderColor: COLORS.border,
 
     alignItems: "center",
     justifyContent: "center",
@@ -296,9 +414,10 @@ const styles = StyleSheet.create({
 
   cardTitle: {
     fontSize: 13,
+
     fontWeight: "800",
 
-    color: COLORS.dark,
+    color: COLORS.text,
 
     textAlign: "center",
   },
@@ -313,7 +432,9 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
 
-  // ================= TOP BADGE =================
+  // =========================
+  // TOP BADGE
+  // =========================
 
   topBadge: {
     position: "absolute",
@@ -331,18 +452,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
 
-    shadowColor: "#000",
+    borderWidth: 1,
+    borderColor: COLORS.border,
+
+    shadowColor: COLORS.black,
+
     shadowOffset: {
       width: 0,
       height: 5,
     },
+
     shadowOpacity: 0.08,
     shadowRadius: 8,
 
     elevation: 5,
   },
 
-  // ================= ACCESS BADGE =================
+  // =========================
+  // ACCESS BADGE
+  // =========================
 
   accessBadge: {
     position: "absolute",
@@ -350,25 +478,26 @@ const styles = StyleSheet.create({
     left: -17,
     bottom: 12,
 
-    height: 26,
+    height: 28,
 
-    paddingHorizontal: 10,
+    paddingHorizontal: 11,
 
     borderRadius: 14,
 
     backgroundColor: COLORS.primary,
 
     flexDirection: "row",
-
     alignItems: "center",
 
     gap: 4,
 
     shadowColor: COLORS.primary,
+
     shadowOffset: {
       width: 0,
       height: 3,
     },
+
     shadowOpacity: 0.2,
     shadowRadius: 5,
 
@@ -383,7 +512,9 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  // ================= CONTENT =================
+  // =========================
+  // CONTENT
+  // =========================
 
   content: {
     width: width * 0.82,
@@ -392,7 +523,7 @@ const styles = StyleSheet.create({
 
     alignItems: "center",
 
-    marginTop: 0,
+    marginTop: 2,
   },
 
   title: {
@@ -402,7 +533,7 @@ const styles = StyleSheet.create({
 
     fontWeight: "800",
 
-    color: COLORS.dark,
+    color: COLORS.text,
 
     textAlign: "center",
   },
@@ -414,12 +545,14 @@ const styles = StyleSheet.create({
 
     lineHeight: 21,
 
-    color: COLORS.text,
+    color: COLORS.textSecondary,
 
     textAlign: "center",
   },
 
-  // ================= BOTTOM =================
+  // =========================
+  // BOTTOM
+  // =========================
 
   bottomSection: {
     width: width * 0.82,
@@ -427,13 +560,14 @@ const styles = StyleSheet.create({
     alignSelf: "center",
 
     marginTop: "auto",
-
     marginBottom: 32,
 
     alignItems: "center",
   },
 
-  // ================= DOTS =================
+  // =========================
+  // DOTS
+  // =========================
 
   dots: {
     flexDirection: "row",
@@ -451,7 +585,7 @@ const styles = StyleSheet.create({
 
     borderRadius: 4,
 
-    backgroundColor: COLORS.dot,
+    backgroundColor: COLORS.border,
   },
 
   activeDot: {

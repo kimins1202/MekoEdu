@@ -1,436 +1,493 @@
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef } from "react";
-import { Animated, Easing, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Animated, Easing, Image, StyleSheet, Text, View } from "react-native";
 
 import COLORS from "../../constants/colors";
+import { RootStackParamList } from "../../types/navigation";
 
-export default function SplashScreen({ navigation }: any) {
-  // ANIMATION VALUES
+type Props = NativeStackScreenProps<RootStackParamList, "Splash">;
 
-  const logoScale = useRef(new Animated.Value(0.75)).current;
-
+export default function SplashScreen({ navigation }: Props) {
+  // =========================
+  // Logo animation
+  // =========================
   const logoOpacity = useRef(new Animated.Value(0)).current;
+  const logoScale = useRef(new Animated.Value(0.82)).current;
+  const logoTranslateY = useRef(new Animated.Value(14)).current;
 
-  const textOpacity = useRef(new Animated.Value(0)).current;
+  // =========================
+  // Loading animation
+  // =========================
+  const loadingOpacity = useRef(new Animated.Value(0)).current;
+  const loadingScale = useRef(new Animated.Value(0.8)).current;
 
-  const textTranslateY = useRef(new Animated.Value(15)).current;
+  const dot1 = useRef(new Animated.Value(0.25)).current;
+  const dot2 = useRef(new Animated.Value(0.25)).current;
+  const dot3 = useRef(new Animated.Value(0.25)).current;
 
-  const ringScale = useRef(new Animated.Value(0.8)).current;
+  const progressScale = useRef(new Animated.Value(0)).current;
 
-  const ringOpacity = useRef(new Animated.Value(0)).current;
-
-  const circleTopAnim = useRef(new Animated.Value(0)).current;
-
-  const circleBottomAnim = useRef(new Animated.Value(0)).current;
-
-  // START ANIMATION
+  // =========================
+  // MekoSoft animation
+  // =========================
+  const brandOpacity = useRef(new Animated.Value(0)).current;
+  const brandTranslateY = useRef(new Animated.Value(12)).current;
 
   useEffect(() => {
-    // Logo xuất hiện
+    // =====================================
+    // 1. Logo xuất hiện
+    // =====================================
     Animated.parallel([
       Animated.timing(logoOpacity, {
         toValue: 1,
         duration: 700,
-        easing: Easing.out(Easing.ease),
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
 
       Animated.spring(logoScale, {
         toValue: 1,
-        friction: 6,
+        friction: 7,
         tension: 45,
         useNativeDriver: true,
       }),
-    ]).start();
 
-    // Vòng sáng phía sau logo
-    Animated.sequence([
-      Animated.delay(250),
-
-      Animated.parallel([
-        Animated.timing(ringOpacity, {
-          toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-
-        Animated.timing(ringScale, {
-          toValue: 1,
-          duration: 900,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ]),
-
-      Animated.timing(ringOpacity, {
+      Animated.timing(logoTranslateY, {
         toValue: 0,
-        duration: 600,
+        duration: 700,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
     ]).start();
 
-    // Text xuất hiện sau logo
-    Animated.sequence([
-      Animated.delay(650),
+    // =====================================
+    // 2. Loading xuất hiện
+    // =====================================
+    Animated.parallel([
+      Animated.timing(loadingOpacity, {
+        toValue: 1,
+        duration: 400,
+        delay: 400,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
 
-      Animated.parallel([
-        Animated.timing(textOpacity, {
-          toValue: 1,
-          duration: 600,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
-        }),
-
-        Animated.timing(textTranslateY, {
-          toValue: 0,
-          duration: 600,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ]),
+      Animated.spring(loadingScale, {
+        toValue: 1,
+        friction: 7,
+        tension: 50,
+        delay: 400,
+        useNativeDriver: true,
+      }),
     ]).start();
 
-    // Decorative animation
-    Animated.loop(
+    // =====================================
+    // 3. Loading dots
+    // =====================================
+    const loadingAnimation = Animated.loop(
       Animated.sequence([
-        Animated.timing(circleTopAnim, {
-          toValue: 1,
-          duration: 3500,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
+        // Dot 1
+        Animated.parallel([
+          Animated.timing(dot1, {
+            toValue: 1,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+          Animated.timing(dot2, {
+            toValue: 0.25,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+          Animated.timing(dot3, {
+            toValue: 0.25,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+        ]),
 
-        Animated.timing(circleTopAnim, {
-          toValue: 0,
-          duration: 3500,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
+        // Dot 2
+        Animated.parallel([
+          Animated.timing(dot1, {
+            toValue: 0.25,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+          Animated.timing(dot2, {
+            toValue: 1,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+          Animated.timing(dot3, {
+            toValue: 0.25,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+        ]),
+
+        // Dot 3
+        Animated.parallel([
+          Animated.timing(dot1, {
+            toValue: 0.25,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+          Animated.timing(dot2, {
+            toValue: 0.25,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+          Animated.timing(dot3, {
+            toValue: 1,
+            duration: 250,
+            useNativeDriver: true,
+          }),
+        ]),
       ]),
-    ).start();
+    );
 
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(circleBottomAnim, {
-          toValue: 1,
-          duration: 4000,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
+    loadingAnimation.start();
 
-        Animated.timing(circleBottomAnim, {
-          toValue: 0,
-          duration: 4000,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ]),
-    ).start();
+    // =====================================
+    // 4. Thanh loading
+    // Chạy từ 0.5s → 1.8s
+    // =====================================
+    Animated.timing(progressScale, {
+      toValue: 1,
+      duration: 1300,
+      delay: 500,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: true,
+    }).start();
 
-    // Chuyển sang Onboarding
+    // =====================================
+    // 5. Loading biến mất
+    // Bắt đầu tại 1.8s
+    // =====================================
+    Animated.timing(loadingOpacity, {
+      toValue: 0,
+      duration: 300,
+      delay: 1800,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true,
+    }).start();
+
+    // =====================================
+    // 6. MekoSoft xuất hiện SAU loading
+    // Bắt đầu tại 2.1s
+    // =====================================
+    Animated.parallel([
+      Animated.timing(brandOpacity, {
+        toValue: 1,
+        duration: 600,
+        delay: 2100,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+
+      Animated.timing(brandTranslateY, {
+        toValue: 0,
+        duration: 600,
+        delay: 2100,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // =====================================
+    // 7. Sau đúng 3 giây → Onboarding
+    // =====================================
     const timer = setTimeout(() => {
       navigation.replace("Onboarding");
-    }, 2500);
+    }, 3000);
 
+    // Cleanup
     return () => {
       clearTimeout(timer);
+      loadingAnimation.stop();
     };
-  }, []);
-
-  // DECORATIVE TRANSFORMS
-
-  const topCircleTranslate = circleTopAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -18],
-  });
-
-  const bottomCircleTranslate = circleBottomAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 20],
-  });
+  }, [navigation]);
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
-      <View style={styles.container}>
-        {/* 
-            BACKGROUND DECORATION
-         */}
-
+    <View style={styles.container}>
+      <LinearGradient
+        colors={[COLORS.primaryDark, COLORS.primary, "#178044"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.background}
+      >
+        {/* =====================================
+            LOGO
+        ===================================== */}
         <Animated.View
           style={[
-            styles.circleTop,
+            styles.logoWrapper,
             {
-              transform: [{ translateY: topCircleTranslate }],
+              opacity: logoOpacity,
+              transform: [{ scale: logoScale }, { translateY: logoTranslateY }],
             },
           ]}
-        />
+        >
+          <View style={styles.logoContainer}>
+            <Image
+              source={require("../../../assets/images/mekosoft-logo.png")}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          </View>
+        </Animated.View>
 
+        {/* =====================================
+            LOADING
+        ===================================== */}
         <Animated.View
           style={[
-            styles.circleBottom,
+            styles.loading,
             {
-              transform: [{ translateY: bottomCircleTranslate }],
+              opacity: loadingOpacity,
+              transform: [{ scale: loadingScale }],
             },
           ]}
-        />
-
-        <View style={styles.smallCircle1} />
-        <View style={styles.smallCircle2} />
-
-        {/* 
-            MAIN CONTENT
-         */}
-
-        <View style={styles.content}>
-          {/* Logo */}
-          <View style={styles.logoWrapper}>
-            {/* Glow ring */}
+        >
+          {/* Loading dots */}
+          <View style={styles.loadingDots}>
             <Animated.View
               style={[
-                styles.logoRing,
+                styles.dot,
                 {
-                  opacity: ringOpacity,
-                  transform: [{ scale: ringScale }],
+                  opacity: dot1,
                 },
               ]}
             />
 
-            {/* Logo */}
             <Animated.View
               style={[
-                styles.logo,
+                styles.dot,
                 {
-                  opacity: logoOpacity,
-                  transform: [{ scale: logoScale }],
+                  opacity: dot2,
                 },
               ]}
-            >
-              <Text style={styles.logoLetter}>M</Text>
-            </Animated.View>
+            />
+
+            <Animated.View
+              style={[
+                styles.dot,
+                {
+                  opacity: dot3,
+                },
+              ]}
+            />
           </View>
 
-          {/* App name + slogan */}
-          <Animated.View
-            style={{
-              opacity: textOpacity,
+          {/* Loading bar */}
+          <View style={styles.progressTrack}>
+            <Animated.View
+              style={[
+                styles.progress,
+                {
+                  transform: [{ scaleX: progressScale }],
+                },
+              ]}
+            />
+          </View>
+        </Animated.View>
+
+        {/* =====================================
+            FROM MEKOSOFT
+        ===================================== */}
+        <Animated.View
+          style={[
+            styles.brand,
+            {
+              opacity: brandOpacity,
               transform: [
                 {
-                  translateY: textTranslateY,
+                  translateY: brandTranslateY,
                 },
               ],
-            }}
-          >
-            <Text style={styles.appName}>
-              Meko
-              <Text style={styles.eduText}>Edu</Text>
-            </Text>
-
-            <Text style={styles.slogan}>Learn smarter. Grow better.</Text>
-          </Animated.View>
-        </View>
-
-        {/* 
-            FOOTER
-         */}
-
-        <Animated.Text
-          style={[
-            styles.footer,
-            {
-              opacity: textOpacity,
             },
           ]}
         >
-          Learning made simple
-        </Animated.Text>
-      </View>
-    </SafeAreaView>
+          <Text style={styles.fromText}>FROM</Text>
+
+          <View style={styles.brandName}>
+            <Text style={styles.mekoText}>Meko</Text>
+            <Text style={styles.softText}>Soft</Text>
+          </View>
+        </Animated.View>
+
+        {/* iPhone Home Indicator */}
+        <View style={styles.homeIndicator} />
+      </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  // CONTAINER
-
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#F7FBF8",
-  },
-
+  // =========================
+  // Container
+  // =========================
   container: {
     flex: 1,
-    backgroundColor: "#F7FBF8",
+    backgroundColor: COLORS.primary,
+  },
+
+  background: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
   },
 
-  // MAIN CONTENT
-
-  content: {
-    alignItems: "center",
-    zIndex: 10,
-  },
-
+  // =========================
+  // Logo
+  // =========================
   logoWrapper: {
-    width: 150,
-    height: 150,
+    width: 230,
+    height: 230,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 20,
+
+    // Đẩy logo lên trên một chút
+    marginTop: -90,
+  },
+
+  logoContainer: {
+    width: 158,
+    height: 158,
+    borderRadius: 79,
+
+    alignItems: "center",
+    justifyContent: "center",
+
+    backgroundColor: COLORS.white,
+
+    shadowColor: COLORS.black,
+    shadowOffset: {
+      width: 0,
+      height: 14,
+    },
+    shadowOpacity: 0.22,
+    shadowRadius: 24,
+
+    elevation: 14,
   },
 
   logo: {
-    width: 105,
-    height: 105,
+    width: 116,
+    height: 116,
+  },
 
-    borderRadius: 32,
+  // =========================
+  // Loading
+  // =========================
+  loading: {
+    position: "absolute",
 
-    backgroundColor: COLORS.primaryDark,
+    // Cách xa MekoSoft
+    bottom: 145,
 
-    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  loadingDots: {
+    flexDirection: "row",
     alignItems: "center",
 
-    shadowColor: COLORS.primaryDark,
-    shadowOffset: {
-      width: 0,
-      height: 10,
-    },
-    shadowOpacity: 0.22,
-    shadowRadius: 18,
-
-    elevation: 10,
+    marginBottom: 13,
   },
 
-  logoLetter: {
+  dot: {
+    width: 5,
+    height: 5,
+
+    borderRadius: 3,
+
+    backgroundColor: COLORS.primaryLight,
+
+    marginHorizontal: 4,
+  },
+
+  progressTrack: {
+    width: 88,
+    height: 2,
+
+    borderRadius: 2,
+
+    overflow: "hidden",
+
+    backgroundColor: "rgba(255,255,255,0.14)",
+  },
+
+  progress: {
+    width: "100%",
+    height: 2,
+
+    borderRadius: 2,
+
+    backgroundColor: COLORS.primaryLight,
+
+    transformOrigin: "left",
+  },
+
+  // =========================
+  // MekoSoft
+  // =========================
+  brand: {
+    position: "absolute",
+
+    bottom: 62,
+
+    alignItems: "center",
+  },
+
+  fromText: {
+    fontSize: 8,
+    fontWeight: "500",
+
+    color: "rgba(255,255,255,0.55)",
+
+    letterSpacing: 3.5,
+
+    marginBottom: 4,
+  },
+
+  brandName: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  mekoText: {
+    fontSize: 25,
+    fontWeight: "800",
+
     color: COLORS.white,
-    fontSize: 60,
-    fontWeight: "800",
-    letterSpacing: -2,
+
+    letterSpacing: 0.2,
   },
 
-  // GLOW RING
-
-  logoRing: {
-    position: "absolute",
-
-    width: 135,
-    height: 135,
-
-    borderRadius: 67.5,
-
-    borderWidth: 1.5,
-    borderColor: COLORS.primary,
-
-    opacity: 0,
-  },
-
-  // APP NAME
-
-  appName: {
-    fontSize: 38,
+  softText: {
+    fontSize: 25,
     fontWeight: "800",
 
-    color: COLORS.text,
+    color: COLORS.primaryLight,
 
-    textAlign: "center",
-
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
   },
 
-  eduText: {
-    color: COLORS.primary,
-  },
-
-  slogan: {
-    marginTop: 8,
-
-    fontSize: 14,
-
-    color: "#60716A",
-
-    textAlign: "center",
-
-    letterSpacing: 0.4,
-  },
-
-  // FOOTER
-
-  footer: {
+  // =========================
+  // Home Indicator
+  // =========================
+  homeIndicator: {
     position: "absolute",
 
-    bottom: 28,
+    bottom: 22,
 
-    fontSize: 12,
+    width: 105,
+    height: 4,
 
-    color: "#8A9992",
+    borderRadius: 4,
 
-    letterSpacing: 0.3,
-  },
-
-  // DECORATIVE SHAPES
-
-  circleTop: {
-    position: "absolute",
-
-    width: 280,
-    height: 280,
-
-    borderRadius: 140,
-
-    backgroundColor: COLORS.primary,
-
-    top: -125,
-    right: -105,
-
-    opacity: 0.08,
-  },
-
-  circleBottom: {
-    position: "absolute",
-
-    width: 340,
-    height: 340,
-
-    borderRadius: 170,
-
-    backgroundColor: COLORS.primaryDark,
-
-    bottom: -175,
-    left: -145,
-
-    opacity: 0.07,
-  },
-
-  smallCircle1: {
-    position: "absolute",
-
-    width: 10,
-    height: 10,
-
-    borderRadius: 5,
-
-    backgroundColor: COLORS.primary,
-
-    top: "28%",
-    left: 45,
-
-    opacity: 0.5,
-  },
-
-  smallCircle2: {
-    position: "absolute",
-
-    width: 16,
-    height: 16,
-
-    borderRadius: 8,
-
-    borderWidth: 2,
-    borderColor: COLORS.primaryDark,
-
-    bottom: "27%",
-    right: 45,
-
-    opacity: 0.35,
+    backgroundColor: "rgba(255,255,255,0.5)",
   },
 });

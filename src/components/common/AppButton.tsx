@@ -1,13 +1,15 @@
-import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
 import {
+  ActivityIndicator,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
   ViewStyle,
 } from "react-native";
+
+import COLORS from "../../constants/colors";
 
 interface AppButtonProps {
   onPress: () => void;
@@ -32,37 +34,31 @@ export default function AppButton({
     <TouchableOpacity
       onPress={onPress}
       disabled={isDisabled}
-      activeOpacity={0.85}
+      activeOpacity={0.88}
       style={[styles.wrapper, style]}
     >
       <LinearGradient
         colors={
           isDisabled
-            ? ["#A8B8AE", "#8FA198"]
-            : ["#006E27", "#006C46", "#008C50"]
+            ? ["#B7C5BD", "#A3B2AA"]
+            : [COLORS.primary, COLORS.primaryDark]
         }
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[styles.button, isDisabled && styles.buttonDisabled]}
+        style={styles.button}
       >
-        {/* Highlight nhẹ phía trên */}
+        {/* Highlight nhẹ ở phía trên */}
         {!isDisabled && <View style={styles.highlight} />}
 
         {loading ? (
           <View style={styles.loadingContent}>
-            <View style={styles.loadingCircle} />
+            <ActivityIndicator size="small" color={COLORS.white} />
             <Text style={styles.text}>Đang xử lý...</Text>
           </View>
         ) : children ? (
           children
         ) : (
-          <View style={styles.content}>
-            <Text style={styles.text}>{title}</Text>
-
-            <View style={styles.arrowContainer}>
-              <Ionicons name="arrow-forward" size={19} color="#FFFFFF" />
-            </View>
-          </View>
+          <Text style={styles.text}>{title}</Text>
         )}
       </LinearGradient>
     </TouchableOpacity>
@@ -74,93 +70,51 @@ const styles = StyleSheet.create({
     width: "100%",
     marginTop: 8,
 
-    borderRadius: 18,
+    // Bo góc đồng nhất với UI MekoEdu
+    borderRadius: 16,
 
-    // Shadow iOS
-    shadowColor: "#006E27",
+    // Shadow nhẹ, không quá nổi
+    shadowColor: COLORS.primary,
     shadowOffset: {
       width: 0,
-      height: 6,
+      height: 4,
     },
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-
-    // Shadow Android
-    elevation: 5,
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    elevation: 4,
   },
 
   button: {
-    height: 56,
+    height: 54,
+    borderRadius: 16,
 
-    borderRadius: 18,
-
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "center",
 
     overflow: "hidden",
   },
 
-  buttonDisabled: {
-    opacity: 0.65,
-  },
-
-  // Ánh sáng nhẹ phía trên button
   highlight: {
     position: "absolute",
-
     top: 0,
-    left: 15,
-    right: 15,
+    left: 18,
+    right: 18,
 
     height: 1,
 
-    backgroundColor: "rgba(255,255,255,0.45)",
-  },
-
-  content: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-
-    gap: 10,
+    backgroundColor: "rgba(255,255,255,0.35)",
   },
 
   text: {
-    color: "#FFFFFF",
-
-    fontSize: 16,
+    color: COLORS.white,
+    fontSize: 15,
     fontWeight: "700",
-
-    letterSpacing: 0.2,
-  },
-
-  arrowContainer: {
-    width: 30,
-    height: 30,
-
-    borderRadius: 15,
-
-    backgroundColor: "rgba(255,255,255,0.16)",
-
-    justifyContent: "center",
-    alignItems: "center",
+    letterSpacing: 0.15,
   },
 
   loadingContent: {
     flexDirection: "row",
     alignItems: "center",
-
-    gap: 10,
-  },
-
-  loadingCircle: {
-    width: 17,
-    height: 17,
-
-    borderRadius: 8.5,
-
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.4)",
-    borderTopColor: "#FFFFFF",
+    gap: 9,
   },
 });
