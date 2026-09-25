@@ -19,6 +19,7 @@ import useExamCountdown from "@/hooks/useExamCountdown";
 import ExamTimer from "@/components/exam/ExamTimer";
 import { ExamContext, OfflineExam, listOfflineExams, queueExamAnswers, readOfflineExam, subscribeExamSync, updateOfflineExam } from "@/services/examStorageService";
 import { isOfflineError, syncExam } from "@/services/syncService";
+import { selectRequestedAttempt } from "@/utils/resumeExam";
 
 import {
   getAttemptData,
@@ -55,7 +56,7 @@ export default function ExamScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
 
-  const { quizid, quizName } = route.params;
+  const { quizid, quizName, attemptid: requestedAttemptId } = route.params;
 
   const [attemptId, setAttemptId] = useState<number | null>(null);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
@@ -115,12 +116,14 @@ export default function ExamScreen() {
 
       const numericQuizId = Number(quizid);
       const numericUserId = Number(userId);
+      const resumeId = requestedAttemptId === undefined ? undefined : Number(requestedAttemptId);
+      if (resumeId !== undefined && (!Number.isInteger(resumeId) || resumeId <= 0)) throw new Error("Lượt thi cần tiếp tục không hợp lệ.");
       setExamUserId(numericUserId);
       const cached = (await listOfflineExams(numericUserId))
-        .filter((exam) => exam.quizid === numericQuizId && !exam.submitted)
+        .filter((exam) => exam.quizid === numericQuizId && !exam.submitted && (resumeId === undefined || exam.attemptid === resumeId))
         .sort((a, b) => b.updatedAt - a.updatedAt)[0];
       // Resume a queued submission before creating another Moodle attempt.
-      if (cached && (cached.submitRequested || (cached.deadline !== null && Date.now() >= cached.deadline))) {
+      if (resumeId === undefined && cached && (cached.submitRequested || (cached.deadline !== null && Date.now() >= cached.deadline))) {
         restoreOfflineExam(cached);
         if (cached.submitRequested) void syncExam(cached).then(async () => {
           const latest = await readOfflineExam(cached);
@@ -146,6 +149,7 @@ export default function ExamScreen() {
         const attempts = Array.isArray(response?.attempts)
           ? response.attempts
           : [];
+        if (resumeId !== undefined) return selectRequestedAttempt(attempts, resumeId);
 
         const currentAttempt = attempts.find(
           (attempt: any) =>
@@ -165,6 +169,10 @@ export default function ExamScreen() {
         restoreOfflineExam(cached);
         return;
       }
+      if (currentAttempt?.state === "finished") {
+        navigation.replace("Result", { attemptId: Number(currentAttempt.id), quizid: numericQuizId });
+        return;
+      }
 
       let currentAttemptId: number;
 
@@ -172,6 +180,7 @@ export default function ExamScreen() {
       if (currentAttempt?.id) {
         currentAttemptId = Number(currentAttempt.id);
       } else {
+        if (resumeId !== undefined) throw new Error("Không thể tiếp tục lượt thi đã chọn.");
         try {
           // Tạo attempt mới
           currentAttemptId = await startQuizAttempt(numericQuizId);
@@ -207,6 +216,13 @@ export default function ExamScreen() {
         answerRef.current = previous.answers;
         setSelectedAnswers(previous.answers);
         setOfflineExam(previous);
+        if (previous.submitRequested) {
+          restoreOfflineExam(previous);
+          await syncExam(context);
+          const latest = await readOfflineExam(context);
+          if (latest) setOfflineExam(latest);
+          return;
+        }
       }
       let currentDeadline;
       try { currentDeadline = await getAttemptDeadline(numericQuizId, currentAttemptId); }
@@ -219,7 +235,8 @@ export default function ExamScreen() {
       setDeadlineLoaded(true);
 
       // Lấy câu hỏi
-      await loadQuestion(currentAttemptId, previous?.currentPage ?? 0);
+      const resumePage = Number(previous?.currentPage ?? currentAttempt?.currentpage ?? 0);
+      await loadQuestion(currentAttemptId, Number.isInteger(resumePage) && resumePage >= 0 ? resumePage : 0);
     } catch (error: any) {
       Alert.alert(
         "Không thể mở bài thi",

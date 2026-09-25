@@ -2,7 +2,7 @@
 
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { useIsFocused, useNavigation, useRoute } from "@react-navigation/native";
 import { useEffect, useState } from "react";
 import {
   Alert,
@@ -18,6 +18,7 @@ import Loading from "@/components/common/Loading";
 import COLORS from "@/constants/colors";
 import { listOfflineExams } from "@/services/examStorageService";
 import { isOfflineError } from "@/services/syncService";
+import { findResumeTarget, ResumeTarget } from "@/utils/resumeExam";
 
 import { getQuizAccessInformation, getUserAttempts } from "../../api/quizApi";
 
@@ -36,7 +37,8 @@ export default function ExamDetailScreen() {
   // =========================================
 
   const [loading, setLoading] = useState(true);
-  const [offlineResume, setOfflineResume] = useState(false);
+  const [resumeTarget, setResumeTarget] = useState<ResumeTarget | null>(null);
+  const isFocused = useIsFocused();
 
   // API 6
   const [canAttempt, setCanAttempt] = useState(false);
@@ -52,12 +54,16 @@ export default function ExamDetailScreen() {
   // =========================================
 
   useEffect(() => {
-    loadExamData();
-  }, []);
+    if (isFocused) void loadExamData();
+  }, [isFocused, quizid]);
 
   const loadExamData = async () => {
     try {
       setLoading(true);
+      setResumeTarget(null);
+      setCanAttempt(false);
+      setPreventAccessReasons([]);
+      setAttempts([]);
 
       // =====================================
       // LẤY USER ID
@@ -93,16 +99,15 @@ export default function ExamDetailScreen() {
       );
 
       setAttempts(attemptsResponse?.attempts ?? []);
+      const cached = await listOfflineExams(Number(userId));
+      setResumeTarget(findResumeTarget(Number(userId), Number(quizid), attemptsResponse?.attempts ?? [], cached));
     } catch (error) {
       if (isOfflineError(error)) {
         try {
           const userid = Number(await AsyncStorage.getItem("userid"));
-          const cached = (await listOfflineExams(userid)).some((exam) =>
-            exam.quizid === Number(quizid) && !exam.submitted && Object.keys(exam.pages).length > 0,
-          );
-          if (cached) {
-            setOfflineResume(true);
-            setCanAttempt(true);
+          const target = findResumeTarget(userid, Number(quizid), null, await listOfflineExams(userid));
+          if (target) {
+            setResumeTarget(target);
             return;
           }
         } catch { /* Fall through to the visible load error. */ }
@@ -180,7 +185,7 @@ export default function ExamDetailScreen() {
   // =========================================
 
   const handleStartQuiz = () => {
-    if (!canAttempt) {
+    if (!canAttempt && !resumeTarget) {
       Alert.alert(
         "Không thể làm bài",
         preventAccessReasons.length > 0
@@ -196,7 +201,7 @@ export default function ExamDetailScreen() {
       "Ứng dụng ghi nhận số lần rời màn hình và lưu nhật ký trên thiết bị. Chụp/quay màn hình sẽ bị chặn trên điện thoại được hỗ trợ. Bạn cần nộp bài trước khi quay lại màn hình khác.",
       [
         { text: "Hủy", style: "cancel" },
-        { text: "Bắt đầu", onPress: () => navigation.navigate("Exam", { quizid, quizName }) },
+        { text: resumeTarget ? "Tiếp tục" : "Bắt đầu", onPress: () => navigation.navigate("Exam", { quizid, quizName, attemptid: resumeTarget?.attemptid }) },
       ],
     );
   };
@@ -539,7 +544,7 @@ export default function ExamDetailScreen() {
         <TouchableOpacity
           style={[
             styles.startButton,
-            !canAttempt && styles.startButtonDisabled,
+            !canAttempt && !resumeTarget && styles.startButtonDisabled,
           ]}
           onPress={handleStartQuiz}
           activeOpacity={0.85}
@@ -551,13 +556,18 @@ export default function ExamDetailScreen() {
               color={COLORS.white}
             />
 
-            <Text style={styles.startButtonText}>{offlineResume ? "Tiếp tục bài đã lưu offline" : "Bắt đầu làm bài"}</Text>
+            <Text style={styles.startButtonText}>{resumeTarget?.pendingSubmission ? "Tiếp tục đồng bộ bài nộp" : resumeTarget ? "Tiếp tục bài làm" : "Bắt đầu làm bài"}</Text>
 
             <Ionicons name="arrow-forward" size={20} color={COLORS.white} />
           </View>
         </TouchableOpacity>
 
-        {!canAttempt && (
+        {resumeTarget && (
+          <Text style={styles.disabledHint}>
+            {resumeTarget.offline ? "Bản lưu trên thiết bị" : "Bài thi đang làm"} · Trang {resumeTarget.page + 1}. Đáp án và hạn giờ được giữ nguyên.
+          </Text>
+        )}
+        {!canAttempt && !resumeTarget && (
           <Text style={styles.disabledHint}>
             Nhấn nút để xem lý do bạn chưa thể làm bài.
           </Text>
