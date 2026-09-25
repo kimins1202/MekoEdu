@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useIsFocused, useNavigation, usePreventRemove, useRoute } from "@react-navigation/native";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -15,9 +15,12 @@ import AppHeader from "@/components/common/AppHeader";
 import Loading from "@/components/common/Loading";
 import COLORS from "@/constants/colors";
 import useExamMonitoring from "@/hooks/useExamMonitoring";
+import useExamCountdown from "@/hooks/useExamCountdown";
+import ExamTimer from "@/components/exam/ExamTimer";
 
 import {
   getAttemptData,
+  getAttemptDeadline,
   getUserAttempts,
   processQuizAttempt,
   saveQuizAttempt,
@@ -67,6 +70,12 @@ export default function ExamScreen() {
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [examFinished, setExamFinished] = useState(false);
+  const [deadline, setDeadline] = useState<number | null>(null);
+  const [deadlineLoaded, setDeadlineLoaded] = useState(false);
+  const secondsRemaining = useExamCountdown(deadline, !examFinished);
+  const timeExpired = deadlineLoaded && deadline !== null && secondsRemaining === 0;
+  const submissionLock = useRef(false);
+  const autoSubmitStarted = useRef(false);
   const [examUserId, setExamUserId] = useState<number | null>(null);
   const isFocused = useIsFocused();
   const monitoring = useExamMonitoring(
@@ -160,6 +169,9 @@ export default function ExamScreen() {
       }
 
       setAttemptId(currentAttemptId);
+
+      setDeadline(await getAttemptDeadline(numericQuizId, currentAttemptId));
+      setDeadlineLoaded(true);
 
       // Lấy câu hỏi
       await loadQuestion(currentAttemptId, 0);
@@ -343,7 +355,7 @@ export default function ExamScreen() {
 
   // Chọn đáp án
   const handleSelectAnswer = (answer: AnswerOption) => {
-    if (saving || submitting) {
+    if (saving || submitting || examFinished || (deadline !== null && Date.now() >= deadline)) {
       return;
     }
 
@@ -440,39 +452,54 @@ export default function ExamScreen() {
   };
 
   // Nộp và xử lý bài thi
-  const submitExam = async () => {
-    if (!attemptId) {
-      Alert.alert("Lỗi", "Không tìm thấy Attempt ID.");
-      return;
-    }
+ const submitExam = async () => {
+   if (submissionLock.current || examFinished) return;
+   if (!attemptId) {
+     Alert.alert("Lỗi", "Không tìm thấy Attempt ID.");
+     return;
+   }
 
-    try {
-      setSubmitting(true);
+   try {
+     submissionLock.current = true;
+     setSubmitting(true);
 
-      await saveAnswers();
+     const data = buildSaveData();
 
-      const data = buildSaveData();
+     const response = await processQuizAttempt(attemptId, data, 1);
 
-      const response = await processQuizAttempt(attemptId, data, 1);
+     if (response?.exception) {
+       throw new Error(response.message || "Không thể nộp bài.");
+     }
 
-      if (response?.exception) {
-        throw new Error(response.message || "Không thể nộp bài.");
-      }
+     // kết thúc monitoring trước
+     monitoring.complete();
 
-      monitoring.complete();
-      setExamFinished(true);
-      Alert.alert("Nộp bài thành công", "Bài thi đã được nộp và xử lý.", [
-        {
-          text: "OK",
-          onPress: () => navigation.replace("Result", { attemptId, quizid }),
-        },
-      ]);
-    } catch (error: any) {
-      Alert.alert("Lỗi nộp bài", error?.message || "Không thể nộp bài.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+     // tắt chặn navigation
+     setExamFinished(true);
+
+     const submittedAttemptId = attemptId;
+     const submittedQuizId = Number(quizid);
+
+     // để React render lại examFinished = true
+     setTimeout(() => {
+       navigation.replace("Result", {
+         attemptId: submittedAttemptId,
+         quizid: submittedQuizId,
+       });
+     }, 100);
+   } catch (error: any) {
+     Alert.alert("Lỗi nộp bài", error?.message || "Không thể nộp bài.");
+   } finally {
+     submissionLock.current = false;
+     setSubmitting(false);
+   }
+ };
+
+  useEffect(() => {
+    if (!timeExpired || loading || saving || submitting || examFinished || autoSubmitStarted.current) return;
+    autoSubmitStarted.current = true;
+    void submitExam();
+  }, [timeExpired, loading, saving, submitting, examFinished]);
 
   const isLastQuestion = nextPage === -1;
 
@@ -515,6 +542,24 @@ export default function ExamScreen() {
   return (
     <View style={styles.container}>
       <AppHeader title="Bài thi" subtitle={quizName} showBack />
+
+      {deadlineLoaded && !examFinished && (
+        <View style={{ paddingHorizontal: 20, paddingVertical: 8 }}>
+          <ExamTimer seconds={secondsRemaining} />
+          {timeExpired && (
+            <View>
+              <Text style={styles.monitoringError}>
+                {submitting ? "Hết giờ. Đang nộp bài…" : "Đã hết thời gian làm bài."}
+              </Text>
+              {!submitting && (
+                <TouchableOpacity onPress={submitExam} disabled={saving || loading} accessibilityRole="button">
+                  <Text style={styles.monitoringTitle}>Thử nộp bài lại</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+        </View>
+      )}
 
       <View style={styles.monitoringBanner} accessibilityLiveRegion="polite">
         <Text style={styles.monitoringTitle}>
@@ -594,7 +639,7 @@ export default function ExamScreen() {
                         isSelected && styles.answerSelected,
                       ]}
                       onPress={() => handleSelectAnswer(answer)}
-                      disabled={saving || submitting || examFinished}
+                      disabled={saving || submitting || examFinished || timeExpired}
                       activeOpacity={0.75}
                     >
                       <View
@@ -671,7 +716,7 @@ export default function ExamScreen() {
               styles.previousButton,
               currentPage === 0 && styles.navButtonDisabled,
             ]}
-            disabled={currentPage === 0 || saving || submitting || examFinished}
+            disabled={currentPage === 0 || saving || submitting || examFinished || timeExpired}
             onPress={handlePrevious}
             activeOpacity={0.8}
           >
@@ -687,7 +732,7 @@ export default function ExamScreen() {
                 styles.nextButton,
                 saving && styles.navButtonDisabled,
               ]}
-              disabled={saving || submitting || examFinished}
+              disabled={saving || submitting || examFinished || timeExpired}
               onPress={handleNext}
               activeOpacity={0.8}
             >

@@ -1,53 +1,25 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import COLORS from "../../constants/colors";
 
 interface ExamTimerProps {
-  initialSeconds: number;
-  onTimeUp?: () => void;
+  seconds: number | null;
 }
 
 export default function ExamTimer({
-  initialSeconds,
-  onTimeUp,
+  seconds,
 }: ExamTimerProps) {
-  const [seconds, setSeconds] = useState(Math.max(0, initialSeconds));
+  const hours = Math.floor((seconds ?? 0) / 3600);
+  const minutes = Math.floor(((seconds ?? 0) % 3600) / 60);
+  const remainingSeconds = (seconds ?? 0) % 60;
 
-  useEffect(() => {
-    setSeconds(Math.max(0, initialSeconds));
-  }, [initialSeconds]);
-
-  useEffect(() => {
-    if (seconds <= 0) {
-      onTimeUp?.();
-      return;
-    }
-
-    const timer = setInterval(() => {
-      setSeconds((current) => {
-        if (current <= 1) {
-          clearInterval(timer);
-          return 0;
-        }
-
-        return current - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [seconds, onTimeUp]);
-
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-
-  const formattedTime = `${String(minutes).padStart(
+  const formattedTime = seconds === null ? "Không giới hạn" : `${hours > 0 ? `${String(hours).padStart(2, "0")}:` : ""}${String(minutes).padStart(
     2,
     "0",
   )}:${String(remainingSeconds).padStart(2, "0")}`;
 
-  const isWarning = seconds <= 60;
-  const isDanger = seconds <= 30;
+  const isWarning = seconds !== null && seconds <= 60;
+  const isDanger = seconds !== null && seconds <= 30;
 
   return (
     <View

@@ -237,6 +237,24 @@ export const saveQuizAttempt = async (attemptid: number, data: any[]) => {
   return response.data;
 };
 
+// Moodle resolves time limits, closing time, and user/group overrides.
+export const getAttemptDeadline = async (quizid: number, attemptid: number): Promise<number | null> => {
+  const token = await getToken();
+  const response = await axiosInstance.post("/webservice/rest/server.php", null, {
+    params: {
+      wstoken: token,
+      wsfunction: "mod_quiz_get_attempt_access_information",
+      moodlewsrestformat: "json",
+      quizid,
+      attemptid,
+    },
+  });
+  if (response.data?.exception) throw new Error(response.data.message || "Không thể lấy thời hạn bài thi.");
+  const endtime = Number(response.data?.endtime);
+  if (!Number.isFinite(endtime) || endtime < 0) throw new Error("Moodle không trả về thời hạn bài thi hợp lệ.");
+  return endtime === 0 ? null : endtime * 1000;
+};
+
 // Nộp và xử lý bài thi
 export const processQuizAttempt = async (
   attemptid: number,
