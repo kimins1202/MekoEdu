@@ -103,23 +103,7 @@ export default function ExamListScreen() {
         title="Danh sách bài thi"
         subtitle={`${exams.length} bài kiểm tra`}
         showBack
-        rightText="Đăng xuất"
-        onRightPress={handleLogout}
       />
-
-      {/* RELOAD */}
-      <TouchableOpacity
-        style={[styles.reloadButton, loading && styles.reloadButtonDisabled]}
-        onPress={loadExams}
-        disabled={loading}
-        activeOpacity={0.75}
-      >
-        <Ionicons name="refresh-outline" size={18} color={COLORS.primaryDark} />
-
-        <Text style={styles.reloadText}>
-          {loading ? "Đang tải..." : "Tải lại danh sách"}
-        </Text>
-      </TouchableOpacity>
 
       {/* DANH SÁCH BÀI THI */}
       {exams.length === 0 ? (
@@ -237,6 +221,20 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.backgroundSoft,
+  },
+
+  logoutButton: {
+    alignSelf: "flex-end",
+    marginHorizontal: 20,
+    marginTop: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+
+  logoutText: {
+    color: COLORS.primaryDark,
+    fontSize: 13,
+    fontWeight: "600",
   },
 
   // RELOAD

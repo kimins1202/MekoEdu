@@ -31,6 +31,7 @@ export type AppStackParamList = {
   Exam: {
     quizid: number;
     quizName: string;
+    questionCount?: number;
     attemptid?: number;
   };
 

@@ -10,14 +10,14 @@ type Props = NativeStackScreenProps<RootStackParamList, "Splash">;
 
 export default function SplashScreen({ navigation }: Props) {
   // =========================
-  // Logo animation
+  // Logo
   // =========================
   const logoOpacity = useRef(new Animated.Value(0)).current;
-  const logoScale = useRef(new Animated.Value(0.82)).current;
-  const logoTranslateY = useRef(new Animated.Value(14)).current;
+  const logoScale = useRef(new Animated.Value(0.85)).current;
+  const logoTranslateY = useRef(new Animated.Value(10)).current;
 
   // =========================
-  // Loading animation
+  // Loading
   // =========================
   const loadingOpacity = useRef(new Animated.Value(0)).current;
   const loadingScale = useRef(new Animated.Value(0.8)).current;
@@ -29,10 +29,10 @@ export default function SplashScreen({ navigation }: Props) {
   const progressScale = useRef(new Animated.Value(0)).current;
 
   // =========================
-  // MekoSoft animation
+  // MekoSoft
   // =========================
   const brandOpacity = useRef(new Animated.Value(0)).current;
-  const brandTranslateY = useRef(new Animated.Value(12)).current;
+  const brandTranslateY = useRef(new Animated.Value(10)).current;
 
   useEffect(() => {
     // =====================================
@@ -41,7 +41,7 @@ export default function SplashScreen({ navigation }: Props) {
     Animated.parallel([
       Animated.timing(logoOpacity, {
         toValue: 1,
-        duration: 700,
+        duration: 350,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
@@ -49,13 +49,13 @@ export default function SplashScreen({ navigation }: Props) {
       Animated.spring(logoScale, {
         toValue: 1,
         friction: 7,
-        tension: 45,
+        tension: 50,
         useNativeDriver: true,
       }),
 
       Animated.timing(logoTranslateY, {
         toValue: 0,
-        duration: 700,
+        duration: 350,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
@@ -67,8 +67,8 @@ export default function SplashScreen({ navigation }: Props) {
     Animated.parallel([
       Animated.timing(loadingOpacity, {
         toValue: 1,
-        duration: 400,
-        delay: 400,
+        duration: 250,
+        delay: 300,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
@@ -77,7 +77,7 @@ export default function SplashScreen({ navigation }: Props) {
         toValue: 1,
         friction: 7,
         tension: 50,
-        delay: 400,
+        delay: 300,
         useNativeDriver: true,
       }),
     ]).start();
@@ -87,59 +87,56 @@ export default function SplashScreen({ navigation }: Props) {
     // =====================================
     const loadingAnimation = Animated.loop(
       Animated.sequence([
-        // Dot 1
         Animated.parallel([
           Animated.timing(dot1, {
             toValue: 1,
-            duration: 250,
+            duration: 180,
             useNativeDriver: true,
           }),
           Animated.timing(dot2, {
             toValue: 0.25,
-            duration: 250,
+            duration: 180,
             useNativeDriver: true,
           }),
           Animated.timing(dot3, {
             toValue: 0.25,
-            duration: 250,
+            duration: 180,
             useNativeDriver: true,
           }),
         ]),
 
-        // Dot 2
         Animated.parallel([
           Animated.timing(dot1, {
             toValue: 0.25,
-            duration: 250,
+            duration: 180,
             useNativeDriver: true,
           }),
           Animated.timing(dot2, {
             toValue: 1,
-            duration: 250,
+            duration: 180,
             useNativeDriver: true,
           }),
           Animated.timing(dot3, {
             toValue: 0.25,
-            duration: 250,
+            duration: 180,
             useNativeDriver: true,
           }),
         ]),
 
-        // Dot 3
         Animated.parallel([
           Animated.timing(dot1, {
             toValue: 0.25,
-            duration: 250,
+            duration: 180,
             useNativeDriver: true,
           }),
           Animated.timing(dot2, {
             toValue: 0.25,
-            duration: 250,
+            duration: 180,
             useNativeDriver: true,
           }),
           Animated.timing(dot3, {
             toValue: 1,
-            duration: 250,
+            duration: 180,
             useNativeDriver: true,
           }),
         ]),
@@ -150,56 +147,56 @@ export default function SplashScreen({ navigation }: Props) {
 
     // =====================================
     // 4. Thanh loading
-    // Chạy từ 0.5s → 1.8s
+    // 0.3s → 1.1s
     // =====================================
     Animated.timing(progressScale, {
       toValue: 1,
-      duration: 1300,
-      delay: 500,
+      duration: 800,
+      delay: 300,
       easing: Easing.inOut(Easing.ease),
       useNativeDriver: true,
     }).start();
 
     // =====================================
     // 5. Loading biến mất
-    // Bắt đầu tại 1.8s
+    // 1.1s → 1.3s
     // =====================================
     Animated.timing(loadingOpacity, {
       toValue: 0,
-      duration: 300,
-      delay: 1800,
+      duration: 200,
+      delay: 1100,
       easing: Easing.out(Easing.ease),
       useNativeDriver: true,
     }).start();
 
     // =====================================
-    // 6. MekoSoft xuất hiện SAU loading
-    // Bắt đầu tại 2.1s
+    // 6. MekoSoft xuất hiện
+    // 1.3s → 1.8s
     // =====================================
     Animated.parallel([
       Animated.timing(brandOpacity, {
         toValue: 1,
-        duration: 600,
-        delay: 2100,
+        duration: 500,
+        delay: 1300,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
 
       Animated.timing(brandTranslateY, {
         toValue: 0,
-        duration: 600,
-        delay: 2100,
+        duration: 500,
+        delay: 1300,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
     ]).start();
 
     // =====================================
-    // 7. Sau đúng 3 giây → Onboarding
+    // 7. Sau 2 giây → Onboarding
     // =====================================
     const timer = setTimeout(() => {
       navigation.replace("Onboarding");
-    }, 3000);
+    }, 2000);
 
     // Cleanup
     return () => {
@@ -216,9 +213,9 @@ export default function SplashScreen({ navigation }: Props) {
         end={{ x: 1, y: 1 }}
         style={styles.background}
       >
-        {/* =====================================
+        {/* =========================
             LOGO
-        ===================================== */}
+        ========================= */}
         <Animated.View
           style={[
             styles.logoWrapper,
@@ -237,9 +234,9 @@ export default function SplashScreen({ navigation }: Props) {
           </View>
         </Animated.View>
 
-        {/* =====================================
+        {/* =========================
             LOADING
-        ===================================== */}
+        ========================= */}
         <Animated.View
           style={[
             styles.loading,
@@ -249,7 +246,6 @@ export default function SplashScreen({ navigation }: Props) {
             },
           ]}
         >
-          {/* Loading dots */}
           <View style={styles.loadingDots}>
             <Animated.View
               style={[
@@ -279,7 +275,6 @@ export default function SplashScreen({ navigation }: Props) {
             />
           </View>
 
-          {/* Loading bar */}
           <View style={styles.progressTrack}>
             <Animated.View
               style={[
@@ -292,19 +287,15 @@ export default function SplashScreen({ navigation }: Props) {
           </View>
         </Animated.View>
 
-        {/* =====================================
+        {/* =========================
             FROM MEKOSOFT
-        ===================================== */}
+        ========================= */}
         <Animated.View
           style={[
             styles.brand,
             {
               opacity: brandOpacity,
-              transform: [
-                {
-                  translateY: brandTranslateY,
-                },
-              ],
+              transform: [{ translateY: brandTranslateY }],
             },
           ]}
         >
@@ -347,8 +338,6 @@ const styles = StyleSheet.create({
     height: 230,
     alignItems: "center",
     justifyContent: "center",
-
-    // Đẩy logo lên trên một chút
     marginTop: -90,
   },
 
@@ -384,7 +373,7 @@ const styles = StyleSheet.create({
   loading: {
     position: "absolute",
 
-    // Cách xa MekoSoft
+    // Đặt cao hơn MekoSoft
     bottom: 145,
 
     alignItems: "center",
@@ -393,14 +382,12 @@ const styles = StyleSheet.create({
   loadingDots: {
     flexDirection: "row",
     alignItems: "center",
-
-    marginBottom: 13,
+    marginBottom: 12,
   },
 
   dot: {
     width: 5,
     height: 5,
-
     borderRadius: 3,
 
     backgroundColor: COLORS.primaryLight,
@@ -413,7 +400,6 @@ const styles = StyleSheet.create({
     height: 2,
 
     borderRadius: 2,
-
     overflow: "hidden",
 
     backgroundColor: "rgba(255,255,255,0.14)",
@@ -426,8 +412,6 @@ const styles = StyleSheet.create({
     borderRadius: 2,
 
     backgroundColor: COLORS.primaryLight,
-
-    transformOrigin: "left",
   },
 
   // =========================
