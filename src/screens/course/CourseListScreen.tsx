@@ -170,20 +170,6 @@ export default function CourseListScreen() {
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
           <View>
-            <View style={styles.introCard}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>KH</Text>
-              </View>
-
-              <View style={styles.introContent}>
-                <Text style={styles.introTitle}>Khóa học của bạn</Text>
-
-                <Text style={styles.introSubtitle}>
-                  Theo dõi tiến độ học tập của bạn
-                </Text>
-              </View>
-            </View>
-
             <SearchBar
               value={searchText}
               onChangeText={setSearchText}
