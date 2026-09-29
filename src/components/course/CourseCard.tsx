@@ -6,10 +6,19 @@ import CourseProgress from "./CourseProgress";
 
 interface CourseCardProps {
   courseName: string;
+
   shortname?: string;
+
   categoryName?: string;
+
   progress?: number;
+
   completed?: boolean;
+
+  completedExams?: number;
+
+  totalExams?: number;
+
   onPress: () => void;
 }
 
@@ -19,6 +28,8 @@ export default function CourseCard({
   categoryName,
   progress,
   completed = false,
+  completedExams = 0,
+  totalExams = 0,
   onPress,
 }: CourseCardProps) {
   return (
@@ -60,6 +71,12 @@ export default function CourseCard({
       </View>
 
       {progress !== undefined && <CourseProgress progress={progress} />}
+      {progress !== undefined && (
+        <Text style={styles.examProgressText}>
+          {completedExams}/{totalExams} bài thi hoàn thành
+        </Text>
+      )}
+      
 
       {progress !== undefined && (
         <View style={styles.statusRow}>
@@ -190,5 +207,11 @@ const styles = StyleSheet.create({
 
   completedText: {
     color: COLORS.success,
+  },
+
+  examProgressText: {
+    marginTop: 6,
+    fontSize: 11,
+    color: COLORS.textSecondary,
   },
 });

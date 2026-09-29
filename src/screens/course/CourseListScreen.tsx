@@ -4,7 +4,8 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useEffect, useMemo, useState } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
 
-import { getCourseCompletionStatus, getUserCourses } from "../../api/courseApi";
+import { getUserCourses } from "../../api/courseApi";
+import { getCourseExamProgress } from "../../services/courseProgressService";
 import AppHeader from "../../components/common/AppHeader";
 import EmptyState from "../../components/common/EmptyState";
 import Loading from "../../components/common/Loading";
@@ -22,8 +23,14 @@ type Course = {
   id: number;
   fullname: string;
   shortname: string;
+
   progress: number;
+
   completed: boolean;
+
+  totalExams: number;
+
+  completedExams: number;
 };
 
 export default function CourseListScreen() {
@@ -38,26 +45,6 @@ export default function CourseListScreen() {
   useEffect(() => {
     loadCourses();
   }, []);
-
-  const calculateProgress = (completion: any) => {
-    const criteria =
-      completion?.completionstatus?.completions ??
-      completion?.completions ??
-      [];
-
-    if (!Array.isArray(criteria) || criteria.length === 0) {
-      return 0;
-    }
-
-    const completedCount = criteria.filter(
-      (item: any) =>
-        item?.complete === true ||
-        item?.complete === 1 ||
-        item?.complete === "1",
-    ).length;
-
-    return Math.round((completedCount / criteria.length) * 100);
-  };
 
   const loadCourses = async () => {
     try {
@@ -85,25 +72,25 @@ export default function CourseListScreen() {
 
       const coursesWithProgress = await Promise.all(
         courseData.map(async (course: any) => {
-          let progress = 0;
-
-          try {
-            const completion = await getCourseCompletionStatus(
-              Number(course.id),
-              userid,
-            );
-
-            progress = calculateProgress(completion);
-          } catch {
-            progress = 0;
-          }
+          const progressData = await getCourseExamProgress(
+            Number(course.id),
+            userid,
+          );
 
           return {
             id: Number(course.id),
+
             fullname: course.fullname || "Khóa học",
+
             shortname: course.shortname || "",
-            progress,
-            completed: progress >= 100,
+
+            progress: progressData.progress,
+
+            completed: progressData.completed,
+
+            totalExams: progressData.totalExams,
+
+            completedExams: progressData.completedExams,
           };
         }),
       );
@@ -228,6 +215,8 @@ export default function CourseListScreen() {
             shortname={item.shortname}
             progress={item.progress}
             completed={item.completed}
+            completedExams={item.completedExams}
+            totalExams={item.totalExams}
             onPress={() =>
               navigation.navigate("ExamList", {
                 courseid: item.id,
