@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { LinearGradient } from "expo-linear-gradient";
 import {
   useIsFocused,
   useNavigation,
@@ -8,7 +9,9 @@ import {
 } from "@react-navigation/native";
 import { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
+  Animated,
   Modal,
   ScrollView,
   StyleSheet,
@@ -86,7 +89,13 @@ export default function ExamScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
 
-  const { quizid, quizName, attemptid: requestedAttemptId } = route.params;
+  const {
+    quizid,
+    quizName,
+    attemptid: requestedAttemptId,
+    submitConfirmed,
+    targetQuestionSlot,
+  } = route.params;
 
   const [attemptId, setAttemptId] = useState<number | null>(null);
 
@@ -158,6 +167,8 @@ export default function ExamScreen() {
     deadlineLoaded && deadline !== null && secondsRemaining === 0;
 
   const answersLocked = !!offlineExam?.submitRequested;
+
+  const insets = useSafeAreaInsets();
 
   const isFocused = useIsFocused();
 
@@ -1294,67 +1305,130 @@ export default function ExamScreen() {
     }
   };
 
-  const submitExam = async () => {
+  const submitExam = async (currentAttemptId: number) => {
     if (submissionLock.current || examFinished) {
       return;
     }
 
-    if (!attemptId) {
+    if (!currentAttemptId) {
       Alert.alert("Lỗi", "Không tìm thấy Attempt ID.");
-
       return;
     }
 
+    submissionLock.current = true;
+    setSubmitting(true);
+
     try {
-      submissionLock.current = true;
-
-      setSubmitting(true);
-
       if (!contextRef.current) {
         throw new Error("Không tìm thấy dữ liệu lượt thi.");
       }
 
-      const context = contextRef.current;
+      const context = {
+        ...contextRef.current,
+        attemptid: currentAttemptId,
+      };
+
+      contextRef.current = context;
 
       await queueExamAnswers(context, answerRef.current, true);
 
       setLocalSaveError(false);
 
       await syncExam(context, true);
+
+      const afterSync = await readOfflineExam(context);
+
+      if (afterSync?.submitted) {
+        return;
+      }
+
+      if (afterSync?.status === "Failed") {
+        throw new Error(
+          afterSync.error || "Nộp bài thất bại. Vui lòng thử lại.",
+        );
+      }
+
+      setLocalSaveError(true);
     } catch (error: any) {
       Alert.alert("Lỗi nộp bài", error?.message || "Không thể nộp bài.");
-    } finally {
-      submissionLock.current = false;
 
+      submissionLock.current = false;
       setSubmitting(false);
     }
   };
 
   const handleSubmit = () => {
-    if (timeExpired) {
-      void submitExam();
-
+    if (!attemptId) {
+      Alert.alert("Lỗi", "Không tìm thấy Attempt ID.");
       return;
     }
 
-    Alert.alert("Nộp bài", "Bạn có chắc chắn muốn nộp bài không?", [
-      {
-        text: "Hủy",
-        style: "cancel",
-      },
-      {
-        text: "Nộp bài",
-        onPress: () => {
-          void submitExam();
-        },
-      },
-    ]);
+    if (timeExpired) {
+      void submitExam(attemptId);
+      return;
+    }
+
+    const confirmQuestions = questionOverview.map((item) => ({
+      id: item.slot,
+      number: Number(item.questionNumber) || item.slot,
+      status: (item.answerName && selectedAnswers[item.answerName]
+        ? "answered"
+        : "unanswered") as "answered" | "unanswered",
+      flagged: Boolean(flaggedQuestions[item.slot] ?? item.flagged),
+      saveStatus: (offlineExam?.status === "Synced"
+        ? "saved"
+        : offlineExam?.status === "Failed"
+          ? "not_saved"
+          : "saving") as "saved" | "saving" | "not_saved",
+    }));
+
+    navigation.navigate("ConfirmSubmit", {
+      quizid: Number(quizid),
+      quizName,
+      attemptid: attemptId,
+      questions: confirmQuestions,
+    });
   };
+
+  // Khi user xác nhận nộp bài từ ConfirmSubmitScreen.
+  useEffect(() => {
+    const { DeviceEventEmitter } = require("react-native");
+    const subscription = DeviceEventEmitter.addListener(
+      "submitExamConfirmed",
+      (confirmedAttemptId: number) => {
+        if (submissionLock.current || examFinished) {
+          return;
+        }
+        void submitExam(Number(confirmedAttemptId));
+      }
+    );
+
+    return () => {
+      subscription.remove();
+    };
+  }, [examFinished]);
+
+  // Khi user chọn xem lại câu hỏi cụ thể từ ConfirmSubmitScreen.
+  useEffect(() => {
+    if (!targetQuestionSlot || !questionOverview.length) {
+      return;
+    }
+
+    const item = questionOverview.find((q) => q.slot === targetQuestionSlot);
+
+    if (item) {
+      void goToQuestion(item);
+    }
+  }, [targetQuestionSlot]);
 
   useEffect(() => {
     if (!offlineExam?.submitted || examFinished) {
       return;
     }
+
+    // Nhả lock và spinner trước khi navigate để tránh state cũ tồn tại.
+    submissionLock.current = false;
+    setSubmitting(false);
 
     monitoring.complete();
 
@@ -1388,9 +1462,16 @@ export default function ExamScreen() {
         !!offlineExam?.submitRequested,
       );
 
-      setLocalSaveError(false);
-
       await syncExam(context, true);
+
+      // syncExam không throw — đọc lại kết quả để xác định trạng thái.
+      const afterSync = await readOfflineExam(context);
+
+      if (afterSync?.status === "Synced" || afterSync?.submitted) {
+        setLocalSaveError(false);
+      } else {
+        setLocalSaveError(true);
+      }
     } catch {
       setLocalSaveError(true);
     } finally {
@@ -1414,6 +1495,7 @@ export default function ExamScreen() {
   useEffect(() => {
     if (
       !timeExpired ||
+      !attemptId ||
       loading ||
       saving ||
       submitting ||
@@ -1425,8 +1507,8 @@ export default function ExamScreen() {
 
     autoSubmitStarted.current = true;
 
-    void submitExam();
-  }, [timeExpired, loading, saving, submitting, examFinished]);
+    void submitExam(attemptId);
+  }, [timeExpired, attemptId, loading, saving, submitting, examFinished]);
 
   if (loading && questions.length === 0) {
     return (
@@ -1551,7 +1633,7 @@ export default function ExamScreen() {
           </View>
 
           <TouchableOpacity
-            onPress={() => void submitExam()}
+            onPress={() => attemptId && void submitExam(attemptId)}
             disabled={saving || loading}
             style={styles.retrySubmitButton}
             activeOpacity={0.8}
@@ -1908,9 +1990,169 @@ export default function ExamScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* ── Submitting Overlay ── */}
+      <Modal
+        visible={submitting}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+      >
+        <SubmittingOverlay />
+      </Modal>
     </View>
   );
 }
+
+// ─────────────────────────── Submitting Overlay ─────────────────────────────
+
+function SubmittingOverlay() {
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const spinAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.12,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+  }, []);
+
+  return (
+    <View style={overlayStyles.backdrop}>
+      <LinearGradient
+        colors={["rgba(0,110,39,0.96)", "rgba(0,61,24,0.98)"]}
+        style={overlayStyles.container}
+      >
+        {/* Pulsing icon ring */}
+        <Animated.View
+          style={[
+            overlayStyles.iconRing,
+            { transform: [{ scale: pulseAnim }] },
+          ]}
+        >
+          <View style={overlayStyles.iconInner}>
+            <ActivityIndicator size={36} color="#fff" />
+          </View>
+        </Animated.View>
+
+        <Text style={overlayStyles.title}>Đang nộp bài...</Text>
+
+        <Text style={overlayStyles.subtitle}>
+          Vui lòng không thoát ứng dụng trong lúc này.
+        </Text>
+
+        {/* Dots */}
+        <View style={overlayStyles.dotsRow}>
+          {[0, 1, 2].map((i) => (
+            <DotsIndicator key={i} delay={i * 220} />
+          ))}
+        </View>
+      </LinearGradient>
+    </View>
+  );
+}
+
+function DotsIndicator({ delay }: { delay: number }) {
+  const anim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.delay(delay),
+        Animated.timing(anim, {
+          toValue: 1,
+          duration: 450,
+          useNativeDriver: true,
+        }),
+        Animated.timing(anim, {
+          toValue: 0.3,
+          duration: 450,
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+  }, []);
+
+  return (
+    <Animated.View
+      style={[overlayStyles.dot, { opacity: anim }]}
+    />
+  );
+}
+
+const overlayStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  container: {
+    width: 280,
+    borderRadius: 28,
+    paddingVertical: 40,
+    paddingHorizontal: 32,
+    alignItems: "center",
+    gap: 14,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  iconRing: {
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  iconInner: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#fff",
+    letterSpacing: 0.2,
+  },
+  subtitle: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.72)",
+    textAlign: "center",
+    lineHeight: 19,
+  },
+  dotsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 8,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "rgba(255,255,255,0.85)",
+  },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const getAnswerLabel = (index: number, label: string) => {
   const letters = ["A", "B", "C", "D", "E", "F"];
