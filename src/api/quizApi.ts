@@ -290,3 +290,27 @@ export const processQuizAttempt = async (
 
   return response.data;
 };
+
+// Lấy số lượng câu hỏi của quiz
+export const getQuizQuestionCount = async (quizid: number): Promise<number> => {
+  const token = await getToken();
+
+  const response = await axiosInstance.post(
+    "/webservice/rest/server.php",
+    null,
+    {
+      params: {
+        wstoken: token,
+        wsfunction: "local_mekoedu_get_quiz_question_count",
+        moodlewsrestformat: "json",
+        quizid: Number(quizid),
+      },
+    },
+  );
+
+  if (response.data?.exception) {
+    throw new Error(response.data.message || "Không thể lấy số câu hỏi.");
+  }
+
+  return Number(response.data?.questioncount ?? 0);
+};

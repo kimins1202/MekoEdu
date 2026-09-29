@@ -17,7 +17,7 @@ import AppHeader from "@/components/common/AppHeader";
 import Loading from "@/components/common/Loading";
 import COLORS from "@/constants/colors";
 
-import { getQuizzesByCourses } from "../../api/quizApi";
+import { getQuizQuestionCount, getQuizzesByCourses } from "../../api/quizApi";
 import { AppStackParamList } from "../../types/navigation";
 
 type ExamListRouteProp = RouteProp<AppStackParamList, "ExamList">;
@@ -50,13 +50,35 @@ export default function ExamListScreen() {
     try {
       setLoading(true);
 
-      // LẤY QUIZZES CỦA COURSE ĐƯỢC CHỌN
+      // Lấy danh sách quiz của course.
       const quizData = await getQuizzesByCourses([courseid]);
 
-      // CẬP NHẬT DANH SÁCH
       const quizzes = quizData?.quizzes ?? [];
 
-      setExams(quizzes);
+      // Lấy số câu của từng quiz.
+      const quizzesWithQuestionCount = await Promise.all(
+        quizzes.map(async (quiz: any) => {
+          try {
+            const questioncount = await getQuizQuestionCount(Number(quiz.id));
+
+            return {
+              ...quiz,
+              questioncount,
+            };
+          } catch (error) {
+            console.error(`Lỗi lấy số câu quiz ${quiz.id}:`, error);
+
+            return {
+              ...quiz,
+              questioncount: null,
+            };
+          }
+        }),
+      );
+
+      console.log("QUIZZES:", quizzesWithQuestionCount);
+
+      setExams(quizzesWithQuestionCount);
     } catch (error: any) {
       console.error("Lỗi load exams:", error?.response?.data || error?.message);
 
@@ -175,7 +197,7 @@ export default function ExamListScreen() {
                   />
 
                   <Text style={styles.examInfo}>
-                    {item.questioncount
+                    {typeof item.questioncount === "number"
                       ? `${item.questioncount} câu hỏi`
                       : "Chưa xác định số câu"}
                   </Text>

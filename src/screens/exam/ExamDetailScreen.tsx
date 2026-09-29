@@ -256,7 +256,7 @@ export default function ExamDetailScreen() {
     navigation.navigate("Exam", {
       quizid: Number(quizid),
       quizName,
-      questionCount: questionCount ?? 0,
+      questionCount,
     });
   };
 
@@ -313,7 +313,7 @@ export default function ExamDetailScreen() {
                 />
 
                 <Text style={styles.summaryMetaText}>
-                  {questionCount
+                  {questionCount != null
                     ? `${questionCount} câu hỏi`
                     : "Chưa xác định số câu"}
                 </Text>
@@ -342,7 +342,7 @@ export default function ExamDetailScreen() {
           <InfoRow
             icon="document-text-outline"
             label="Số câu hỏi"
-            value={questionCount ? `${questionCount} câu` : "Chưa xác định"}
+            value={questionCount != null ? `${questionCount} câu` : "Chưa xác định"}
           />
 
           <InfoRow
