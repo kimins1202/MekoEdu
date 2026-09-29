@@ -314,3 +314,44 @@ export const getQuizQuestionCount = async (quizid: number): Promise<number> => {
 
   return Number(response.data?.questioncount ?? 0);
 };
+
+export type QuizMonitoringConfig = {
+  quizid: number;
+  monitoring_enabled: boolean;
+  max_departures: number;
+};
+
+export const getQuizMonitoringConfig = async (
+  quizid: number,
+): Promise<QuizMonitoringConfig> => {
+  const token = await getToken();
+
+  const response = await axiosInstance.post(
+    "/webservice/rest/server.php",
+    null,
+    {
+      params: {
+        wstoken: token,
+        wsfunction: "local_mekoedu_get_quiz_monitoring",
+        moodlewsrestformat: "json",
+        quizid: Number(quizid),
+      },
+    },
+  );
+
+  if (response.data?.exception) {
+    throw new Error(
+      response.data?.message || "Không thể lấy cấu hình giám sát",
+    );
+  }
+
+  const enabled = response.data?.monitoring_enabled;
+
+  return {
+    quizid: Number(response.data?.quizid),
+
+    monitoring_enabled: enabled === true || enabled === 1 || enabled === "1",
+
+    max_departures: Number(response.data?.max_departures ?? 3),
+  };
+};

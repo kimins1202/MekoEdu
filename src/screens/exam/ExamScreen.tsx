@@ -40,6 +40,7 @@ import { selectRequestedAttempt } from "@/utils/resumeExam";
 import {
   getAttemptData,
   getAttemptDeadline,
+  getQuizMonitoringConfig,
   getUserAttempts,
   startQuizAttempt,
 } from "../../api/quizApi";
@@ -108,6 +109,12 @@ export default function ExamScreen() {
     Record<number, boolean>
   >({});
 
+  const [monitoringEnabled, setMonitoringEnabled] = useState(false);
+
+  const [monitoringConfigLoaded, setMonitoringConfigLoaded] = useState(false);
+
+  const [maxDepartures, setMaxDepartures] = useState(3);
+
   const [questionMenuVisible, setQuestionMenuVisible] = useState(false);
 
   const [loading, setLoading] = useState(true);
@@ -154,6 +161,8 @@ export default function ExamScreen() {
 
   const isFocused = useIsFocused();
 
+  const insets = useSafeAreaInsets();
+
   const monitoring = useExamMonitoring(
     attemptId && examUserId
       ? {
@@ -162,7 +171,8 @@ export default function ExamScreen() {
           attemptid: attemptId,
         }
       : null,
-    isFocused && !examFinished,
+
+    monitoringEnabled && monitoringConfigLoaded && isFocused && !examFinished,
   );
 
   const answeredCount = Math.min(
@@ -186,7 +196,12 @@ export default function ExamScreen() {
     secondsRemaining <= 60;
 
   usePreventRemove(
-    !!attemptId && questions.length > 0 && !examFinished && !answersLocked,
+    monitoringEnabled &&
+      !!attemptId &&
+      questions.length > 0 &&
+      !examFinished &&
+      !answersLocked,
+
     () => {
       Alert.alert(
         "Bài thi đang được giám sát",
@@ -473,6 +488,23 @@ export default function ExamScreen() {
 
       const numericQuizId = Number(quizid);
       const numericUserId = Number(userId);
+
+      try {
+        const monitoringConfig = await getQuizMonitoringConfig(numericQuizId);
+
+        setMonitoringEnabled(monitoringConfig.monitoring_enabled);
+
+        setMaxDepartures(monitoringConfig.max_departures);
+
+      } catch (error) {
+
+        // Fail-safe:
+        // nếu không lấy được cấu hình thì mặc định tắt
+        setMonitoringEnabled(false);
+        setMaxDepartures(3);
+      } finally {
+        setMonitoringConfigLoaded(true);
+      }
 
       const resumeId =
         requestedAttemptId === undefined
@@ -1367,6 +1399,19 @@ export default function ExamScreen() {
   };
 
   useEffect(() => {
+    if (!monitoringEnabled) {
+      return;
+    }
+
+    if (monitoring.departures >= maxDepartures) {
+      Alert.alert(
+        "Vượt quá số lần rời màn hình",
+        `Bạn đã rời màn hình thi ${monitoring.departures}/${maxDepartures} lần.`,
+      );
+    }
+  }, [monitoring.departures, monitoringEnabled, maxDepartures]);
+
+  useEffect(() => {
     if (
       !timeExpired ||
       loading ||
@@ -1418,8 +1463,6 @@ export default function ExamScreen() {
       </View>
     );
   }
-
-  const insets = useSafeAreaInsets();
 
   return (
     <View style={styles.container}>
