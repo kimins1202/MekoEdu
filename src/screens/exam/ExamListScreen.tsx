@@ -76,8 +76,6 @@ export default function ExamListScreen() {
         }),
       );
 
-      console.log("QUIZZES:", quizzesWithQuestionCount);
-
       setExams(quizzesWithQuestionCount);
     } catch (error: any) {
       console.error("Lỗi load exams:", error?.response?.data || error?.message);

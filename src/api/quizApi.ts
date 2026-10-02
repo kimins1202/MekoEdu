@@ -398,7 +398,10 @@ export const getUserBestGrade = async (quizid: number, userid: number) => {
 };
 
 // Lấy feedback theo điểm
-export const getQuizFeedbackForGrade = async (quizid: number, grade: number) => {
+export const getQuizFeedbackForGrade = async (
+  quizid: number,
+  grade: number,
+) => {
   const token = await getToken();
 
   const response = await axiosInstance.post(
