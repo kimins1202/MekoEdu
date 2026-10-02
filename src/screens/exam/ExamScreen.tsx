@@ -90,6 +90,7 @@ export default function ExamScreen() {
   const route = useRoute<any>();
 
   const {
+    courseid,
     quizid,
     quizName,
     attemptid: requestedAttemptId,
@@ -623,8 +624,10 @@ export default function ExamScreen() {
 
       if (currentAttempt?.state === "finished") {
         navigation.replace("Result", {
-          attemptId: Number(currentAttempt.id),
+          courseid: Number(courseid),
           quizid: numericQuizId,
+          quizName,
+          attemptid: Number(currentAttempt.id),
         });
 
         return;
@@ -1330,12 +1333,15 @@ export default function ExamScreen() {
 
       await queueExamAnswers(context, answerRef.current, true);
 
+      const beforeSync = await readOfflineExam(context);
+
       setLocalSaveError(false);
 
       await syncExam(context, true);
 
       const afterSync = await readOfflineExam(context);
 
+      
       if (afterSync?.submitted) {
         return;
       }
@@ -1446,15 +1452,17 @@ export default function ExamScreen() {
   }, [offlineExam?.submitted, examFinished]);
 
   useEffect(() => {
-    if (!examFinished) {
+    if (!examFinished || !attemptId) {
       return;
     }
 
     navigation.replace("Result", {
-      attemptId,
+      courseid: Number(courseid),
       quizid: Number(quizid),
+      quizName,
+      attemptid: Number(attemptId),
     });
-  }, [examFinished, navigation, attemptId, quizid]);
+  }, [examFinished, navigation, attemptId, courseid, quizid, quizName]);
 
   const retrySync = async () => {
     if (!contextRef.current || syncing) {

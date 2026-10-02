@@ -16,7 +16,31 @@ export function syncExam(context: ExamContext, retryFailed = false): Promise<voi
       const snapshot = await readOfflineExam(context);
       if (!snapshot || snapshot.submitted || snapshot.status === "Synced" || (snapshot.status === "Failed" && !retryFailed)) return;
       if (Number(await AsyncStorage.getItem("userid")) !== context.userid || !(await AsyncStorage.getItem("wstoken"))) return;
-      const data = Object.entries(snapshot.answers).map(([name, value]) => ({ name, value }));
+      const data: { name: string; value: string }[] = [];
+
+      // 1. Đáp án người dùng đã chọn
+      Object.entries(snapshot.answers).forEach(([name, value]) => {
+        data.push({
+          name,
+          value: String(value),
+        });
+      });
+
+      // 2. sequencecheck của từng câu hỏi
+      Object.values(snapshot.pages).forEach((page) => {
+        page.questions.forEach((question: any) => {
+          const slot = Number(question.slot);
+          const sequencecheck = Number(question.sequencecheck);
+
+          if (Number.isFinite(slot) && Number.isFinite(sequencecheck)) {
+            data.push({
+              name: `q${context.attemptid}:${slot}_:sequencecheck`,
+              value: String(sequencecheck),
+            });
+          }
+        });
+      });
+
       try {
         if (snapshot.submitRequested) {
           // Resolve a lost submission response before attempting submission again.
