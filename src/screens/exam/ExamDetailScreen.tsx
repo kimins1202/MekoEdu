@@ -14,9 +14,7 @@ import { getQuizAccessInformation, getUserAttempts } from "../../api/quizApi";
 
 import { AppStackParamList } from "../../types/navigation";
 
-// =========================
 // TYPES
-// =========================
 
 type RouteParams = {
   quizid: number;
@@ -39,9 +37,7 @@ type Attempt = {
   sumgrades?: number;
 };
 
-// =========================
 // SCREEN
-// =========================
 
 export default function ExamDetailScreen() {
   const navigation = useNavigation<NavigationProp>();
@@ -61,9 +57,7 @@ export default function ExamDetailScreen() {
   // API 7
   const [attempts, setAttempts] = useState<Attempt[]>([]);
 
-  // =========================
   // LOAD DATA
-  // =========================
 
   useEffect(() => {
     loadQuizData();
@@ -79,10 +73,8 @@ export default function ExamDetailScreen() {
         throw new Error("Không tìm thấy User ID. Vui lòng đăng nhập lại.");
       }
 
-      // =========================
       // API 6
       // KIỂM TRA QUYỀN TRUY CẬP
-      // =========================
 
       const accessResponse = await getQuizAccessInformation(Number(quizid));
 
@@ -90,10 +82,8 @@ export default function ExamDetailScreen() {
 
       setPreventAccessReasons(accessResponse?.preventaccessreasons ?? []);
 
-      // =========================
       // API 7
       // LẤY LỊCH SỬ LÀM BÀI
-      // =========================
 
       const attemptsResponse = await getUserAttempts(
         Number(quizid),
@@ -121,9 +111,7 @@ export default function ExamDetailScreen() {
     }
   };
 
-  // =========================
   // 3 LẦN GẦN NHẤT
-  // =========================
 
   const recentAttempts = useMemo(() => {
     return [...attempts]
@@ -137,9 +125,7 @@ export default function ExamDetailScreen() {
       .slice(0, 3);
   }, [attempts]);
 
-  // =========================
   // FORMAT TIME
-  // =========================
 
   const formatDate = (timestamp?: number) => {
     if (!timestamp) {
@@ -164,9 +150,7 @@ export default function ExamDetailScreen() {
     });
   };
 
-  // =========================
   // ATTEMPT STATUS
-  // =========================
 
   const getAttemptStatus = (state?: string) => {
     switch (state) {
@@ -212,9 +196,7 @@ export default function ExamDetailScreen() {
     }
   };
 
-  // =========================
   // FORMAT TIMELIMIT
-  // =========================
 
   const formattedTimeLimit = useMemo(() => {
     if (!timelimit || timelimit <= 0) {
@@ -237,9 +219,7 @@ export default function ExamDetailScreen() {
     return `${hours} giờ ${remainingMinutes} phút`;
   }, [timelimit]);
 
-  // =========================
   // START QUIZ
-  // =========================
 
   const handleStartQuiz = () => {
     if (!canAttempt) {
@@ -260,9 +240,7 @@ export default function ExamDetailScreen() {
     });
   };
 
-  // =========================
   // LOADING
-  // =========================
 
   if (loading) {
     return (
@@ -274,9 +252,7 @@ export default function ExamDetailScreen() {
     );
   }
 
-  // =========================
   // UI
-  // =========================
 
   return (
     <View style={styles.container}>
@@ -438,7 +414,7 @@ export default function ExamDetailScreen() {
                   style={[
                     styles.historyItem,
                     index === recentAttempts.length - 1 &&
-                      styles.historyItemLast,
+                    styles.historyItemLast,
                   ]}
                 >
                   {/* ICON */}
@@ -542,9 +518,7 @@ export default function ExamDetailScreen() {
   );
 }
 
-// =========================
 // INFO ROW
-// =========================
 
 interface InfoRowProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -578,9 +552,7 @@ function InfoRow({
   );
 }
 
-// =========================
 // STYLES
-// =========================
 
 const styles = StyleSheet.create({
   container: {
@@ -593,9 +565,7 @@ const styles = StyleSheet.create({
     paddingBottom: 35,
   },
 
-  // =========================
   // SUMMARY
-  // =========================
 
   summaryCard: {
     backgroundColor: COLORS.white,
@@ -655,9 +625,7 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
 
-  // =========================
   // SECTION
-  // =========================
 
   sectionTitle: {
     fontSize: 17,
@@ -671,9 +639,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
-  // =========================
   // INFO CARD
-  // =========================
 
   infoCard: {
     marginTop: 11,
@@ -720,9 +686,7 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
 
-  // =========================
   // WARNING
-  // =========================
 
   warningCard: {
     marginTop: 12,
@@ -761,9 +725,7 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
 
-  // =========================
   // HISTORY
-  // =========================
 
   historyHeader: {
     marginTop: 23,
@@ -855,9 +817,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  // =========================
   // EMPTY HISTORY
-  // =========================
 
   emptyHistory: {
     backgroundColor: COLORS.white,
@@ -896,9 +856,7 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
 
-  // =========================
   // START
-  // =========================
 
   startButton: {
     marginTop: 22,

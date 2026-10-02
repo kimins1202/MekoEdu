@@ -28,6 +28,8 @@ type Quiz = {
   id: number;
   course?: number;
   name?: string;
+  grade?: number | string;
+  sumgrades?: number | string;
 };
 
 type Attempt = {
@@ -46,6 +48,8 @@ type HistoryItem = Attempt & {
   quizName: string;
   courseId: number;
   courseName: string;
+  quizGradeMax: number;
+  quizSumGrades: number;
 };
 
 type SortType = "newest" | "oldest";
@@ -157,6 +161,8 @@ export default function HistoryScreen() {
               quizName: quiz.name || "Bài kiểm tra",
               courseId,
               courseName: course?.fullname || course?.shortname || "Khóa học",
+              quizGradeMax: Number(quiz.grade) || 0,
+              quizSumGrades: Number(quiz.sumgrades) || 0,
             }));
           } catch {
             return [];
@@ -326,6 +332,9 @@ export default function HistoryScreen() {
     );
   }
 
+  const finishedCount = history.filter((i) => i.state === "finished").length;
+  const inProgressCount = history.filter((i) => i.state === "inprogress").length;
+
   return (
     <View style={styles.container}>
       <AppHeader title="Lịch sử làm bài" />
@@ -342,91 +351,53 @@ export default function HistoryScreen() {
         contentContainerStyle={styles.content}
       >
         {error ? (
-          <View style={styles.emptyCard}>
-            <View style={styles.emptyIcon}>
-              <Ionicons
-                name="cloud-offline-outline"
-                size={34}
-                color={COLORS.error}
-              />
+          <View style={styles.errorCard}>
+            <View style={styles.errorIconWrap}>
+              <Ionicons name="cloud-offline-outline" size={32} color={COLORS.error} />
             </View>
-
             <Text style={styles.emptyTitle}>Không thể tải dữ liệu</Text>
-
             <Text style={styles.emptyText}>{error}</Text>
-
-            <TouchableOpacity
-              style={styles.retryButton}
-              onPress={loadHistory}
-              activeOpacity={0.8}
-            >
+            <TouchableOpacity style={styles.retryButton} onPress={loadHistory} activeOpacity={0.8}>
               <Ionicons name="refresh-outline" size={16} color={COLORS.white} />
               <Text style={styles.retryText}>Thử lại</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <>
-            <Text style={styles.filterTitle}>Lọc theo khóa học</Text>
 
+
+            {/* COURSE FILTER CHIPS */}
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.courseFilters}
             >
               <TouchableOpacity
-                style={[
-                  styles.courseChip,
-                  selectedCourseId === null && styles.courseChipActive,
-                ]}
+                style={[styles.courseChip, selectedCourseId === null && styles.courseChipActive]}
                 onPress={() => handleCourseChange(null)}
                 activeOpacity={0.8}
               >
                 <Ionicons
                   name="apps-outline"
-                  size={15}
-                  color={
-                    selectedCourseId === null
-                      ? COLORS.white
-                      : COLORS.textSecondary
-                  }
+                  size={14}
+                  color={selectedCourseId === null ? COLORS.white : COLORS.primary}
                 />
-
-                <Text
-                  style={[
-                    styles.courseChipText,
-                    selectedCourseId === null && styles.courseChipTextActive,
-                  ]}
-                >
+                <Text style={[styles.courseChipText, selectedCourseId === null && styles.courseChipTextActive]}>
                   Tất cả
                 </Text>
               </TouchableOpacity>
 
               {courses.map((course) => {
                 const active = selectedCourseId === Number(course.id);
-
                 return (
                   <TouchableOpacity
                     key={course.id}
-                    style={[
-                      styles.courseChip,
-                      active && styles.courseChipActive,
-                    ]}
+                    style={[styles.courseChip, active && styles.courseChipActive]}
                     onPress={() => handleCourseChange(Number(course.id))}
                     activeOpacity={0.8}
                   >
-                    <Ionicons
-                      name="book-outline"
-                      size={15}
-                      color={active ? COLORS.white : COLORS.textSecondary}
-                    />
-
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        styles.courseChipText,
-                        active && styles.courseChipTextActive,
-                      ]}
-                    >
+                    <Ionicons name="book-outline" size={14} color={active ? COLORS.white : COLORS.primary} />
+                    <Text numberOfLines={1} style={[styles.courseChipText, active && styles.courseChipTextActive]}>
                       {course.shortname || course.fullname}
                     </Text>
                   </TouchableOpacity>
@@ -434,88 +405,57 @@ export default function HistoryScreen() {
               })}
             </ScrollView>
 
+            {/* HISTORY HEADER */}
             <View style={styles.historyHeader}>
               <View>
                 <Text style={styles.sectionTitle}>Bài đã làm</Text>
-
                 <Text style={styles.resultCount}>
                   {filteredHistory.length === 0
                     ? "Không có kết quả"
-                    : `Hiển thị ${startResult}-${endResult} / ${filteredHistory.length}`}
+                    : `${startResult}–${endResult} / ${filteredHistory.length} lượt`}
                 </Text>
               </View>
 
               <View style={styles.sortBox}>
                 <TouchableOpacity
-                  style={[
-                    styles.sortOption,
-                    sortType === "newest" && styles.sortOptionActive,
-                  ]}
+                  style={[styles.sortOption, sortType === "newest" && styles.sortOptionActive]}
                   onPress={() => handleSortChange("newest")}
                   activeOpacity={0.8}
                 >
                   <Ionicons
                     name="arrow-down"
-                    size={14}
-                    color={
-                      sortType === "newest"
-                        ? COLORS.white
-                        : COLORS.textSecondary
-                    }
+                    size={13}
+                    color={sortType === "newest" ? COLORS.white : COLORS.textSecondary}
                   />
-
-                  <Text
-                    style={[
-                      styles.sortOptionText,
-                      sortType === "newest" && styles.sortOptionTextActive,
-                    ]}
-                  >
+                  <Text style={[styles.sortOptionText, sortType === "newest" && styles.sortOptionTextActive]}>
                     Mới nhất
                   </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[
-                    styles.sortOption,
-                    sortType === "oldest" && styles.sortOptionActive,
-                  ]}
+                  style={[styles.sortOption, sortType === "oldest" && styles.sortOptionActive]}
                   onPress={() => handleSortChange("oldest")}
                   activeOpacity={0.8}
                 >
                   <Ionicons
                     name="arrow-up"
-                    size={14}
-                    color={
-                      sortType === "oldest"
-                        ? COLORS.white
-                        : COLORS.textSecondary
-                    }
+                    size={13}
+                    color={sortType === "oldest" ? COLORS.white : COLORS.textSecondary}
                   />
-
-                  <Text
-                    style={[
-                      styles.sortOptionText,
-                      sortType === "oldest" && styles.sortOptionTextActive,
-                    ]}
-                  >
+                  <Text style={[styles.sortOptionText, sortType === "oldest" && styles.sortOptionTextActive]}>
                     Cũ nhất
                   </Text>
                 </TouchableOpacity>
               </View>
             </View>
 
+            {/* EMPTY */}
             {paginatedHistory.length === 0 ? (
               <View style={styles.emptyCard}>
-                <View style={styles.emptyIcon}>
-                  <Ionicons
-                    name="document-text-outline"
-                    size={34}
-                    color={COLORS.textLight}
-                  />
+                <View style={styles.emptyIconWrap}>
+                  <Ionicons name="document-text-outline" size={32} color={COLORS.textLight} />
                 </View>
-
                 <Text style={styles.emptyTitle}>Chưa có lịch sử</Text>
-
                 <Text style={styles.emptyText}>
                   Không tìm thấy lượt làm bài trong bộ lọc hiện tại.
                 </Text>
@@ -524,127 +464,108 @@ export default function HistoryScreen() {
               <>
                 {paginatedHistory.map((item) => {
                   const status = getStatus(item.state);
+                  const rawScore = Number(item.sumgrades);
+                  const computedScore =
+                    item.sumgrades !== null && item.sumgrades !== undefined
+                      ? item.quizSumGrades > 0 && item.quizGradeMax > 0
+                        ? (rawScore / item.quizSumGrades) * item.quizGradeMax
+                        : rawScore
+                      : null;
+
+                  const scorePercent =
+                    computedScore !== null && item.quizGradeMax > 0
+                      ? Math.min(100, (computedScore / item.quizGradeMax) * 100)
+                      : 0;
 
                   return (
-                    <View
-                      key={`${item.id}-${item.attempt}`}
-                      style={styles.resultCard}
-                    >
-                      <View style={styles.resultIcon}>
-                        <Ionicons
-                          name="document-text-outline"
-                          size={21}
-                          color={COLORS.primaryDark}
-                        />
+                    <View key={`${item.id}-${item.attempt}`} style={styles.resultCard}>
+                      {/* LEFT ICON */}
+                      <View style={styles.resultIconWrap}>
+                        <Ionicons name="document-text-outline" size={20} color={COLORS.primary} />
                       </View>
 
+                      {/* CENTER INFO */}
                       <View style={styles.resultInfo}>
                         <Text style={styles.resultTitle} numberOfLines={2}>
                           {item.quizName}
                         </Text>
 
                         <View style={styles.courseRow}>
-                          <Ionicons
-                            name="book-outline"
-                            size={13}
-                            color={COLORS.primary}
-                          />
-
+                          <Ionicons name="book-outline" size={12} color={COLORS.primary} />
                           <Text style={styles.courseName} numberOfLines={1}>
                             {item.courseName}
                           </Text>
                         </View>
 
                         <View style={styles.metaRow}>
-                          <View style={styles.metaItem}>
-                            <Ionicons
-                              name="repeat-outline"
-                              size={12}
-                              color={COLORS.textLight}
-                            />
-
-                            <Text style={styles.metaText}>
-                              Lần {item.attempt}
-                            </Text>
+                          <View style={styles.metaBadge}>
+                            <Ionicons name="repeat-outline" size={11} color={COLORS.textLight} />
+                            <Text style={styles.metaText}>Lần {item.attempt}</Text>
                           </View>
-
-                          <View style={styles.metaItem}>
-                            <Ionicons
-                              name="calendar-outline"
-                              size={12}
-                              color={COLORS.textLight}
-                            />
-
+                          <View style={styles.metaBadge}>
+                            <Ionicons name="calendar-outline" size={11} color={COLORS.textLight} />
                             <Text style={styles.metaText}>
-                              {formatDate(
-                                item.timemodified ||
-                                  item.timefinish ||
-                                  item.timestart,
-                              )}
+                              {formatDate(item.timemodified || item.timefinish || item.timestart)}
                             </Text>
                           </View>
                         </View>
 
-                        <View
-                          style={[
-                            styles.statusBadge,
-                            {
-                              backgroundColor: status.background,
-                            },
-                          ]}
-                        >
-                          <Ionicons
-                            name={status.icon}
-                            size={12}
-                            color={status.color}
-                          />
-
-                          <Text
-                            style={[
-                              styles.statusText,
-                              {
-                                color: status.color,
-                              },
-                            ]}
-                          >
-                            {status.text}
-                          </Text>
+                        <View style={[styles.statusBadge, { backgroundColor: status.background }]}>
+                          <Ionicons name={status.icon} size={11} color={status.color} />
+                          <Text style={[styles.statusText, { color: status.color }]}>{status.text}</Text>
                         </View>
                       </View>
 
+                      {/* RIGHT SCORE */}
                       <View style={styles.scoreContainer}>
-                        <Text style={styles.score}>
-                          {item.sumgrades !== null &&
-                          item.sumgrades !== undefined
-                            ? Number(item.sumgrades).toFixed(1)
-                            : "—"}
-                        </Text>
-
-                        <Text style={styles.scoreLabel}>điểm</Text>
+                        {computedScore !== null ? (
+                          <>
+                            <View style={styles.scoreCircleWrap}>
+                              <Text style={styles.scoreValue}>{computedScore.toFixed(1)}</Text>
+                              <Text style={styles.scoreMax}>
+                                /{item.quizGradeMax > 0 ? item.quizGradeMax : "—"}
+                              </Text>
+                            </View>
+                            {item.quizGradeMax > 0 && (
+                              <View style={styles.scoreBar}>
+                                <View
+                                  style={[
+                                    styles.scoreBarFill,
+                                    {
+                                      width: `${scorePercent}%` as any,
+                                      backgroundColor:
+                                        scorePercent >= 80
+                                          ? COLORS.success
+                                          : scorePercent >= 50
+                                            ? COLORS.warning
+                                            : COLORS.error,
+                                    },
+                                  ]}
+                                />
+                              </View>
+                            )}
+                          </>
+                        ) : (
+                          <Text style={styles.scoreDash}>—</Text>
+                        )}
                       </View>
                     </View>
                   );
                 })}
 
+                {/* PAGINATION */}
                 {totalPages > 1 && (
                   <View style={styles.paginationCard}>
                     <TouchableOpacity
-                      style={[
-                        styles.pageArrow,
-                        currentPage === 1 && styles.pageArrowDisabled,
-                      ]}
-                      onPress={() =>
-                        setCurrentPage((page) => Math.max(1, page - 1))
-                      }
+                      style={[styles.pageArrow, currentPage === 1 && styles.pageArrowDisabled]}
+                      onPress={() => setCurrentPage((p) => Math.max(1, p - 1))}
                       disabled={currentPage === 1}
                       activeOpacity={0.8}
                     >
                       <Ionicons
                         name="chevron-back"
                         size={17}
-                        color={
-                          currentPage === 1 ? COLORS.textLight : COLORS.primary
-                        }
+                        color={currentPage === 1 ? COLORS.textLight : COLORS.primary}
                       />
                     </TouchableOpacity>
 
@@ -652,33 +573,20 @@ export default function HistoryScreen() {
                       {getPageNumbers().map((pageNumber, index) => {
                         if (pageNumber === -1) {
                           return (
-                            <View
-                              key={`ellipsis-${index}`}
-                              style={styles.ellipsis}
-                            >
+                            <View key={`ellipsis-${index}`} style={styles.ellipsis}>
                               <Text style={styles.ellipsisText}>•••</Text>
                             </View>
                           );
                         }
-
                         const active = pageNumber === currentPage;
-
                         return (
                           <TouchableOpacity
                             key={pageNumber}
-                            style={[
-                              styles.pageNumber,
-                              active && styles.pageNumberActive,
-                            ]}
+                            style={[styles.pageNumber, active && styles.pageNumberActive]}
                             onPress={() => setCurrentPage(pageNumber)}
                             activeOpacity={0.8}
                           >
-                            <Text
-                              style={[
-                                styles.pageNumberText,
-                                active && styles.pageNumberTextActive,
-                              ]}
-                            >
+                            <Text style={[styles.pageNumberText, active && styles.pageNumberTextActive]}>
                               {pageNumber}
                             </Text>
                           </TouchableOpacity>
@@ -687,33 +595,22 @@ export default function HistoryScreen() {
                     </View>
 
                     <TouchableOpacity
-                      style={[
-                        styles.pageArrow,
-                        currentPage === totalPages && styles.pageArrowDisabled,
-                      ]}
-                      onPress={() =>
-                        setCurrentPage((page) => Math.min(totalPages, page + 1))
-                      }
+                      style={[styles.pageArrow, currentPage === totalPages && styles.pageArrowDisabled]}
+                      onPress={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                       disabled={currentPage === totalPages}
                       activeOpacity={0.8}
                     >
                       <Ionicons
                         name="chevron-forward"
                         size={17}
-                        color={
-                          currentPage === totalPages
-                            ? COLORS.textLight
-                            : COLORS.primary
-                        }
+                        color={currentPage === totalPages ? COLORS.textLight : COLORS.primary}
                       />
                     </TouchableOpacity>
                   </View>
                 )}
 
                 {totalPages > 1 && (
-                  <Text style={styles.pageInfo}>
-                    Trang {currentPage} / {totalPages}
-                  </Text>
+                  <Text style={styles.pageInfo}>Trang {currentPage} / {totalPages}</Text>
                 )}
               </>
             )}
@@ -735,65 +632,61 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
 
-  overviewCard: {
+  // ── SUMMARY CARD ──────────────────────────────
+  summaryCard: {
     backgroundColor: COLORS.white,
     borderRadius: 20,
-    padding: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 8,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-around",
     marginBottom: 22,
     borderWidth: 1,
-    borderColor: "#E5EEE9",
+    borderColor: COLORS.border,
   },
 
-  overviewIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 16,
-    backgroundColor: "#EAF6EF",
+  summaryItem: {
+    flex: 1,
+    alignItems: "center",
+    gap: 4,
+  },
+
+  summaryIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 13,
+    marginBottom: 2,
   },
 
-  overviewInfo: {
-    flex: 1,
-  },
-
-  overviewTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: COLORS.text,
-  },
-
-  overviewText: {
-    marginTop: 4,
-    fontSize: 12,
-    color: COLORS.textSecondary,
-  },
-
-  overviewRight: {
-    alignItems: "flex-end",
-    paddingLeft: 12,
-  },
-
-  overviewNumber: {
+  summaryNumber: {
     fontSize: 22,
     fontWeight: "800",
-    color: COLORS.primaryDark,
+    color: COLORS.primary,
   },
 
-  overviewLabel: {
-    marginTop: 2,
+  summaryLabel: {
     fontSize: 10,
     color: COLORS.textLight,
+    fontWeight: "600",
   },
 
+  summaryDivider: {
+    width: 1,
+    height: 52,
+    backgroundColor: COLORS.border,
+  },
+
+  // ── FILTER ──────────────────────────────────
   filterTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "700",
-    color: COLORS.text,
+    color: COLORS.textSecondary,
     marginBottom: 10,
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
   },
 
   courseFilters: {
@@ -802,12 +695,12 @@ const styles = StyleSheet.create({
   },
 
   courseChip: {
-    height: 38,
+    height: 36,
     paddingHorizontal: 13,
     borderRadius: 12,
     backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
@@ -821,19 +714,20 @@ const styles = StyleSheet.create({
   courseChipText: {
     maxWidth: 145,
     fontSize: 12,
-    fontWeight: "600",
-    color: COLORS.textSecondary,
+    fontWeight: "700",
+    color: COLORS.primary,
   },
 
   courseChipTextActive: {
     color: COLORS.white,
   },
 
+  // ── HEADER ──────────────────────────────────
   historyHeader: {
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "space-between",
-    marginBottom: 13,
+    marginBottom: 14,
   },
 
   sectionTitle: {
@@ -851,15 +745,15 @@ const styles = StyleSheet.create({
   sortBox: {
     flexDirection: "row",
     padding: 3,
-    borderRadius: 13,
-    backgroundColor: "#E7EFEA",
+    borderRadius: 12,
+    backgroundColor: "#E4EDE8",
     gap: 2,
   },
 
   sortOption: {
-    height: 31,
+    height: 30,
     paddingHorizontal: 9,
-    borderRadius: 10,
+    borderRadius: 9,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -880,25 +774,26 @@ const styles = StyleSheet.create({
     color: COLORS.white,
   },
 
+  // ── RESULT CARD ──────────────────────────────
   resultCard: {
     backgroundColor: COLORS.white,
-    borderRadius: 17,
+    borderRadius: 18,
     padding: 14,
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: "#E7EEE9",
+    borderColor: COLORS.border,
   },
 
-  resultIcon: {
+  resultIconWrap: {
     width: 44,
     height: 44,
-    borderRadius: 13,
-    backgroundColor: COLORS.backgroundSoft,
+    borderRadius: 14,
+    backgroundColor: "#EBF5EF",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 11,
+    marginRight: 12,
   },
 
   resultInfo: {
@@ -922,28 +817,33 @@ const styles = StyleSheet.create({
 
   courseName: {
     flex: 1,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "600",
-    color: COLORS.primaryDark,
+    color: COLORS.primary,
   },
 
   metaRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 9,
+    gap: 7,
     marginTop: 5,
+    flexWrap: "wrap",
   },
 
-  metaItem: {
+  metaBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    flexShrink: 1,
+    gap: 3,
+    backgroundColor: COLORS.backgroundSoft,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
 
   metaText: {
     fontSize: 9,
-    color: COLORS.textLight,
+    color: COLORS.textSecondary,
+    fontWeight: "600",
   },
 
   statusBadge: {
@@ -951,35 +851,62 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
-    marginTop: 6,
+    marginTop: 7,
   },
 
   statusText: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: "700",
   },
 
+  // ── SCORE ──────────────────────────────────
   scoreContainer: {
-    minWidth: 43,
+    minWidth: 52,
     alignItems: "center",
-    marginLeft: 8,
+    marginLeft: 10,
+    gap: 6,
   },
 
-  score: {
-    fontSize: 19,
+  scoreCircleWrap: {
+    alignItems: "center",
+  },
+
+  scoreValue: {
+    fontSize: 20,
     fontWeight: "800",
-    color: COLORS.primaryDark,
+    color: COLORS.primary,
+    lineHeight: 24,
   },
 
-  scoreLabel: {
-    fontSize: 9,
+  scoreMax: {
+    fontSize: 10,
     color: COLORS.textLight,
-    marginTop: 1,
+    fontWeight: "600",
   },
 
+  scoreBar: {
+    width: 44,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "#E4EDE8",
+    overflow: "hidden",
+  },
+
+  scoreBarFill: {
+    height: "100%",
+    borderRadius: 3,
+  },
+
+  scoreDash: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: COLORS.textLight,
+  },
+
+  // ── PAGINATION ──────────────────────────────
   paginationCard: {
     marginTop: 6,
     backgroundColor: COLORS.white,
@@ -989,7 +916,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     borderWidth: 1,
-    borderColor: "#E7EEE9",
+    borderColor: COLORS.border,
   },
 
   pageArrow: {
@@ -1057,27 +984,49 @@ const styles = StyleSheet.create({
     color: COLORS.textLight,
   },
 
+  // ── EMPTY / ERROR ───────────────────────────
   emptyCard: {
     backgroundColor: COLORS.white,
     borderRadius: 20,
-    padding: 30,
+    padding: 32,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#E7EEE9",
+    borderColor: COLORS.border,
   },
 
-  emptyIcon: {
-    width: 62,
-    height: 62,
+  errorCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 20,
+    padding: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#F5DADA",
+  },
+
+  emptyIconWrap: {
+    width: 64,
+    height: 64,
     borderRadius: 20,
     backgroundColor: COLORS.backgroundSoft,
     justifyContent: "center",
     alignItems: "center",
+    marginBottom: 4,
+  },
+
+  errorIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: "#FDF0F0",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 4,
   },
 
   emptyTitle: {
-    marginTop: 13,
+    marginTop: 12,
     fontSize: 16,
     fontWeight: "700",
     color: COLORS.text,
@@ -1093,9 +1042,9 @@ const styles = StyleSheet.create({
 
   retryButton: {
     marginTop: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 11,
+    paddingHorizontal: 22,
+    paddingVertical: 11,
+    borderRadius: 12,
     backgroundColor: COLORS.primary,
     flexDirection: "row",
     alignItems: "center",

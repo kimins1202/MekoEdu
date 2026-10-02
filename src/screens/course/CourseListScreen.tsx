@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
 
 import { getUserCourses } from "../../api/courseApi";
-import { getCourseExamProgress } from "../../services/courseProgressService";
 import AppHeader from "../../components/common/AppHeader";
 import EmptyState from "../../components/common/EmptyState";
 import Loading from "../../components/common/Loading";
@@ -15,6 +14,7 @@ import CourseFilter, {
   CourseFilterType,
 } from "../../components/course/CourseFilter";
 import COLORS from "../../constants/colors";
+import { getCourseExamProgress } from "../../services/courseProgressService";
 import type { AppStackParamList } from "../../types/navigation";
 
 type NavigationProp = NativeStackNavigationProp<AppStackParamList>;

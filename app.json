@@ -17,18 +17,22 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.mekoedu.app"
     },
     "web": {
       "output": "single",
       "favicon": "./assets/images/favicon.png"
     },
-    "plugins": [
-      "expo-splash-screen"
-    ],
+    "plugins": ["expo-splash-screen", "@react-native-community/datetimepicker"],
     "experiments": {
       "typedRoutes": false,
       "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "303e1f63-2ddf-4d72-8a5d-ad115ebbb6f9"
+      }
     }
   }
 }

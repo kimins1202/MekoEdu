@@ -63,8 +63,11 @@ export type AppStackParamList = {
 
   Help: undefined;
 
-  Result: undefined;
-
+  Result: {
+    quizid: number;
+    quizName: string;
+    attemptid: number;
+  };
   AnswerReview: undefined;
 
   Statistics: undefined;

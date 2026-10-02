@@ -238,20 +238,29 @@ export const saveQuizAttempt = async (attemptid: number, data: any[]) => {
 };
 
 // Moodle resolves time limits, closing time, and user/group overrides.
-export const getAttemptDeadline = async (quizid: number, attemptid: number): Promise<number | null> => {
+export const getAttemptDeadline = async (
+  quizid: number,
+  attemptid: number,
+): Promise<number | null> => {
   const token = await getToken();
-  const response = await axiosInstance.post("/webservice/rest/server.php", null, {
-    params: {
-      wstoken: token,
-      wsfunction: "mod_quiz_get_attempt_access_information",
-      moodlewsrestformat: "json",
-      quizid,
-      attemptid,
+  const response = await axiosInstance.post(
+    "/webservice/rest/server.php",
+    null,
+    {
+      params: {
+        wstoken: token,
+        wsfunction: "mod_quiz_get_attempt_access_information",
+        moodlewsrestformat: "json",
+        quizid,
+        attemptid,
+      },
     },
-  });
-  if (response.data?.exception) throw new Error(response.data.message || "Không thể lấy thời hạn bài thi.");
+  );
+  if (response.data?.exception)
+    throw new Error(response.data.message || "Không thể lấy thời hạn bài thi.");
   const endtime = Number(response.data?.endtime);
-  if (!Number.isFinite(endtime) || endtime < 0) throw new Error("Moodle không trả về thời hạn bài thi hợp lệ.");
+  if (!Number.isFinite(endtime) || endtime < 0)
+    throw new Error("Moodle không trả về thời hạn bài thi hợp lệ.");
   return endtime === 0 ? null : endtime * 1000;
 };
 
@@ -313,4 +322,102 @@ export const getQuizQuestionCount = async (quizid: number): Promise<number> => {
   }
 
   return Number(response.data?.questioncount ?? 0);
+};
+//Lấy kết quả học tập
+export const getGradeItems = async (courseid: number, userid: number) => {
+  const token = await getToken();
+
+  const response = await axiosInstance.post(
+    "/webservice/rest/server.php",
+    null,
+    {
+      params: {
+        wstoken: token,
+        wsfunction: "gradereport_user_get_grade_items",
+        moodlewsrestformat: "json",
+        courseid: Number(courseid),
+        userid: Number(userid),
+      },
+    },
+  );
+
+  if (response.data?.exception) {
+    throw new Error(response.data.message || "Không thể lấy kết quả học tập.");
+  }
+
+  return response.data;
+};
+
+// Lấy chi tiết bài làm
+export const getAttemptReview = async (attemptid: number) => {
+  const token = await getToken();
+
+  const response = await axiosInstance.post(
+    "/webservice/rest/server.php",
+    null,
+    {
+      params: {
+        wstoken: token,
+        wsfunction: "mod_quiz_get_attempt_review",
+        moodlewsrestformat: "json",
+        attemptid: Number(attemptid),
+      },
+    },
+  );
+
+  if (response.data?.exception) {
+    throw new Error(response.data.message || "Không thể lấy chi tiết bài làm.");
+  }
+
+  return response.data;
+};
+
+// Lấy điểm cao nhất
+export const getUserBestGrade = async (quizid: number, userid: number) => {
+  const token = await getToken();
+
+  const response = await axiosInstance.post(
+    "/webservice/rest/server.php",
+    null,
+    {
+      params: {
+        wstoken: token,
+        wsfunction: "mod_quiz_get_user_best_grade",
+        moodlewsrestformat: "json",
+        quizid: Number(quizid),
+        userid: Number(userid),
+      },
+    },
+  );
+
+  if (response.data?.exception) {
+    throw new Error(response.data.message || "Không thể lấy điểm cao nhất.");
+  }
+
+  return response.data;
+};
+
+// Lấy feedback theo điểm
+export const getQuizFeedbackForGrade = async (quizid: number, grade: number) => {
+  const token = await getToken();
+
+  const response = await axiosInstance.post(
+    "/webservice/rest/server.php",
+    null,
+    {
+      params: {
+        wstoken: token,
+        wsfunction: "mod_quiz_get_quiz_feedback_for_grade",
+        moodlewsrestformat: "json",
+        quizid: Number(quizid),
+        grade: Number(grade),
+      },
+    },
+  );
+
+  if (response.data?.exception) {
+    throw new Error(response.data.message || "Không thể lấy feedback.");
+  }
+
+  return response.data;
 };

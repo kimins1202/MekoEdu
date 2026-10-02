@@ -232,18 +232,14 @@ export default function OnboardingScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  // =========================
   // CONTAINER
-  // =========================
 
   container: {
     flex: 1,
     backgroundColor: COLORS.white,
   },
 
-  // =========================
   // HEADER
-  // =========================
 
   header: {
     height: 76,
@@ -267,17 +263,13 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
 
-  // =========================
   // ANIMATED CONTENT
-  // =========================
 
   animatedContent: {
     flex: 1,
   },
 
-  // =========================
   // ILLUSTRATION
-  // =========================
 
   illustrationContainer: {
     width: width * 0.82,
@@ -311,9 +303,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
   },
 
-  // =========================
   // DECORATIONS
-  // =========================
 
   circleTop: {
     position: "absolute",
@@ -343,9 +333,7 @@ const styles = StyleSheet.create({
     right: -30,
   },
 
-  // =========================
   // MAIN CARD
-  // =========================
 
   mainCard: {
     width: 140,
@@ -410,9 +398,7 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
 
-  // =========================
   // TOP BADGE
-  // =========================
 
   topBadge: {
     position: "absolute",
@@ -446,9 +432,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
 
-  // =========================
   // ACCESS BADGE
-  // =========================
 
   accessBadge: {
     position: "absolute",
@@ -490,9 +474,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  // =========================
   // CONTENT
-  // =========================
 
   content: {
     width: width * 0.82,
@@ -528,9 +510,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  // =========================
   // BOTTOM
-  // =========================
 
   bottomSection: {
     width: width * 0.82,
@@ -543,9 +523,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  // =========================
   // DOTS
-  // =========================
 
   dots: {
     flexDirection: "row",

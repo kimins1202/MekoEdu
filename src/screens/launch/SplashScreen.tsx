@@ -9,16 +9,12 @@ import { RootStackParamList } from "../../types/navigation";
 type Props = NativeStackScreenProps<RootStackParamList, "Splash">;
 
 export default function SplashScreen({ navigation }: Props) {
-  // =========================
   // Logo
-  // =========================
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const logoScale = useRef(new Animated.Value(0.85)).current;
   const logoTranslateY = useRef(new Animated.Value(10)).current;
 
-  // =========================
   // Loading
-  // =========================
   const loadingOpacity = useRef(new Animated.Value(0)).current;
   const loadingScale = useRef(new Animated.Value(0.8)).current;
 
@@ -28,9 +24,7 @@ export default function SplashScreen({ navigation }: Props) {
 
   const progressScale = useRef(new Animated.Value(0)).current;
 
-  // =========================
   // MekoSoft
-  // =========================
   const brandOpacity = useRef(new Animated.Value(0)).current;
   const brandTranslateY = useRef(new Animated.Value(10)).current;
 
@@ -315,9 +309,7 @@ export default function SplashScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  // =========================
   // Container
-  // =========================
   container: {
     flex: 1,
     backgroundColor: COLORS.primary,
@@ -330,9 +322,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
 
-  // =========================
   // Logo
-  // =========================
   logoWrapper: {
     width: 230,
     height: 230,
@@ -367,9 +357,7 @@ const styles = StyleSheet.create({
     height: 116,
   },
 
-  // =========================
   // Loading
-  // =========================
   loading: {
     position: "absolute",
 
@@ -414,9 +402,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primaryLight,
   },
 
-  // =========================
   // MekoSoft
-  // =========================
   brand: {
     position: "absolute",
 
@@ -459,9 +445,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
 
-  // =========================
   // Home Indicator
-  // =========================
   homeIndicator: {
     position: "absolute",
 

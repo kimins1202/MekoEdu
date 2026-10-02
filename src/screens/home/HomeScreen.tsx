@@ -88,9 +88,7 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // =====================================================
   // LOAD HOME DATA
-  // =====================================================
 
   const loadHomeData = useCallback(async () => {
     try {
@@ -227,9 +225,7 @@ export default function HomeScreen() {
     loadHomeData();
   }, [loadHomeData]);
 
-  // =====================================================
   // HELPERS
-  // =====================================================
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -304,9 +300,7 @@ export default function HomeScreen() {
     }
   };
 
-  // =====================================================
   // NAVIGATION
-  // =====================================================
 
   const goToCourses = () => {
     navigation.navigate("Courses");
@@ -337,9 +331,7 @@ export default function HomeScreen() {
     });
   };
 
-  // =====================================================
   // LOADING
-  // =====================================================
 
   if (loading) {
     return <Loading message="Đang tải trang chủ..." />;
@@ -353,9 +345,7 @@ export default function HomeScreen() {
     ? getCourseProgress(firstCourse)
     : null;
 
-  // =====================================================
   // RENDER
-  // =====================================================
 
   return (
     <View style={styles.container}>
@@ -376,9 +366,9 @@ export default function HomeScreen() {
           />
         }
       >
-        {/* =================================================
+        {/* 
             USER WELCOME
-        ================================================= */}
+         */}
 
         <View style={styles.userCard}>
           <View style={styles.userAvatar}>
@@ -420,9 +410,9 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* =================================================
+        {/* 
             STATISTICS
-        ================================================= */}
+         */}
 
         <View style={styles.statsRow}>
           <StatisticCard
@@ -444,20 +434,11 @@ export default function HomeScreen() {
               }
             }}
           />
-
-          <StatisticCard
-            icon="trending-up-outline"
-            value={
-              firstCourseProgress !== null ? `${firstCourseProgress}%` : "--"
-            }
-            label="Thống kê"
-            onPress={() => navigation.navigate("Statistics")}
-          />
         </View>
 
-        {/* =================================================
+        {/* 
             RECENT COURSES
-        ================================================= */}
+         */}
 
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleRow}>
@@ -524,9 +505,9 @@ export default function HomeScreen() {
           />
         )}
 
-        {/* =================================================
+        {/* 
             RECENT HISTORY
-        ================================================= */}
+         */}
 
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleRow}>
@@ -572,8 +553,8 @@ export default function HomeScreen() {
                     <Text style={styles.historyDate}>
                       {formatDate(
                         attempt.timemodified ||
-                          attempt.timefinish ||
-                          attempt.timestart,
+                        attempt.timefinish ||
+                        attempt.timestart,
                       )}
                     </Text>
 
@@ -607,9 +588,9 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* =================================================
+        {/* 
             QUICK ACTIONS
-        ================================================= */}
+         */}
 
         <View style={styles.quickHeader}>
           <View style={styles.sectionTitleRow}>
@@ -655,9 +636,7 @@ export default function HomeScreen() {
   );
 }
 
-// =====================================================
 // QUICK ACTION
-// =====================================================
 
 interface QuickActionProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -683,9 +662,7 @@ function QuickAction({ icon, title, onPress }: QuickActionProps) {
   );
 }
 
-// =====================================================
 // STYLES
-// =====================================================
 
 const styles = StyleSheet.create({
   container: {

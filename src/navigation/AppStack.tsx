@@ -8,7 +8,6 @@ import ExamListScreen from "../screens/exam/ExamListScreen";
 import ExamScreen from "../screens/exam/ExamScreen";
 
 import ProfileScreen from "../screens/account/ProfileScreen";
-import CourseDetailScreen from "../screens/course/CourseDetailScreen";
 import NotificationScreen from "../screens/notification/NotificationScreen";
 import AnswerReviewScreen from "../screens/result/AnswerReviewScreen";
 import ConfirmSubmitScreen from "../screens/result/ConfirmSubmitScreen";
@@ -35,7 +34,6 @@ export default function AppStack() {
 
       {/* New Screens */}
       <Stack.Screen name="Profile" component={ProfileScreen} />
-      <Stack.Screen name="CourseDetail" component={CourseDetailScreen} />
       <Stack.Screen name="Notification" component={NotificationScreen} />
       <Stack.Screen
         name="SettingsNotification"

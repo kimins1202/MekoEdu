@@ -1,12 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { LinearGradient } from "expo-linear-gradient";
 import {
   useIsFocused,
   useNavigation,
   usePreventRemove,
   useRoute,
 } from "@react-navigation/native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -1368,7 +1368,7 @@ export default function ExamScreen() {
           return;
         }
         void submitExam(Number(confirmedAttemptId));
-      }
+      },
     );
 
     return () => {
@@ -2038,11 +2038,7 @@ function DotsIndicator({ delay }: { delay: number }) {
     ).start();
   }, []);
 
-  return (
-    <Animated.View
-      style={[overlayStyles.dot, { opacity: anim }]}
-    />
-  );
+  return <Animated.View style={[overlayStyles.dot, { opacity: anim }]} />;
 }
 
 const overlayStyles = StyleSheet.create({
