@@ -23,6 +23,7 @@ export type AppStackParamList = {
   };
 
   ExamDetail: {
+    courseid: number;
     quizid: number;
     quizName: string;
     questionCount?: number;
@@ -30,6 +31,7 @@ export type AppStackParamList = {
   };
 
   Exam: {
+    courseid: number;
     quizid: number;
     quizName: string;
     questionCount?: number;
@@ -51,6 +53,19 @@ export type AppStackParamList = {
     }[];
   };
 
+  Result: {
+    courseid: number;
+    quizid: number;
+    quizName: string;
+    attemptid: number;
+  };
+
+  AnswerReview: {
+    attemptid: number;
+    quizid: number;
+    quizName: string;
+  };
+
   MainTabs: undefined;
 
   Profile: undefined;
@@ -62,13 +77,6 @@ export type AppStackParamList = {
   Contact: undefined;
 
   Help: undefined;
-
-  Result: {
-    quizid: number;
-    quizName: string;
-    attemptid: number;
-  };
-  AnswerReview: undefined;
 
   Statistics: undefined;
 };

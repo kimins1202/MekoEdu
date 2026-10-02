@@ -17,6 +17,7 @@ import { AppStackParamList } from "../../types/navigation";
 // TYPES
 
 type RouteParams = {
+  courseid: number;
   quizid: number;
   quizName: string;
   questionCount?: number;
@@ -43,7 +44,7 @@ export default function ExamDetailScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<any>();
 
-  const { quizid, quizName, questionCount, timelimit } =
+  const { courseid, quizid, quizName, questionCount, timelimit } =
     route.params as RouteParams;
 
   const [loading, setLoading] = useState(true);
@@ -234,6 +235,7 @@ export default function ExamDetailScreen() {
     }
 
     navigation.navigate("Exam", {
+      courseid: Number(courseid),
       quizid: Number(quizid),
       quizName,
       questionCount,

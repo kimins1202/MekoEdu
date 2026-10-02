@@ -162,8 +162,11 @@ export default function ExamListScreen() {
             <TouchableOpacity
               style={styles.examCard}
               activeOpacity={0.75}
+              
               onPress={() =>
+                
                 navigation.navigate("ExamDetail", {
+                  courseid: Number(courseid),
                   quizid: item.id,
                   quizName: item.name,
                   questionCount: item.questioncount,

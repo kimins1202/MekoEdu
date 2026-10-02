@@ -90,7 +90,15 @@ export default function ResultScreen() {
       let correctQ = 0;
 
       questions.forEach((q: any) => {
-        if (Number(q.mark) > 0) {
+        const mark = Number(q.mark);
+        const maxMark = Number(q.maxmark);
+
+        if (
+          Number.isFinite(mark) &&
+          Number.isFinite(maxMark) &&
+          maxMark > 0 &&
+          mark >= maxMark
+        ) {
           correctQ++;
         }
       });
