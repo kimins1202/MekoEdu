@@ -172,8 +172,6 @@ export default function ExamScreen() {
 
   const isFocused = useIsFocused();
 
-  const insets = useSafeAreaInsets();
-
   const monitoring = useExamMonitoring(
     attemptId && examUserId
       ? {
