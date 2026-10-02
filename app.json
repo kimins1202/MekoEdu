@@ -4,27 +4,32 @@
     "slug": "MekoEdu",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/meko-logo-dark-rmbg.png",
+    "icon": "./assets/images/mekosoft-logo.png",
     "scheme": "mekoedu",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/mekosoft-logo.png"
     },
     "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
-      },
       "predictiveBackGestureEnabled": false,
       "package": "com.mekoedu.app"
     },
     "web": {
       "output": "single",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/mekosoft-logo.png"
     },
-    "plugins": ["expo-splash-screen", "@react-native-community/datetimepicker"],
+    "plugins": [
+      "expo-splash-screen",
+      "@react-native-community/datetimepicker",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
+    ],
     "experiments": {
       "typedRoutes": false,
       "reactCompiler": true
