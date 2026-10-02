@@ -1,11 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Animated,
+  Alert,
   DeviceEventEmitter,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,6 +19,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import COLORS from "../../constants/colors";
 import { AppStackParamList } from "../../types/navigation";
+import { OfflineExam, readOfflineExam, subscribeExamSync } from "../../services/examStorageService";
+import { syncExam } from "../../services/syncService";
 
 type QuestionStatus = "answered" | "unanswered";
 
@@ -47,6 +52,71 @@ export default function ConfirmSubmitScreen() {
   const route = useRoute<RouteProp>();
 
   const { quizid, quizName, attemptid, questions = [] } = route.params;
+  const [saveStatus, setSaveStatus] = useState<SaveStatus | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshLock = useRef(false);
+  const submitLock = useRef(false);
+  const mounted = useRef(true);
+
+  const applySyncStatus = (exam: OfflineExam) => {
+    if (!mounted.current) return;
+    setSaveStatus(exam.status === "Synced" ? "saved" : "not_saved");
+  };
+
+  useEffect(() => {
+    mounted.current = true;
+    let active = true;
+    let unsubscribe = () => {};
+    void (async () => {
+      try {
+        const userid = Number(await AsyncStorage.getItem("userid"));
+        if (!active || !userid) return;
+        unsubscribe = subscribeExamSync((exam) => {
+          if (exam.userid === userid && exam.quizid === quizid && exam.attemptid === attemptid) {
+            applySyncStatus(exam);
+          }
+        });
+        const exam = await readOfflineExam({ userid, quizid, attemptid });
+        if (active && exam) applySyncStatus(exam);
+      } catch {
+        if (active) setSaveStatus("not_saved");
+      }
+    })();
+    return () => {
+      active = false;
+      mounted.current = false;
+      unsubscribe();
+    };
+  }, [quizid, attemptid]);
+
+  const handleRefresh = async () => {
+    if (refreshLock.current || submitLock.current) return;
+    refreshLock.current = true;
+    setRefreshing(true);
+    try {
+      const userid = Number(await AsyncStorage.getItem("userid"));
+      if (!userid) throw new Error("Không tìm thấy thông tin người dùng.");
+      const context = { userid, quizid, attemptid };
+      await syncExam(context, true);
+      const exam = await readOfflineExam(context);
+      if (!exam) throw new Error("Không tìm thấy dữ liệu bài làm.");
+      applySyncStatus(exam);
+      if (exam.status !== "Synced") {
+        throw new Error(exam.error || "Chưa đồng bộ được bài làm. Vui lòng thử lại.");
+      }
+    } catch (error) {
+      if (mounted.current) {
+        setSaveStatus("not_saved");
+        Alert.alert("Không thể tải lại", error instanceof Error ? error.message : "Vui lòng thử lại.");
+      }
+    } finally {
+      refreshLock.current = false;
+      if (mounted.current) setRefreshing(false);
+    }
+  };
+
+  const questionSaveStatus = (question: QuestionSummary): SaveStatus =>
+    refreshing ? "saving" : saveStatus ?? question.saveStatus ?? "not_saved";
 
   // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -62,22 +132,22 @@ export default function ConfirmSubmitScreen() {
   const flaggedCount = questions.filter((question) => question.flagged).length;
 
   const savedCount = questions.filter(
-    (question) => question.saveStatus === "saved",
+    (question) => questionSaveStatus(question) === "saved",
   ).length;
 
   const savingCount = questions.filter(
-    (question) => question.saveStatus === "saving",
+    (question) => questionSaveStatus(question) === "saving",
   ).length;
 
   const notSavedCount = questions.filter(
-    (question) => question.saveStatus === "not_saved",
+    (question) => questionSaveStatus(question) === "not_saved",
   ).length;
 
   const progressPercent =
     questions.length > 0 ? answeredCount / questions.length : 0;
 
   const allSaved = savingCount === 0 && notSavedCount === 0;
-  const canSubmit = allSaved;
+  const canSubmit = questions.length > 0 && allSaved && !refreshing;
 
   useEffect(() => {
     Animated.parallel([
@@ -94,19 +164,34 @@ export default function ConfirmSubmitScreen() {
       }),
     ]).start();
 
+  }, [fadeAnim, slideAnim]);
+
+  useEffect(() => {
     Animated.timing(progressAnim, {
       toValue: progressPercent,
       duration: 900,
       delay: 250,
       useNativeDriver: false,
     }).start();
-  }, []);
+  }, [progressAnim, progressPercent]);
 
   const handleBackToExam = () => {
     navigation.goBack();
   };
 
+  const handleReviewQuestion = (slot: number) => {
+    if (submitLock.current) return;
+    navigation.popTo("Exam", {
+      quizid,
+      quizName,
+      attemptid,
+      targetQuestionSlot: slot,
+    }, { merge: true });
+  };
+
   const handleConfirmSubmit = () => {
+    if (!canSubmit || submitLock.current) return;
+    submitLock.current = true;
     DeviceEventEmitter.emit("submitExamConfirmed", attemptid);
     navigation.goBack();
   };
@@ -207,6 +292,10 @@ export default function ConfirmSubmitScreen() {
       </LinearGradient>
 
       <ScrollView
+        alwaysBounceVertical
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[COLORS.primary]} tintColor={COLORS.primary} />
+        }
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
@@ -437,7 +526,14 @@ export default function ConfirmSubmitScreen() {
                 const flagged = question.flagged;
 
                 return (
-                  <View key={question.id} style={styles.questionItem}>
+                  <TouchableOpacity
+                    key={question.id}
+                    style={styles.questionItem}
+                    onPress={() => handleReviewQuestion(question.id)}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Quay lại câu ${question.number}`}
+                  >
                     <View
                       style={[
                         styles.questionBubble,
@@ -462,12 +558,12 @@ export default function ConfirmSubmitScreen() {
                         styles.saveDot,
                         {
                           backgroundColor: getSaveStatusColor(
-                            question.saveStatus,
+                            questionSaveStatus(question),
                           ),
                         },
                       ]}
                     />
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
             </View>

@@ -1355,7 +1355,8 @@ export default function ExamScreen() {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (saving || submitting || examFinished) return;
     if (!attemptId) {
       Alert.alert("Lỗi", "Không tìm thấy Attempt ID.");
       return;
@@ -1364,6 +1365,16 @@ export default function ExamScreen() {
     if (timeExpired) {
       void submitExam(attemptId);
       return;
+    }
+
+    try {
+      setSaving(true);
+      await saveAnswers();
+    } catch (error) {
+      Alert.alert("Lỗi lưu bài", error instanceof Error ? error.message : "Không thể lưu bài làm.");
+      return;
+    } finally {
+      setSaving(false);
     }
 
     const confirmQuestions = questionOverview.map((item) => ({
@@ -1408,16 +1419,17 @@ export default function ExamScreen() {
 
   // Khi user chọn xem lại câu hỏi cụ thể từ ConfirmSubmitScreen.
   useEffect(() => {
-    if (!targetQuestionSlot || !questionOverview.length) {
+    if (!isFocused || !targetQuestionSlot || !questionOverview.length || loading || saving || submitting || examFinished) {
       return;
     }
 
     const item = questionOverview.find((q) => q.slot === targetQuestionSlot);
 
     if (item) {
+      navigation.setParams({ targetQuestionSlot: undefined });
       void goToQuestion(item);
     }
-  }, [targetQuestionSlot]);
+  }, [targetQuestionSlot, isFocused, questionOverview, loading, saving, submitting, examFinished]);
 
   useEffect(() => {
     if (!offlineExam?.submitted || examFinished) {

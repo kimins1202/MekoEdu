@@ -446,7 +446,7 @@ export const getQuizMonitoringConfig = async (
     {
       params: {
         wstoken: token,
-        wsfunction: "local_mekoedu_get_quiz_monitoring_config",
+        wsfunction: "local_mekoedu_get_quiz_monitoring",
         moodlewsrestformat: "json",
         quizid: Number(quizid),
       },
