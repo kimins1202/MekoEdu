@@ -1,5 +1,4 @@
-import { parse } from "node-html-parser";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   Modal,
   Pressable,
@@ -13,37 +12,9 @@ import COLORS from "../../../constants/colors";
 import { Choice, SelectField } from "../../../types/question";
 
 interface Props {
-  question: string;
-  qtextHtml?: string;
   fields: SelectField[];
   answers: Record<string, string>;
   setAnswer: (field: string, value: string) => void;
-}
-
-function buildCleanQuestionText(html?: string, fallback = ""): string {
-  if (!html) {
-    return fallback
-      .replace(/Blank\s+\d+\s+Question\s+\d+/gi, "")
-      .replace(/\s+/g, " ")
-      .trim();
-  }
-
-  let cleaned = html
-    .replace(
-      /<(?:label|span)[^>]*class=["'][^"']*(?:accesshide|sr-only|visually-hidden)[^"']*["'][^>]*>[\s\S]*?<\/(?:label|span)>/gi,
-      "",
-    )
-    .replace(/<select[\s\S]*?<\/select>/gi, " ___ ");
-
-  const root = parse(cleaned);
-
-  return root.text
-    .replace(/&nbsp;/g, " ")
-    .replace(/\u00a0/g, " ")
-    .replace(/Blank\s+\d+\s+Question\s+\d+/gi, "")
-    .replace(/\s+([.,;:!?])/g, "$1")
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 function selectedLabel(field: SelectField, value?: string): string {
@@ -56,33 +27,21 @@ function selectedLabel(field: SelectField, value?: string): string {
 }
 
 export default function SelectMissingWordsQuestion({
-  question,
-  qtextHtml,
   fields,
   answers,
   setAnswer,
 }: Props) {
   const [activeField, setActiveField] = useState<SelectField | null>(null);
 
-  const displayQuestion = useMemo(
-    () => buildCleanQuestionText(qtextHtml, question),
-    [qtextHtml, question],
-  );
-
   const choose = (choice: Choice) => {
     if (!activeField) return;
 
     setAnswer(activeField.fieldName, choice.value);
-
     setActiveField(null);
   };
 
   return (
     <View>
-      {!!displayQuestion && (
-        <Text style={styles.questionContext}>{displayQuestion}</Text>
-      )}
-
       {fields.map((field, index) => {
         const value = answers[field.fieldName];
         const hasValue = Boolean(value);

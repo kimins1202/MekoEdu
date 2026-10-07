@@ -109,8 +109,6 @@ export default function QuestionRenderer({
     case "gapselect":
       return (
         <SelectMissingWordsQuestion
-          question={question.text}
-          qtextHtml={question.qtextHtml}
           fields={question.selectFields ?? []}
           answers={answers}
           setAnswer={setAnswer}
@@ -150,7 +148,6 @@ export default function QuestionRenderer({
     case "ddwtos":
       return (
         <DragDropTextQuestion
-          qtextHtml={question.qtextHtml}
           items={question.dragItems ?? []}
           fields={question.dropFields ?? []}
           answers={answers}

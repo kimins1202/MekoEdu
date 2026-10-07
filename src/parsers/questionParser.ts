@@ -22,22 +22,30 @@ function cleanText(value?: string | null): string {
 }
 
 function parseQuestionText(root: HTMLElement): string {
-  const qtext = root.querySelector(".qtext");
+  const qtext =
+    root.querySelector(".qtext") ?? root.querySelector(".formulation");
 
   if (!qtext) return "";
 
-  // Parse bản copy để không thay đổi HTML gốc
+  // Clone để không ảnh hưởng HTML gốc
   const cloned = parse(qtext.innerHTML);
 
-  // Xóa toàn bộ media player Moodle khỏi phần text
+  // Embedded Answers / Cloze
+  cloned.querySelectorAll("input, select, textarea").forEach((element) => {
+    const type = element.getAttribute("type") ?? "";
+
+    if (type !== "hidden") {
+      element.replaceWith(" ___ ");
+    }
+  });
+
+  // Xóa media player
   cloned
     .querySelectorAll(".mediaplugin")
     .forEach((element) => element.remove());
 
-  // Dự phòng nếu audio không nằm trong .mediaplugin
   cloned.querySelectorAll("audio").forEach((element) => element.remove());
 
-  // Dự phòng trường hợp Moodle chỉ trả link file audio
   cloned.querySelectorAll("a").forEach((element) => {
     const href = element.getAttribute("href") ?? "";
 
@@ -46,9 +54,31 @@ function parseQuestionText(root: HTMLElement): string {
     }
   });
 
-  return cleanText(cloned.text);
-}
+  // Xóa text hỗ trợ accessibility của Moodle:
+  // "Blank 1 Question 1"
+  cloned
+    .querySelectorAll(".accesshide, .sr-only, .visually-hidden")
+    .forEach((element) => element.remove());
 
+  // Select Missing Words:
+  // thay dropdown trong câu hỏi bằng ___
+  cloned.querySelectorAll("select").forEach((select) => {
+    select.replaceWith(" ___ ");
+  });
+
+  // Drag and drop into text
+  cloned
+    .querySelectorAll(".drop, .dropzone, [class*='place']")
+    .forEach((element) => {
+      element.replaceWith(" ___ ");
+    });
+
+  return cleanText(cloned.text)
+    .replace(/Blank\s+\d+\s+Question\s+\d+/gi, "")
+    .replace(/\s+([.,;:!?])/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 /**
  * Moodle sinh ID dạng q103:2_choice0_label. Dấu ':' có ý nghĩa đặc biệt
  * trong CSS selector nên không dùng querySelector(`#${id}`).
@@ -294,17 +324,51 @@ function parseDragDropText(root: HTMLElement): {
   const dragHomes = root.querySelectorAll(".draghome");
 
   const items: DragItem[] = dragHomes
-    .map((element, index) => ({
-      id: element.getAttribute("id") ?? `choice-${index + 1}`,
-      choice: Number(element.getAttribute("data-choice")) || index + 1,
-      text: parseQuestionText(root),
-    }))
-    .filter((item) => item.text);
+    .map((element, index) => {
+      // Lấy nội dung của chính drag item,
+      // KHÔNG lấy toàn bộ question
+      const text = cleanText(
+        element.querySelector(".drag")?.text ??
+          element.querySelector(".dragtext")?.text ??
+          element.text,
+      );
+
+      return {
+        id: element.getAttribute("id") ?? `choice-${index + 1}`,
+        choice: Number(element.getAttribute("data-choice")) || index + 1,
+        text,
+      };
+    })
+    .filter((item) => Boolean(item.text));
 
   return {
     items,
     fields: parseDropFields(root, "_p"),
   };
+}
+
+function parseDragDropQuestionText(root: HTMLElement): string {
+  const qtext = root.querySelector(".qtext");
+
+  if (!qtext) return "";
+
+  const cloned = parse(qtext.innerHTML);
+
+  // Xóa accessibility text
+  cloned
+    .querySelectorAll(".accesshide, .sr-only, .visually-hidden")
+    .forEach((element) => element.remove());
+
+  // Thay các vị trí thả bằng ___
+  cloned.querySelectorAll(".drop").forEach((element) => {
+    element.replaceWith(" ___ ");
+  });
+
+  return cleanText(cloned.text)
+    .replace(/Blank\s*\d+\s*Question\s*\d+/gi, " ___ ")
+    .replace(/\s+([.,;:!?])/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function parseDragImage(root: HTMLElement): {
@@ -373,43 +437,119 @@ function parseMarkers(root: HTMLElement): {
   };
 }
 
+function getClozeContainer(root: HTMLElement): HTMLElement | null {
+  return (
+    root.querySelector(".qtext") ??
+    root.querySelector(".formulation") ??
+    root.querySelector(".ablock")
+  );
+}
+
 function parseCloze(root: HTMLElement): ClozePart[] {
-  const qtext = root.querySelector(".qtext");
-  if (!qtext) return [];
+  const qtext = getClozeContainer(root);
+
+  if (!qtext) {
+    console.warn("CLOZE: không tìm thấy .qtext");
+    return [];
+  }
 
   const parts: ClozePart[] = [];
 
-  const walk = (element: HTMLElement) => {
-    element.childNodes.forEach((node: any) => {
-      if (node.nodeType === 3) {
-        const text = node.rawText ?? "";
-        if (text) parts.push({ type: "text", text });
-        return;
+  const walk = (node: any) => {
+    if (!node) return;
+
+    // Text node
+    if (node.nodeType === 3) {
+      let text = node.rawText ?? "";
+
+      // Xóa accessibility text Moodle
+      text = text
+        .replace(/Question\s+text/gi, "")
+        .replace(/Answer\s+\d+\s+Question\s+\d+/gi, "")
+        .replace(/Blank\s+\d+\s+Question\s+\d+/gi, "");
+
+      if (text.trim()) {
+        parts.push({
+          type: "text",
+          text,
+        });
       }
 
-      const child = node as HTMLElement;
-      const input =
-        child.tagName === "INPUT" ? child : child.querySelector?.("input");
-      const select =
-        child.tagName === "SELECT" ? child : child.querySelector?.("select");
-      const control = input ?? select;
-      const fieldName = control?.getAttribute?.("name");
+      return;
+    }
+
+    const element = node as HTMLElement;
+
+    const tagName = element.tagName?.toUpperCase?.() ?? "";
+
+    // Bỏ các nội dung accessibility của Moodle
+    const className = element.getAttribute?.("class") ?? "";
+
+    if (
+      className.includes("accesshide") ||
+      className.includes("sr-only") ||
+      className.includes("visually-hidden")
+    ) {
+      return;
+    }
+
+    // INPUT của Embedded Answers
+    if (tagName === "INPUT") {
+      const type = element.getAttribute("type") ?? "text";
+
+      const fieldName = element.getAttribute("name") ?? "";
+
+      // Chỉ lấy input người dùng thực sự nhập
+      if (fieldName && !["hidden", "submit", "button"].includes(type)) {
+        parts.push({
+          type: "input",
+          fieldName,
+        });
+      }
+
+      return;
+    }
+
+    // SELECT của Cloze multichoice
+    if (tagName === "SELECT") {
+      const fieldName = element.getAttribute("name") ?? "";
 
       if (fieldName) {
-        parts.push({ type: "input", fieldName });
-        return;
+        parts.push({
+          type: "input",
+          fieldName,
+        });
       }
 
-      if (child.childNodes?.length) {
+      return;
+    }
+
+    // TEXTAREA nếu Moodle sử dụng
+    if (tagName === "TEXTAREA") {
+      const fieldName = element.getAttribute("name") ?? "";
+
+      if (fieldName) {
+        parts.push({
+          type: "input",
+          fieldName,
+        });
+      }
+
+      return;
+    }
+
+    // Tiếp tục duyệt node con
+    if (element.childNodes?.length) {
+      element.childNodes.forEach((child: any) => {
         walk(child);
-      } else {
-        const text = child.text;
-        if (text) parts.push({ type: "text", text });
-      }
-    });
-  };
+      });
+    }
+  };;
 
-  walk(qtext);
+  qtext.childNodes.forEach((node: any) => {
+    walk(node);
+  });
+
   return parts;
 }
 
@@ -420,7 +560,11 @@ export function parseQuestion(html: string): ParsedQuestion {
 
   const result: ParsedQuestion = {
     type,
-    text: parseQuestionText(root),
+    text:
+      type === "ddwtos"
+        ? parseDragDropQuestionText(root)
+        : parseQuestionText(root),
+
     html,
     qtextHtml: qtext?.innerHTML ?? undefined,
     audioUrl: parseAudioUrl(root),
@@ -537,3 +681,5 @@ function parseAudioUrl(root: HTMLElement): string | undefined {
 
   return audioLink?.getAttribute("href") ?? undefined;
 }
+
+

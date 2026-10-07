@@ -1,9 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useRef, useState } from "react";
-import { Animated, StyleSheet, Text, View } from "react-native";
-import { TouchableOpacity } from "react-native-gesture-handler";
-import {
-  NestableDraggableFlatList,
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import DraggableFlatList, {
   RenderItemParams,
   ScaleDecorator,
 } from "react-native-draggable-flatlist";
@@ -47,32 +45,29 @@ export default function OrderingQuestion({
 
     return (
       <ScaleDecorator>
-        <Animated.View>
-          <TouchableOpacity
-            activeOpacity={1}
-            onLongPress={drag}
-            delayLongPress={150}
-            style={[styles.item, isActive && styles.itemActive]}
-          >
+        <Pressable
+          onLongPress={drag}
+          delayLongPress={150}
+          style={[styles.item, isActive && styles.itemActive]}
+        >
           <View style={[styles.numberBox, isActive && styles.numberBoxActive]}>
             <Text style={[styles.number, isActive && styles.numberActive]}>
               {index + 1}
             </Text>
           </View>
 
-            <Text style={[styles.itemText, isActive && styles.itemTextActive]}>
-              {item.text}
-            </Text>
+          <Text style={[styles.itemText, isActive && styles.itemTextActive]}>
+            {item.text}
+          </Text>
 
-            <View style={styles.dragHandle}>
-              <Ionicons
-                name="reorder-two"
-                size={26}
-                color={isActive ? COLORS.primary : COLORS.textLight}
-              />
-            </View>
-          </TouchableOpacity>
-        </Animated.View>
+          <View style={styles.dragHandle}>
+            <Ionicons
+              name="reorder-two"
+              size={26}
+              color={isActive ? COLORS.primary : COLORS.textLight}
+            />
+          </View>
+        </Pressable>
       </ScaleDecorator>
     );
   };
@@ -83,11 +78,14 @@ export default function OrderingQuestion({
         Nhấn giữ và kéo thả để sắp xếp các mục theo thứ tự phù hợp.
       </Text>
 
-      <NestableDraggableFlatList
+      <DraggableFlatList
         data={items}
-        onDragEnd={({ data }) => setItems(data)}
+        onDragEnd={({ data }) => {
+          setItems(data);
+        }}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
+        scrollEnabled={false}
       />
     </View>
   );

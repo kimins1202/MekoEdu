@@ -175,6 +175,8 @@ export default function ExamScreen() {
   const [localSaveError, setLocalSaveError] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
+  const [token, setToken] = useState<string>("");
+
   /* REFS                                                                   */
 
   const contextRef = useRef<ExamContext | null>(null);
@@ -1450,6 +1452,18 @@ export default function ExamScreen() {
     }
   };
 
+  useEffect(() => {
+      const loadToken = async () => {
+        const savedToken = await AsyncStorage.getItem("wstoken");
+
+        if (savedToken) {
+          setToken(savedToken);
+        }
+      };
+
+      loadToken();
+  }, []);
+
   /* MONITORING WARNING                                                     */
 
   useEffect(() => {
@@ -1524,6 +1538,8 @@ export default function ExamScreen() {
       </View>
     );
   }
+
+
 
   /* MAIN UI                                                                */
 
@@ -1614,6 +1630,7 @@ export default function ExamScreen() {
               }
               questionText={parsedQuestion.text}
               question={parsedQuestion}
+              token={token}
               isFlagged={isFlagged}
               selectedAnswers={selectedAnswers}
               disabled={submitting || examFinished || answersLocked}

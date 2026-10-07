@@ -1,48 +1,17 @@
-import { parse } from "node-html-parser";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import COLORS from "../../../constants/colors";
 import { DragItem, DropField } from "../../../types/question";
 
 interface Props {
-  qtextHtml?: string;
   items: DragItem[];
   fields: DropField[];
   answers: Record<string, string>;
   setAnswer: (field: string, value: string) => void;
 }
 
-function buildCleanQuestionText(html?: string, fallback = ""): string {
-  if (!html) {
-    return fallback
-      .replace(/Blank\s*\d+\s*Question\s*\d+/gi, " ___ ")
-      .replace(/\s+/g, " ")
-      .trim();
-  }
-
-  let cleaned = html
-    .replace(
-      /<(?:label|span)[^>]*class=["'][^"']*(?:accesshide|sr-only|visually-hidden)[^"']*["'][^>]*>[\s\S]*?<\/(?:label|span)>/gi,
-      "",
-    )
-    .replace(
-      /<span[^>]*class=["'][^"']*(?:place\d+|drop)[^"']*["'][^>]*>[\s\S]*?<\/span>/gi,
-      " ___ ",
-    );
-
-  const root = parse(cleaned);
-
-  return root.text
-    .replace(/&nbsp;/g, " ")
-    .replace(/\u00a0/g, " ")
-    .replace(/Blank\s*\d+\s*Question\s*\d+/gi, " ___ ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 export default function DragDropTextQuestion({
-  qtextHtml,
   items,
   fields,
   answers,
@@ -50,17 +19,8 @@ export default function DragDropTextQuestion({
 }: Props) {
   const [selected, setSelected] = useState<DragItem | null>(null);
 
-  const displayQuestion = useMemo(
-    () => buildCleanQuestionText(qtextHtml, ""),
-    [qtextHtml],
-  );
-
   return (
     <View>
-      {!!displayQuestion && (
-        <Text style={styles.questionContext}>{displayQuestion}</Text>
-      )}
-
       <Text style={styles.title}>Vị trí:</Text>
 
       {fields.map((field) => {

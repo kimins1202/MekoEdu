@@ -3,6 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import COLORS from "../../../constants/colors";
 import { DragItem, DropField } from "../../../types/question";
+import { getMoodleFileUrl } from "../../../utils/moodleFile";
 
 interface Props {
   image?: string;
@@ -11,28 +12,6 @@ interface Props {
   fields: DropField[];
   answers: Record<string, string>;
   setAnswer: (field: string, value: string) => void;
-}
-
-function buildAuthenticatedImageUrl(
-  image?: string,
-  token?: string,
-): string | undefined {
-  if (!image) return undefined;
-
-  let url = image;
-
-  if (
-    url.includes("/pluginfile.php/") &&
-    !url.includes("/webservice/pluginfile.php/")
-  ) {
-    url = url.replace("/pluginfile.php/", "/webservice/pluginfile.php/");
-  }
-
-  if (!token) return url;
-
-  const separator = url.includes("?") ? "&" : "?";
-
-  return `${url}${separator}token=${encodeURIComponent(token)}`;
 }
 
 export default function DragDropImageQuestion({
@@ -46,10 +25,11 @@ export default function DragDropImageQuestion({
   const [selected, setSelected] = useState<DragItem | null>(null);
   const [imageFailed, setImageFailed] = useState(false);
 
-  const imageUrl = useMemo(
-    () => buildAuthenticatedImageUrl(image, token),
-    [image, token],
-  );
+ const imageUrl = useMemo(() => {
+   if (!image) return "";
+
+   return getMoodleFileUrl(image, token);
+ }, [image, token]);
 
   return (
     <View>

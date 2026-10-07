@@ -22,6 +22,9 @@ interface ExamQuestionItemProps {
   disabled: boolean;
   flagDisabled?: boolean;
   answerDisabled?: boolean;
+
+  token?: string;
+
   onFlagToggle: () => void;
   onAnswerChange: (answer: unknown) => void;
   onLayout?: (event: LayoutChangeEvent) => void;
@@ -36,6 +39,7 @@ export default function ExamQuestionItem({
   disabled,
   flagDisabled = disabled,
   answerDisabled = disabled,
+  token,
   onFlagToggle,
   onAnswerChange,
   onLayout,
@@ -97,6 +101,7 @@ export default function ExamQuestionItem({
           question={question}
           answers={selectedAnswers}
           setAnswer={handleAnswerChange}
+          token={token}
         />
       </AppCard>
     </View>
