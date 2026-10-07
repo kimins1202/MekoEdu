@@ -41,6 +41,7 @@ export type AppStackParamList = {
   };
 
   ConfirmSubmit: {
+    courseid: number;
     quizid: number;
     quizName: string;
     attemptid: number;

@@ -1,11 +1,24 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import {
+  useFocusEffect,
+  useNavigation,
+  useRoute,
+} from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useEffect, useMemo, useState } from "react";
-import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback, useMemo, useState } from "react";
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import AppButton from "@/components/common/AppButton";
+import AppCard from "@/components/common/AppCard";
 import AppHeader from "@/components/common/AppHeader";
 import Loading from "@/components/common/Loading";
 import COLORS from "@/constants/colors";
@@ -60,11 +73,7 @@ export default function ExamDetailScreen() {
 
   // LOAD DATA
 
-  useEffect(() => {
-    loadQuizData();
-  }, [quizid]);
-
-  const loadQuizData = async () => {
+  const loadQuizData = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -110,7 +119,17 @@ export default function ExamDetailScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [quizid]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const timeoutId = setTimeout(() => {
+        void loadQuizData();
+      }, 0);
+
+      return () => clearTimeout(timeoutId);
+    }, [loadQuizData]),
+  );
 
   // 3 LẦN GẦN NHẤT
 
@@ -125,6 +144,23 @@ export default function ExamDetailScreen() {
       })
       .slice(0, 3);
   }, [attempts]);
+
+  const inProgressAttempt = useMemo(
+    () =>
+      attempts
+        .filter(
+          (attempt) =>
+            String(attempt.state).toLowerCase() === "inprogress" &&
+            Number.isInteger(Number(attempt.id)) &&
+            Number(attempt.id) > 0,
+        )
+        .sort(
+          (a, b) =>
+            (b.timemodified || b.timestart || 0) -
+            (a.timemodified || a.timestart || 0),
+        )[0],
+    [attempts],
+  );
 
   // FORMAT TIME
 
@@ -223,7 +259,7 @@ export default function ExamDetailScreen() {
   // START QUIZ
 
   const handleStartQuiz = () => {
-    if (!canAttempt) {
+    if (!canAttempt && !inProgressAttempt) {
       Alert.alert(
         "Không thể làm bài",
         preventAccessReasons.length > 0
@@ -239,6 +275,7 @@ export default function ExamDetailScreen() {
       quizid: Number(quizid),
       quizName,
       questionCount,
+      ...(inProgressAttempt ? { attemptid: Number(inProgressAttempt.id) } : {}),
     });
   };
 
@@ -258,17 +295,15 @@ export default function ExamDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <AppHeader title="Chi tiết bài thi" subtitle={quizName} showBack />
+      <AppHeader title="Chi tiết bài thi" showBack />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
-        {/* ========================= */}
         {/* SUMMARY CARD */}
-        {/* ========================= */}
 
-        <View style={styles.summaryCard}>
+        <AppCard style={styles.summaryCard}>
           <View style={styles.summaryIcon}>
             <Ionicons
               name="document-text-outline"
@@ -308,19 +343,21 @@ export default function ExamDetailScreen() {
               </View>
             </View>
           </View>
+        </AppCard>
+
+        {/* THÔNG TIN BÀI THI */}
+
+        <View style={styles.infoHeader}>
+          <Text style={styles.sectionTitle}>Thông tin bài thi</Text>
         </View>
 
-        {/* ========================= */}
-        {/* THÔNG TIN BÀI THI */}
-        {/* ========================= */}
-
-        <Text style={styles.sectionTitle}>Thông tin bài thi</Text>
-
-        <View style={styles.infoCard}>
+        <AppCard style={styles.infoCard}>
           <InfoRow
             icon="document-text-outline"
             label="Số câu hỏi"
-            value={questionCount != null ? `${questionCount} câu` : "Chưa xác định"}
+            value={
+              questionCount != null ? `${questionCount} câu` : "Chưa xác định"
+            }
           />
 
           <InfoRow
@@ -342,11 +379,9 @@ export default function ExamDetailScreen() {
             valueColor={canAttempt ? COLORS.success : COLORS.error}
             last
           />
-        </View>
+        </AppCard>
 
-        {/* ========================= */}
         {/* ACCESS WARNING */}
-        {/* ========================= */}
 
         {!canAttempt && preventAccessReasons.length > 0 && (
           <View style={styles.warningCard}>
@@ -370,9 +405,7 @@ export default function ExamDetailScreen() {
           </View>
         )}
 
-        {/* ========================= */}
         {/* LỊCH SỬ LÀM BÀI */}
-        {/* ========================= */}
 
         <View style={styles.historyHeader}>
           <View>
@@ -383,7 +416,7 @@ export default function ExamDetailScreen() {
         </View>
 
         {recentAttempts.length === 0 ? (
-          <View style={styles.emptyHistory}>
+          <AppCard style={styles.emptyHistory}>
             <View style={styles.emptyHistoryIcon}>
               <Ionicons
                 name="time-outline"
@@ -401,23 +434,35 @@ export default function ExamDetailScreen() {
                 Bạn chưa thực hiện bài thi này.
               </Text>
             </View>
-          </View>
+          </AppCard>
         ) : (
-          <View style={styles.historyCard}>
+          <AppCard style={styles.historyCard}>
             {recentAttempts.map((attempt, index) => {
               const status = getAttemptStatus(attempt.state);
+              const isFinished = attempt.state === "finished";
 
               const timestamp =
                 attempt.timemodified || attempt.timefinish || attempt.timestart;
 
               return (
-                <View
+                <TouchableOpacity
                   key={`${attempt.id}-${index}`}
                   style={[
                     styles.historyItem,
                     index === recentAttempts.length - 1 &&
-                    styles.historyItemLast,
+                      styles.historyItemLast,
                   ]}
+                  activeOpacity={isFinished ? 0.7 : 1}
+                  disabled={!isFinished}
+                  onPress={() => {
+                    if (!isFinished || !attempt.id) return;
+                    navigation.navigate("Result", {
+                      courseid: Number(courseid),
+                      quizid: Number(quizid),
+                      quizName,
+                      attemptid: attempt.id,
+                    });
+                  }}
                 >
                   {/* ICON */}
 
@@ -472,50 +517,59 @@ export default function ExamDetailScreen() {
                       )}
                   </View>
 
-                  {/* STATUS */}
+                  {/* STATUS + CHEVRON */}
 
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      {
-                        backgroundColor: status.background,
-                      },
-                    ]}
-                  >
-                    <Ionicons
-                      name={status.icon}
-                      size={13}
-                      color={status.color}
-                    />
-
-                    <Text
+                  <View style={styles.historyRight}>
+                    <View
                       style={[
-                        styles.statusText,
+                        styles.statusBadge,
                         {
-                          color: status.color,
+                          backgroundColor: status.background,
                         },
                       ]}
                     >
-                      {status.label}
-                    </Text>
+                      <Ionicons
+                        name={status.icon}
+                        size={13}
+                        color={status.color}
+                      />
+
+                      <Text
+                        style={[
+                          styles.statusText,
+                          {
+                            color: status.color,
+                          },
+                        ]}
+                      >
+                        {status.label}
+                      </Text>
+                    </View>
+
+                    {isFinished && (
+                      <Ionicons
+                        name="chevron-forward"
+                        size={16}
+                        color={COLORS.textLight}
+                        style={styles.chevron}
+                      />
+                    )}
                   </View>
-                </View>
+                </TouchableOpacity>
               );
             })}
-          </View>
+          </AppCard>
         )}
+      </ScrollView>
 
-        {/* ========================= */}
-        {/* START BUTTON */}
-        {/* ========================= */}
-
+      <SafeAreaView edges={["bottom"]} style={styles.startFooter}>
         <AppButton
-          title="Bắt đầu làm bài"
+          title={inProgressAttempt ? "Tiếp tục bài thi" : "Bắt đầu làm bài"}
           onPress={handleStartQuiz}
-          disabled={!canAttempt}
+          disabled={!canAttempt && !inProgressAttempt}
           style={styles.startButton}
         />
-      </ScrollView>
+      </SafeAreaView>
     </View>
   );
 }
@@ -564,28 +618,16 @@ const styles = StyleSheet.create({
 
   content: {
     padding: 20,
-    paddingBottom: 35,
+    paddingBottom: 24,
   },
 
   // SUMMARY
 
   summaryCard: {
-    backgroundColor: COLORS.white,
     borderRadius: 20,
     padding: 17,
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: COLORS.border,
-
-    shadowColor: COLORS.black,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.04,
-    shadowRadius: 7,
-    elevation: 2,
   },
 
   summaryIcon: {
@@ -635,6 +677,10 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
 
+  infoHeader: {
+    marginTop: 23,
+  },
+
   sectionSubtitle: {
     fontSize: 12,
     color: COLORS.textSecondary,
@@ -645,11 +691,8 @@ const styles = StyleSheet.create({
 
   infoCard: {
     marginTop: 11,
-    backgroundColor: COLORS.white,
-    borderRadius: 18,
-    paddingHorizontal: 15,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    padding: 0,
+    paddingHorizontal: 16,
     overflow: "hidden",
   },
 
@@ -666,13 +709,13 @@ const styles = StyleSheet.create({
   },
 
   infoIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     backgroundColor: COLORS.backgroundSoft,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 10,
+    marginRight: 11,
   },
 
   infoLabel: {
@@ -735,17 +778,14 @@ const styles = StyleSheet.create({
   },
 
   historyCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    padding: 0,
     overflow: "hidden",
   },
 
   historyItem: {
-    minHeight: 80,
-    paddingHorizontal: 13,
-    paddingVertical: 11,
+    minHeight: 72,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
     flexDirection: "row",
     alignItems: "center",
     borderBottomWidth: 1,
@@ -757,9 +797,9 @@ const styles = StyleSheet.create({
   },
 
   historyIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     backgroundColor: COLORS.backgroundSoft,
     justifyContent: "center",
     alignItems: "center",
@@ -819,13 +859,19 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
+  historyRight: {
+    alignItems: "flex-end",
+    gap: 6,
+    marginLeft: 6,
+  },
+
+  chevron: {
+    marginTop: 2,
+  },
+
   // EMPTY HISTORY
 
   emptyHistory: {
-    backgroundColor: COLORS.white,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: COLORS.border,
     padding: 15,
     flexDirection: "row",
     alignItems: "center",
@@ -861,6 +907,15 @@ const styles = StyleSheet.create({
   // START
 
   startButton: {
-    marginTop: 22,
+    marginTop: 0,
+  },
+
+  startFooter: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 8,
+    backgroundColor: COLORS.white,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
   },
 });

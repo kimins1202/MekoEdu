@@ -29,31 +29,38 @@ export default function LoginScreen() {
 
   // Đọc thông tin đăng nhập đã lưu
   useEffect(() => {
+    let isMounted = true;
+
+    const loadRememberedAccount = async () => {
+      try {
+        const [rememberedUsername, rememberedPassword] = await Promise.all([
+          AsyncStorage.getItem(REMEMBER_USERNAME_KEY),
+          AsyncStorage.getItem(REMEMBER_PASSWORD_KEY),
+        ]);
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (rememberedUsername) {
+          setUsername(rememberedUsername);
+        }
+
+        if (rememberedPassword) {
+          setPassword(rememberedPassword);
+          setRememberPassword(true);
+        }
+      } catch (error) {
+        console.log("Không thể đọc thông tin đăng nhập đã lưu");
+      }
+    };
+
     loadRememberedAccount();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
-
-  const loadRememberedAccount = async () => {
-    try {
-      const rememberedUsername = await AsyncStorage.getItem(
-        REMEMBER_USERNAME_KEY,
-      );
-
-      const rememberedPassword = await AsyncStorage.getItem(
-        REMEMBER_PASSWORD_KEY,
-      );
-
-      if (rememberedUsername) {
-        setUsername(rememberedUsername);
-      }
-
-      if (rememberedPassword) {
-        setPassword(rememberedPassword);
-        setRememberPassword(true);
-      }
-    } catch (error) {
-      console.log("Không thể đọc thông tin đăng nhập đã lưu");
-    }
-  };
 
   // Đăng nhập
   const handleLogin = async () => {

@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from "react-native";
 import COLORS from "../../constants/colors";
+import AppProgressBar from "../common/AppProgressBar";
 
 interface CourseProgressProps {
   progress: number;
@@ -16,16 +17,7 @@ export default function CourseProgress({ progress }: CourseProgressProps) {
         <Text style={styles.value}>{safeProgress}%</Text>
       </View>
 
-      <View style={styles.progressBackground}>
-        <View
-          style={[
-            styles.progress,
-            {
-              width: `${safeProgress}%` as `${number}%`,
-            },
-          ]}
-        />
-      </View>
+      <AppProgressBar progress={safeProgress} height={7} />
     </View>
   );
 }
@@ -54,17 +46,5 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
   },
 
-  progressBackground: {
-    height: 7,
-    width: "100%",
-    borderRadius: 10,
-    overflow: "hidden",
-    backgroundColor: COLORS.border,
-  },
 
-  progress: {
-    height: "100%",
-    borderRadius: 10,
-    backgroundColor: COLORS.primary,
-  },
 });

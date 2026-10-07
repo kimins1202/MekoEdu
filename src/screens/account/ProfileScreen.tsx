@@ -141,7 +141,18 @@ export default function ProfileScreen() {
   }, []);
 
   useEffect(() => {
-    loadProfile();
+    let active = true;
+
+    const timer = setTimeout(() => {
+      if (active) {
+        void loadProfile();
+      }
+    }, 0);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
   }, [loadProfile]);
 
   // Refresh profile

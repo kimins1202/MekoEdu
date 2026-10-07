@@ -1,11 +1,16 @@
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { RouteProp } from "@react-navigation/native";
-import { useNavigation, useRoute } from "@react-navigation/native";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useEffect, useState } from "react";
+
 import {
-  DeviceEventEmitter,
+  useNavigation,
+  useRoute,
+  type RouteProp,
+} from "@react-navigation/native";
+
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+
+import { useCallback, useEffect, useState } from "react";
+
+import {
   FlatList,
   StyleSheet,
   Text,
@@ -18,7 +23,12 @@ import Loading from "@/components/common/Loading";
 import COLORS from "@/constants/colors";
 
 import { getQuizQuestionCount, getQuizzesByCourses } from "../../api/quizApi";
-import { AppStackParamList } from "../../types/navigation";
+
+import type { AppStackParamList } from "../../types/navigation";
+
+// =========================
+// TYPES
+// =========================
 
 type ExamListRouteProp = RouteProp<AppStackParamList, "ExamList">;
 
@@ -27,9 +37,13 @@ type NavigationProp = NativeStackNavigationProp<AppStackParamList, "ExamList">;
 type Exam = {
   id: number;
   name: string;
-  questioncount?: number;
+  questioncount?: number | null;
   timelimit?: number;
 };
+
+// =========================
+// SCREEN
+// =========================
 
 export default function ExamListScreen() {
   const route = useRoute<ExamListRouteProp>();
@@ -40,22 +54,18 @@ export default function ExamListScreen() {
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // LOAD EXAM TỪ API
+  // LOAD EXAMS FROM API
 
-  useEffect(() => {
-    loadExams();
-  }, [courseid]);
-
-  const loadExams = async () => {
+  const loadExams = useCallback(async () => {
     try {
       setLoading(true);
 
-      // Lấy danh sách quiz của course.
+      // Lấy danh sách quiz của course
       const quizData = await getQuizzesByCourses([courseid]);
 
       const quizzes = quizData?.quizzes ?? [];
 
-      // Lấy số câu của từng quiz.
+      // Lấy số câu hỏi của từng quiz
       const quizzesWithQuestionCount = await Promise.all(
         quizzes.map(async (quiz: any) => {
           try {
@@ -84,30 +94,24 @@ export default function ExamListScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [courseid]);
 
-  // ĐĂNG XUẤT
+  // LOAD KHI MỞ SCREEN
 
-  const handleLogout = async () => {
-    try {
-      await AsyncStorage.removeItem("wstoken");
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      void loadExams();
+    }, 0);
 
-      DeviceEventEmitter.emit("authChange");
-    } catch (error) {
-      console.error("Lỗi đăng xuất:", error);
-    }
-  };
+    return () => clearTimeout(timeout);
+  }, [loadExams]);
 
-  // LOADING LẦN ĐẦU
+  // INITIAL LOADING
 
   if (loading && exams.length === 0) {
     return (
       <View style={styles.container}>
-        <AppHeader
-          title="Danh sách bài thi"
-          subtitle="Các bài kiểm tra trong khóa học"
-          showBack
-        />
+        <AppHeader title="Danh sách bài thi" showBack />
 
         <Loading message="Đang tải danh sách bài thi..." />
       </View>
@@ -119,6 +123,7 @@ export default function ExamListScreen() {
   return (
     <View style={styles.container}>
       {/* HEADER */}
+
       <AppHeader
         title="Danh sách bài thi"
         subtitle={`${exams.length} bài kiểm tra`}
@@ -126,6 +131,7 @@ export default function ExamListScreen() {
       />
 
       {/* DANH SÁCH BÀI THI */}
+
       {exams.length === 0 ? (
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIcon}>
@@ -162,19 +168,21 @@ export default function ExamListScreen() {
             <TouchableOpacity
               style={styles.examCard}
               activeOpacity={0.75}
-              
               onPress={() =>
-                
                 navigation.navigate("ExamDetail", {
                   courseid: Number(courseid),
-                  quizid: item.id,
+                  quizid: Number(item.id),
                   quizName: item.name,
-                  questionCount: item.questioncount,
+                  questionCount:
+                    typeof item.questioncount === "number"
+                      ? item.questioncount
+                      : undefined,
                   timelimit: item.timelimit,
                 })
               }
             >
               {/* ICON */}
+
               <View style={styles.examIcon}>
                 <Ionicons
                   name="document-text-outline"
@@ -184,12 +192,14 @@ export default function ExamListScreen() {
               </View>
 
               {/* CONTENT */}
+
               <View style={styles.examContent}>
                 <Text style={styles.examName} numberOfLines={2}>
                   {item.name}
                 </Text>
 
                 {/* QUESTION COUNT */}
+
                 <View style={styles.infoRow}>
                   <Ionicons
                     name="help-circle-outline"
@@ -205,6 +215,7 @@ export default function ExamListScreen() {
                 </View>
 
                 {/* TIME */}
+
                 <View style={styles.infoRow}>
                   <Ionicons
                     name="time-outline"
@@ -221,6 +232,7 @@ export default function ExamListScreen() {
               </View>
 
               {/* ARROW */}
+
               <View style={styles.arrowContainer}>
                 <Ionicons
                   name="chevron-forward"
@@ -237,60 +249,13 @@ export default function ExamListScreen() {
 }
 
 // =========================
-// STYLE
+// STYLES
 // =========================
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.backgroundSoft,
-  },
-
-  logoutButton: {
-    alignSelf: "flex-end",
-    marginHorizontal: 20,
-    marginTop: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-  },
-
-  logoutText: {
-    color: COLORS.primaryDark,
-    fontSize: 13,
-    fontWeight: "600",
-  },
-
-  // RELOAD
-
-  reloadButton: {
-    marginHorizontal: 20,
-    marginTop: 15,
-    marginBottom: 4,
-
-    height: 44,
-
-    borderRadius: 12,
-
-    borderWidth: 1,
-    borderColor: COLORS.border,
-
-    backgroundColor: COLORS.white,
-
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-
-    gap: 7,
-  },
-
-  reloadButtonDisabled: {
-    opacity: 0.55,
-  },
-
-  reloadText: {
-    color: COLORS.primaryDark,
-    fontSize: 13,
-    fontWeight: "600",
   },
 
   // LIST
@@ -304,14 +269,10 @@ const styles = StyleSheet.create({
   examCard: {
     flexDirection: "row",
     alignItems: "center",
-
     backgroundColor: COLORS.white,
-
     borderRadius: 18,
-
     padding: 15,
     marginBottom: 12,
-
     borderWidth: 1,
     borderColor: COLORS.border,
 
@@ -331,14 +292,10 @@ const styles = StyleSheet.create({
   examIcon: {
     width: 52,
     height: 52,
-
     borderRadius: 15,
-
     backgroundColor: COLORS.backgroundSoft,
-
     justifyContent: "center",
     alignItems: "center",
-
     marginRight: 13,
   },
 
@@ -351,26 +308,20 @@ const styles = StyleSheet.create({
   examName: {
     fontSize: 15,
     lineHeight: 21,
-
     fontWeight: "700",
-
     color: COLORS.text,
-
     marginBottom: 8,
   },
 
   infoRow: {
     flexDirection: "row",
     alignItems: "center",
-
     marginTop: 4,
   },
 
   examInfo: {
     marginLeft: 6,
-
     fontSize: 12,
-
     color: COLORS.textSecondary,
   },
 
@@ -384,44 +335,33 @@ const styles = StyleSheet.create({
 
   emptyContainer: {
     flex: 1,
-
     justifyContent: "center",
     alignItems: "center",
-
     paddingHorizontal: 30,
   },
 
   emptyIcon: {
     width: 80,
     height: 80,
-
     borderRadius: 40,
-
     backgroundColor: COLORS.white,
-
     justifyContent: "center",
     alignItems: "center",
-
     marginBottom: 18,
   },
 
   emptyTitle: {
     fontSize: 17,
     fontWeight: "700",
-
     color: COLORS.text,
-
     marginBottom: 7,
   },
 
   emptyText: {
     fontSize: 13,
     lineHeight: 20,
-
     color: COLORS.textSecondary,
-
     textAlign: "center",
-
     marginBottom: 20,
   },
 
@@ -429,20 +369,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-
     backgroundColor: COLORS.primaryDark,
-
     paddingHorizontal: 20,
     paddingVertical: 11,
-
     borderRadius: 12,
-
     gap: 7,
   },
 
   emptyRetryText: {
     color: COLORS.white,
-
     fontSize: 13,
     fontWeight: "600",
   },

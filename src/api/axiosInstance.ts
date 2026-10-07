@@ -1,9 +1,9 @@
 import axios from "axios";
-import { API_CONFIG } from "../constants/config";
+import { apiConfig } from "../config";
 
 const axiosInstance = axios.create({
-  baseURL: API_CONFIG.BASE_URL,
-  timeout: API_CONFIG.TIMEOUT,
+  baseURL: apiConfig.BASE_URL,
+  timeout: apiConfig.TIMEOUT,
   headers: {
     "Content-Type": "application/x-www-form-urlencoded",
   },

@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
 
 import { getUserCourses } from "../../api/courseApi";
@@ -42,11 +42,7 @@ export default function CourseListScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    loadCourses();
-  }, []);
-
-  const loadCourses = async () => {
+  const loadCourses = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
@@ -101,7 +97,17 @@ export default function CourseListScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      const timeoutId = setTimeout(() => {
+        void loadCourses();
+      }, 0);
+
+      return () => clearTimeout(timeoutId);
+    }, [loadCourses]),
+  );
 
   const filteredCourses = useMemo(() => {
     const keyword = searchText.trim().toLowerCase();

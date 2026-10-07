@@ -7,11 +7,12 @@ import {
   useRoute,
 } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Animated,
+  DeviceEventEmitter,
   Modal,
   ScrollView,
   StyleSheet,
@@ -19,10 +20,14 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { NestableScrollContainer } from "react-native-draggable-flatlist";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import Loading from "@/components/common/Loading";
-import ExamTimer from "@/components/exam/ExamTimer";
+import ExamNavigation from "@/components/exam/ExamNavigation";
+import ExamQuestionItem from "@/components/exam/ExamQuestionItem";
+import ExamQuestionMenu from "@/components/exam/ExamQuestionMenu";
+import ExamTopBar from "@/components/exam/ExamTopBar";
 import COLORS from "@/constants/colors";
 import useExamCountdown from "@/hooks/useExamCountdown";
 import useExamMonitoring from "@/hooks/useExamMonitoring";
@@ -48,11 +53,12 @@ import {
   startQuizAttempt,
 } from "../../api/quizApi";
 
-type AnswerOption = {
-  name: string;
-  value: string;
-  label: string;
-};
+import { parseQuestion } from "@/parsers/questionParser";
+import type { ParsedQuestion } from "@/types/question";
+
+/* -------------------------------------------------------------------------- */
+/* TYPES                                                                      */
+/* -------------------------------------------------------------------------- */
 
 type QuizQuestion = {
   slot: number;
@@ -85,6 +91,38 @@ type QuestionOverviewItem = {
   flagged: boolean;
 };
 
+type ExamAnswers = Record<string, string>;
+
+/* -------------------------------------------------------------------------- */
+/* HELPERS                                                                    */
+/* -------------------------------------------------------------------------- */
+
+const getQuestionSlot = (question: QuizQuestion) => {
+  const slot = Number(question.slot);
+
+  if (Number.isFinite(slot) && slot > 0) {
+    return slot;
+  }
+
+  const number = Number(question.number);
+
+  if (Number.isFinite(number) && number > 0) {
+    return number;
+  }
+
+  return 0;
+};
+
+const getQuestionAnswerName = (html: string): string | null => {
+  const match = html.match(/<input\b[^>]*name=["']([^"']+)["']/i);
+
+  return match?.[1] ?? null;
+};
+
+/* -------------------------------------------------------------------------- */
+/* EXAM SCREEN                                                                */
+/* -------------------------------------------------------------------------- */
+
 export default function ExamScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
@@ -94,21 +132,16 @@ export default function ExamScreen() {
     quizid,
     quizName,
     attemptid: requestedAttemptId,
-    submitConfirmed,
     targetQuestionSlot,
   } = route.params;
 
+  /* STATE                                                                  */
+
   const [attemptId, setAttemptId] = useState<number | null>(null);
-
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
-
-  const [selectedAnswers, setSelectedAnswers] = useState<
-    Record<string, string>
-  >({});
-
+  const [selectedAnswers, setSelectedAnswers] = useState<ExamAnswers>({});
   const [currentPage, setCurrentPage] = useState(0);
   const [nextPage, setNextPage] = useState(-1);
-
   const [totalQuestions, setTotalQuestions] = useState(0);
 
   const [questionOverview, setQuestionOverview] = useState<
@@ -119,13 +152,13 @@ export default function ExamScreen() {
     Record<number, boolean>
   >({});
 
+  const [questionMenuVisible, setQuestionMenuVisible] = useState(false);
+
   const [monitoringEnabled, setMonitoringEnabled] = useState(false);
 
   const [monitoringConfigLoaded, setMonitoringConfigLoaded] = useState(false);
 
   const [maxDepartures, setMaxDepartures] = useState(3);
-
-  const [questionMenuVisible, setQuestionMenuVisible] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -142,9 +175,11 @@ export default function ExamScreen() {
   const [localSaveError, setLocalSaveError] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
+  /* REFS                                                                   */
+
   const contextRef = useRef<ExamContext | null>(null);
 
-  const answerRef = useRef<Record<string, string>>({});
+  const answerRef = useRef<ExamAnswers>({});
 
   const pageCacheRef = useRef<Record<number, CachedPage>>({});
 
@@ -162,14 +197,14 @@ export default function ExamScreen() {
 
   const pendingQuestionSlotRef = useRef<number | null>(null);
 
+  /* HOOKS                                                                  */
+
   const secondsRemaining = useExamCountdown(deadline, !examFinished);
 
   const timeExpired =
     deadlineLoaded && deadline !== null && secondsRemaining === 0;
 
   const answersLocked = !!offlineExam?.submitRequested;
-
-  const insets = useSafeAreaInsets();
 
   const isFocused = useIsFocused();
 
@@ -181,9 +216,10 @@ export default function ExamScreen() {
           attemptid: attemptId,
         }
       : null,
-
     monitoringEnabled && monitoringConfigLoaded && isFocused && !examFinished,
   );
+
+  /* CALCULATIONS                                                           */
 
   const answeredCount = Math.min(
     totalQuestions || Object.keys(selectedAnswers).length,
@@ -205,13 +241,14 @@ export default function ExamScreen() {
     secondsRemaining > 0 &&
     secondsRemaining <= 60;
 
+  /* PREVENT LEAVING EXAM                                                   */
+
   usePreventRemove(
     monitoringEnabled &&
       !!attemptId &&
       questions.length > 0 &&
       !examFinished &&
       !answersLocked,
-
     () => {
       Alert.alert(
         "Bài thi đang được giám sát",
@@ -220,75 +257,7 @@ export default function ExamScreen() {
     },
   );
 
-  // Quản lý toàn bộ câu hỏi, đáp án và trạng thái đánh dấu xuyên suốt các page.
-  useEffect(() => {
-    const unsubscribe = subscribeExamSync((exam) => {
-      const context = contextRef.current;
-
-      if (
-        context &&
-        exam.userid === context.userid &&
-        exam.attemptid === context.attemptid &&
-        exam.quizid === context.quizid
-      ) {
-        setOfflineExam(exam);
-      }
-    });
-
-    initializeExam();
-
-    return () => {
-      unsubscribe();
-
-      if (syncTimer.current) {
-        clearTimeout(syncTimer.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (pendingQuestionSlotRef.current === null) {
-      return;
-    }
-
-    const slot = pendingQuestionSlotRef.current;
-    const position = questionPositionsRef.current[slot];
-
-    if (position !== undefined) {
-      setTimeout(() => {
-        scrollRef.current?.scrollTo({
-          y: Math.max(position - 20, 0),
-          animated: true,
-        });
-
-        pendingQuestionSlotRef.current = null;
-      }, 100);
-    }
-  }, [currentPage, questions]);
-
-  const getQuestionSlot = (question: QuizQuestion) => {
-    const slot = Number(question.slot);
-
-    if (Number.isFinite(slot) && slot > 0) {
-      return slot;
-    }
-
-    const number = Number(question.number);
-
-    if (Number.isFinite(number) && number > 0) {
-      return number;
-    }
-
-    return 0;
-  };
-
-  const getQuestionAnswerName = (html: string): string | null => {
-    const match = html.match(
-      /<input\b[^>]*type=["']radio["'][^>]*name=["']([^"']+)["']/i,
-    );
-
-    return match?.[1] ?? null;
-  };
+  /* QUESTION OVERVIEW                                                      */
 
   const mergeQuestionOverview = (
     page: number,
@@ -383,8 +352,11 @@ export default function ExamScreen() {
     );
   };
 
+  /* GET TOTAL QUESTION COUNT                                               */
+
   const getAllQuestionsCount = async (currentAttemptId: number) => {
     const slots = new Set<number>();
+
     const overviewMap = new Map<number, QuestionOverviewItem>();
 
     let page = 0;
@@ -426,7 +398,6 @@ export default function ExamScreen() {
         });
 
         page = cachedPage.nextpage;
-
         continue;
       }
 
@@ -483,7 +454,168 @@ export default function ExamScreen() {
     return slots.size;
   };
 
-  const initializeExam = async () => {
+  /* RESTORE OFFLINE EXAM                                                   */
+
+  const restoreOfflineExam = (exam: OfflineExam) => {
+    const pageKeys = Object.keys(exam.pages ?? {});
+
+    const fallbackPage = pageKeys.length > 0 ? Number(pageKeys[0]) : 0;
+
+    const pageNumber = exam.pages[exam.currentPage]
+      ? exam.currentPage
+      : fallbackPage;
+
+    const page = exam.pages[pageNumber];
+
+    if (!page) {
+      throw new Error(
+        "Chưa có câu hỏi lưu trên thiết bị. Hãy kết nối mạng để tải bài thi.",
+      );
+    }
+
+    contextRef.current = {
+      userid: exam.userid,
+      quizid: exam.quizid,
+      attemptid: exam.attemptid,
+    };
+
+    answerRef.current = exam.answers;
+
+    setSelectedAnswers(exam.answers);
+    setAttemptId(exam.attemptid);
+    setOfflineExam(exam);
+
+    setDeadline(exam.deadline);
+    setDeadlineLoaded(true);
+
+    const restoredFlags: Record<number, boolean> = {};
+
+    Object.values(exam.pages ?? {}).forEach((cachedPage: any) => {
+      cachedPage.questions?.forEach((question: QuizQuestion) => {
+        const slot = getQuestionSlot(question);
+
+        if (slot > 0) {
+          restoredFlags[slot] = Boolean(question.flagged);
+        }
+      });
+    });
+
+    flaggedRef.current = restoredFlags;
+    setFlaggedQuestions(restoredFlags);
+
+    const restoredQuestions = page.questions.map((question: QuizQuestion) => ({
+      ...question,
+      flagged:
+        restoredFlags[getQuestionSlot(question)] ?? Boolean(question.flagged),
+    }));
+
+    setQuestions(restoredQuestions);
+    setCurrentPage(pageNumber);
+    setNextPage(page.nextpage);
+
+    const total = getOfflineQuestionCount(exam);
+
+    if (total > 0) {
+      setTotalQuestions(total);
+    }
+
+    buildOverviewFromOfflineExam(exam);
+  };
+
+  /* LOAD QUESTION PAGE                                                     */
+
+  const loadQuestion = async (currentAttemptId: number, page: number) => {
+    try {
+      setLoading(true);
+
+      let response: any;
+
+      const cachedPage = pageCacheRef.current[page];
+
+      if (cachedPage) {
+        response = {
+          questions: cachedPage.questions,
+          nextpage: cachedPage.nextpage,
+        };
+      } else {
+        try {
+          response = await getAttemptData(currentAttemptId, page);
+        } catch (error) {
+          if (!isOfflineError(error) || !contextRef.current) {
+            throw error;
+          }
+
+          const cached = await readOfflineExam(contextRef.current);
+
+          response = cached?.pages?.[page];
+
+          if (!response) {
+            throw new Error(
+              "Trang này chưa được tải. Hãy kết nối mạng để xem câu hỏi mới; đáp án hiện tại đã được giữ lại.",
+            );
+          }
+        }
+      }
+
+      if (response?.exception) {
+        throw new Error(response.message || "Không thể lấy dữ liệu bài thi.");
+      }
+
+      const pageQuestions: QuizQuestion[] = response?.questions ?? [];
+
+      const pageNext = Number(response?.nextpage ?? -1);
+
+      if (pageQuestions.length === 0) {
+        throw new Error("Không tìm thấy câu hỏi.");
+      }
+
+      const normalizedQuestions = pageQuestions.map((question) => {
+        const slot = getQuestionSlot(question);
+
+        const storedFlag = flaggedRef.current[slot];
+
+        if (storedFlag === undefined) {
+          flaggedRef.current[slot] = Boolean(question.flagged);
+        }
+
+        return {
+          ...question,
+          flagged: flaggedRef.current[slot] ?? Boolean(question.flagged),
+        };
+      });
+
+      pageCacheRef.current[page] = {
+        questions: normalizedQuestions,
+        nextpage: pageNext,
+      };
+
+      mergeQuestionOverview(page, normalizedQuestions);
+
+      if (contextRef.current) {
+        await updateOfflineExam(contextRef.current, (exam) => ({
+          ...exam,
+          currentPage: page,
+          pages: {
+            ...exam.pages,
+            [page]: {
+              questions: normalizedQuestions,
+              nextpage: pageNext,
+            },
+          },
+        }));
+      }
+
+      setQuestions(normalizedQuestions);
+      setCurrentPage(page);
+      setNextPage(pageNext);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /* INITIALIZE EXAM                                                        */
+
+  async function initializeExamImpl() {
     try {
       setLoading(true);
 
@@ -505,11 +637,7 @@ export default function ExamScreen() {
         setMonitoringEnabled(monitoringConfig.monitoring_enabled);
 
         setMaxDepartures(monitoringConfig.max_departures);
-
-      } catch (error) {
-
-        // Fail-safe:
-        // nếu không lấy được cấu hình thì mặc định tắt
+      } catch {
         setMonitoringEnabled(false);
         setMaxDepartures(3);
       } finally {
@@ -774,310 +902,71 @@ export default function ExamScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const restoreOfflineExam = (exam: OfflineExam) => {
-    const pageKeys = Object.keys(exam.pages ?? {});
+  /* INITIALIZATION EFFECT                                                  */
 
-    const fallbackPage = pageKeys.length > 0 ? Number(pageKeys[0]) : 0;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const unsubscribe = subscribeExamSync((exam) => {
+      const context = contextRef.current;
 
-    const pageNumber = exam.pages[exam.currentPage]
-      ? exam.currentPage
-      : fallbackPage;
+      if (
+        context &&
+        exam.userid === context.userid &&
+        exam.attemptid === context.attemptid &&
+        exam.quizid === context.quizid
+      ) {
+        setOfflineExam(exam);
+      }
+    });
 
-    const page = exam.pages[pageNumber];
+    const initTimer = setTimeout(() => {
+      void initializeExamImpl();
+    }, 0);
 
-    if (!page) {
-      throw new Error(
-        "Chưa có câu hỏi lưu trên thiết bị. Hãy kết nối mạng để tải bài thi.",
-      );
-    }
+    return () => {
+      clearTimeout(initTimer);
+      unsubscribe();
 
-    contextRef.current = {
-      userid: exam.userid,
-      quizid: exam.quizid,
-      attemptid: exam.attemptid,
+      if (syncTimer.current) {
+        clearTimeout(syncTimer.current);
+      }
     };
+  }, []);
 
-    answerRef.current = exam.answers;
+  /* SCROLL TO TARGET QUESTION                                              */
 
-    setSelectedAnswers(exam.answers);
-
-    setAttemptId(exam.attemptid);
-
-    setOfflineExam(exam);
-
-    setDeadline(exam.deadline);
-
-    setDeadlineLoaded(true);
-
-    const restoredFlags: Record<number, boolean> = {};
-
-    Object.values(exam.pages ?? {}).forEach((cachedPage: any) => {
-      cachedPage.questions?.forEach((question: QuizQuestion) => {
-        const slot = getQuestionSlot(question);
-
-        if (slot > 0) {
-          restoredFlags[slot] = Boolean(question.flagged);
-        }
-      });
-    });
-
-    flaggedRef.current = restoredFlags;
-
-    setFlaggedQuestions(restoredFlags);
-
-    const restoredQuestions = page.questions.map((question: QuizQuestion) => ({
-      ...question,
-      flagged:
-        restoredFlags[getQuestionSlot(question)] ?? Boolean(question.flagged),
-    }));
-
-    setQuestions(restoredQuestions);
-
-    setCurrentPage(pageNumber);
-
-    setNextPage(page.nextpage);
-
-    const total = getOfflineQuestionCount(exam);
-
-    if (total > 0) {
-      setTotalQuestions(total);
-    }
-
-    buildOverviewFromOfflineExam(exam);
-  };
-
-  const loadQuestion = async (currentAttemptId: number, page: number) => {
-    try {
-      setLoading(true);
-
-      let response: any;
-
-      const cachedPage = pageCacheRef.current[page];
-
-      if (cachedPage) {
-        response = {
-          questions: cachedPage.questions,
-          nextpage: cachedPage.nextpage,
-        };
-      } else {
-        try {
-          response = await getAttemptData(currentAttemptId, page);
-        } catch (error) {
-          if (!isOfflineError(error) || !contextRef.current) {
-            throw error;
-          }
-
-          const cached = await readOfflineExam(contextRef.current);
-
-          response = cached?.pages?.[page];
-
-          if (!response) {
-            throw new Error(
-              "Trang này chưa được tải. Hãy kết nối mạng để xem câu hỏi mới; đáp án hiện tại đã được giữ lại.",
-            );
-          }
-        }
-      }
-
-      if (response?.exception) {
-        throw new Error(response.message || "Không thể lấy dữ liệu bài thi.");
-      }
-
-      const pageQuestions: QuizQuestion[] = response?.questions ?? [];
-
-      const pageNext = Number(response?.nextpage ?? -1);
-
-      if (pageQuestions.length === 0) {
-        throw new Error("Không tìm thấy câu hỏi.");
-      }
-
-      const normalizedQuestions = pageQuestions.map((question) => {
-        const slot = getQuestionSlot(question);
-
-        const storedFlag = flaggedRef.current[slot];
-
-        if (storedFlag === undefined) {
-          flaggedRef.current[slot] = Boolean(question.flagged);
-        }
-
-        return {
-          ...question,
-          flagged: flaggedRef.current[slot] ?? Boolean(question.flagged),
-        };
-      });
-
-      pageCacheRef.current[page] = {
-        questions: normalizedQuestions,
-        nextpage: pageNext,
-      };
-
-      mergeQuestionOverview(page, normalizedQuestions);
-
-      if (contextRef.current) {
-        await updateOfflineExam(contextRef.current, (exam) => ({
-          ...exam,
-          currentPage: page,
-          pages: {
-            ...exam.pages,
-            [page]: {
-              questions: normalizedQuestions,
-              nextpage: pageNext,
-            },
-          },
-        }));
-      }
-
-      setQuestions(normalizedQuestions);
-
-      setCurrentPage(page);
-
-      setNextPage(pageNext);
-
-      normalizedQuestions.forEach((question) => {
-        restoreSelectedAnswer(question.html);
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const parseQuestionHtml = (html: string): AnswerOption[] => {
-    const result: AnswerOption[] = [];
-
-    const radioRegex = /<input\b[^>]*type=["']radio["'][^>]*>/gi;
-
-    const radioMatches = [...html.matchAll(radioRegex)];
-
-    radioMatches.forEach((match, index) => {
-      const input = match[0];
-
-      const nameMatch = input.match(/name=["']([^"']+)["']/i);
-
-      const valueMatch = input.match(/value=["']([^"']*)["']/i);
-
-      if (!nameMatch || !valueMatch) {
-        return;
-      }
-
-      const name = nameMatch[1];
-      const value = valueMatch[1];
-
-      if (!name.endsWith("_answer") || value === "-1") {
-        return;
-      }
-
-      const startIndex = match.index ?? 0;
-
-      const nextMatch = radioMatches[index + 1];
-
-      const endIndex = nextMatch?.index ?? html.length;
-
-      const answerHtml = html.substring(startIndex, endIndex);
-
-      let label = "";
-
-      const answerNumberMatch = answerHtml.match(
-        /<span[^>]*class=["'][^"']*answernumber[^"']*["'][^>]*>[\s\S]*?<\/span>([\s\S]*?)(?:<\/div>|<\/label>)/i,
-      );
-
-      if (answerNumberMatch) {
-        label = cleanHtmlText(answerNumberMatch[1]);
-      }
-
-      if (!label) {
-        const pMatches = answerHtml.match(/<p[^>]*>([\s\S]*?)<\/p>/gi) ?? [];
-
-        for (const paragraph of pMatches) {
-          const text = cleanHtmlText(paragraph);
-
-          if (text) {
-            label = text;
-            break;
-          }
-        }
-      }
-
-      if (!label) {
-        return;
-      }
-
-      result.push({
-        name,
-        value,
-        label,
-      });
-    });
-
-    return result;
-  };
-
-  const cleanHtmlText = (html: string): string => {
-    return html
-      .replace(/<script[\s\S]*?<\/script>/gi, "")
-      .replace(/<style[\s\S]*?<\/style>/gi, "")
-      .replace(/<br\s*\/?>/gi, "\n")
-      .replace(/<\/p>/gi, "\n")
-      .replace(/<\/div>/gi, "\n")
-      .replace(/<\/li>/gi, "\n")
-      .replace(/<[^>]+>/g, "")
-      .replace(/&nbsp;/gi, " ")
-      .replace(/&amp;/gi, "&")
-      .replace(/&lt;/gi, "<")
-      .replace(/&gt;/gi, ">")
-      .replace(/&#39;/gi, "'")
-      .replace(/&quot;/gi, '"')
-      .replace(/[ \t]+/g, " ")
-      .replace(/ *\n */g, "\n")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim();
-  };
-
-  const extractQuestionText = (html: string): string => {
-    const qtextMatch = html.match(
-      /<div[^>]*class=["'][^"']*qtext[^"']*["'][^>]*>([\s\S]*?)<\/div>/i,
-    );
-
-    return cleanHtmlText(qtextMatch?.[1] ?? "");
-  };
-
-  const restoreSelectedAnswer = (html: string) => {
-    const checkedRegex = /<input[^>]*type=["']radio["'][^>]*checked[^>]*>/gi;
-
-    const checkedInputs = html.match(checkedRegex) ?? [];
-
-    if (checkedInputs.length === 0) {
+  useEffect(() => {
+    if (pendingQuestionSlotRef.current === null) {
       return;
     }
 
-    const restored = {
-      ...answerRef.current,
-    };
+    const slot = pendingQuestionSlotRef.current;
 
-    checkedInputs.forEach((input) => {
-      const nameMatch = input.match(/name=["']([^"']+)["']/i);
+    const position = questionPositionsRef.current[slot];
 
-      const valueMatch = input.match(/value=["']([^"']*)["']/i);
+    if (position !== undefined) {
+      setTimeout(() => {
+        scrollRef.current?.scrollTo({
+          y: Math.max(position - 20, 0),
+          animated: true,
+        });
 
-      if (!nameMatch || !valueMatch) {
-        return;
-      }
+        pendingQuestionSlotRef.current = null;
+      }, 100);
+    }
+  }, [currentPage, questions]);
 
-      const name = nameMatch[1];
-      const value = valueMatch[1];
+  /* ANSWER HANDLING                                                        */
 
-      if (value !== "-1" && !(name in restored)) {
-        restored[name] = value;
-      }
-    });
+  const handleAnswerChange = (answer: unknown) => {
+    if (typeof answer !== "object" || answer === null) {
+      return;
+    }
 
-    answerRef.current = restored;
+    const answers = answer as Record<string, string>;
 
-    setSelectedAnswers(restored);
-  };
-
-  const handleSelectAnswer = (answer: AnswerOption) => {
     if (
       saving ||
       submitting ||
@@ -1089,13 +978,7 @@ export default function ExamScreen() {
       return;
     }
 
-    const answers = {
-      ...answerRef.current,
-      [answer.name]: answer.value,
-    };
-
     answerRef.current = answers;
-
     setSelectedAnswers(answers);
 
     if (contextRef.current) {
@@ -1136,6 +1019,8 @@ export default function ExamScreen() {
       setLocalSaveError(true);
     });
   };
+
+  /* PAGE NAVIGATION                                                        */
 
   const handleNext = async () => {
     if (!attemptId || timeExpired) {
@@ -1181,6 +1066,8 @@ export default function ExamScreen() {
       setSaving(false);
     }
   };
+
+  /* FLAG QUESTION                                                          */
 
   const toggleQuestionFlag = async (question: QuizQuestion) => {
     const slot = getQuestionSlot(question);
@@ -1265,6 +1152,19 @@ export default function ExamScreen() {
     }
   };
 
+  /* GO TO QUESTION                                                         */
+
+  const clearTargetQuestionSlot = () => {
+    if (!route?.params) {
+      return;
+    }
+
+    navigation.setParams({
+      ...route.params,
+      targetQuestionSlot: undefined,
+    });
+  };
+
   const goToQuestion = async (item: QuestionOverviewItem) => {
     if (!attemptId || submitting || examFinished) {
       return;
@@ -1288,6 +1188,7 @@ export default function ExamScreen() {
         }, 100);
       }
 
+      clearTargetQuestionSlot();
       return;
     }
 
@@ -1304,7 +1205,11 @@ export default function ExamScreen() {
     } finally {
       setSaving(false);
     }
+
+    clearTargetQuestionSlot();
   };
+
+  /* SUBMIT EXAM                                                            */
 
   const submitExam = async (currentAttemptId: number) => {
     if (submissionLock.current || examFinished) {
@@ -1313,6 +1218,7 @@ export default function ExamScreen() {
 
     if (!currentAttemptId) {
       Alert.alert("Lỗi", "Không tìm thấy Attempt ID.");
+
       return;
     }
 
@@ -1333,15 +1239,12 @@ export default function ExamScreen() {
 
       await queueExamAnswers(context, answerRef.current, true);
 
-      const beforeSync = await readOfflineExam(context);
-
       setLocalSaveError(false);
 
       await syncExam(context, true);
 
       const afterSync = await readOfflineExam(context);
 
-      
       if (afterSync?.submitted) {
         return;
       }
@@ -1357,14 +1260,21 @@ export default function ExamScreen() {
       Alert.alert("Lỗi nộp bài", error?.message || "Không thể nộp bài.");
 
       submissionLock.current = false;
+
       setSubmitting(false);
     }
   };
 
+  /* CONFIRM SUBMIT                                                         */
+
   const handleSubmit = async () => {
-    if (saving || submitting || examFinished) return;
+    if (saving || submitting || examFinished) {
+      return;
+    }
+
     if (!attemptId) {
       Alert.alert("Lỗi", "Không tìm thấy Attempt ID.");
+
       return;
     }
 
@@ -1375,9 +1285,14 @@ export default function ExamScreen() {
 
     try {
       setSaving(true);
+
       await saveAnswers();
     } catch (error) {
-      Alert.alert("Lỗi lưu bài", error instanceof Error ? error.message : "Không thể lưu bài làm.");
+      Alert.alert(
+        "Lỗi lưu bài",
+        error instanceof Error ? error.message : "Không thể lưu bài làm.",
+      );
+
       return;
     } finally {
       setSaving(false);
@@ -1386,18 +1301,21 @@ export default function ExamScreen() {
     const confirmQuestions = questionOverview.map((item) => ({
       id: item.slot,
       number: Number(item.questionNumber) || item.slot,
-      status: (item.answerName && selectedAnswers[item.answerName]
-        ? "answered"
-        : "unanswered") as "answered" | "unanswered",
+      status:
+        item.answerName && selectedAnswers[item.answerName]
+          ? "answered"
+          : "unanswered",
       flagged: Boolean(flaggedQuestions[item.slot] ?? item.flagged),
-      saveStatus: (offlineExam?.status === "Synced"
-        ? "saved"
-        : offlineExam?.status === "Failed"
-          ? "not_saved"
-          : "saving") as "saved" | "saving" | "not_saved",
+      saveStatus:
+        offlineExam?.status === "Synced"
+          ? "saved"
+          : offlineExam?.status === "Failed"
+            ? "not_saved"
+            : "saving",
     }));
 
     navigation.navigate("ConfirmSubmit", {
+      courseid,
       quizid: Number(quizid),
       quizName,
       attemptid: attemptId,
@@ -1405,15 +1323,16 @@ export default function ExamScreen() {
     });
   };
 
-  // Khi user xác nhận nộp bài từ ConfirmSubmitScreen.
+  /* CONFIRM SUBMIT EVENT                                                   */
+
   useEffect(() => {
-    const { DeviceEventEmitter } = require("react-native");
     const subscription = DeviceEventEmitter.addListener(
       "submitExamConfirmed",
       (confirmedAttemptId: number) => {
         if (submissionLock.current || examFinished) {
           return;
         }
+
         void submitExam(Number(confirmedAttemptId));
       },
     );
@@ -1423,33 +1342,66 @@ export default function ExamScreen() {
     };
   }, [examFinished]);
 
-  // Khi user chọn xem lại câu hỏi cụ thể từ ConfirmSubmitScreen.
+  /* TARGET QUESTION FROM CONFIRM                                           */
+
   useEffect(() => {
-    if (!isFocused || !targetQuestionSlot || !questionOverview.length || loading || saving || submitting || examFinished) {
+    if (
+      !isFocused ||
+      targetQuestionSlot === undefined ||
+      targetQuestionSlot === null ||
+      !questionOverview.length ||
+      loading ||
+      saving ||
+      submitting ||
+      examFinished
+    ) {
       return;
     }
 
-    const item = questionOverview.find((q) => q.slot === targetQuestionSlot);
+    const item = questionOverview.find(
+      (question) => question.slot === targetQuestionSlot,
+    );
 
-    if (item) {
-      navigation.setParams({ targetQuestionSlot: undefined });
-      void goToQuestion(item);
+    if (!item) {
+      clearTargetQuestionSlot();
+      return;
     }
-  }, [targetQuestionSlot, isFocused, questionOverview, loading, saving, submitting, examFinished]);
+
+    const timeoutId = setTimeout(() => {
+      void goToQuestion(item);
+    }, 0);
+
+    return () => clearTimeout(timeoutId);
+  }, [
+    targetQuestionSlot,
+    isFocused,
+    questionOverview,
+    loading,
+    saving,
+    submitting,
+    examFinished,
+    navigation,
+  ]);
+
+  /* SUBMIT SUCCESS                                                         */
 
   useEffect(() => {
     if (!offlineExam?.submitted || examFinished) {
       return;
     }
 
-    // Nhả lock và spinner trước khi navigate để tránh state cũ tồn tại.
-    submissionLock.current = false;
-    setSubmitting(false);
+    const timeoutId = setTimeout(() => {
+      submissionLock.current = false;
 
-    monitoring.complete();
+      setSubmitting(false);
 
-    setExamFinished(true);
-  }, [offlineExam?.submitted, examFinished]);
+      monitoring.complete();
+
+      setExamFinished(true);
+    }, 0);
+
+    return () => clearTimeout(timeoutId);
+  }, [offlineExam?.submitted, examFinished, monitoring]);
 
   useEffect(() => {
     if (!examFinished || !attemptId) {
@@ -1463,6 +1415,8 @@ export default function ExamScreen() {
       attemptid: Number(attemptId),
     });
   }, [examFinished, navigation, attemptId, courseid, quizid, quizName]);
+
+  /* RETRY SYNC                                                             */
 
   const retrySync = async () => {
     if (!contextRef.current || syncing) {
@@ -1482,7 +1436,6 @@ export default function ExamScreen() {
 
       await syncExam(context, true);
 
-      // syncExam không throw — đọc lại kết quả để xác định trạng thái.
       const afterSync = await readOfflineExam(context);
 
       if (afterSync?.status === "Synced" || afterSync?.submitted) {
@@ -1497,6 +1450,8 @@ export default function ExamScreen() {
     }
   };
 
+  /* MONITORING WARNING                                                     */
+
   useEffect(() => {
     if (!monitoringEnabled) {
       return;
@@ -1509,6 +1464,8 @@ export default function ExamScreen() {
       );
     }
   }, [monitoring.departures, monitoringEnabled, maxDepartures]);
+
+  /* AUTO SUBMIT                                                            */
 
   useEffect(() => {
     if (
@@ -1528,6 +1485,8 @@ export default function ExamScreen() {
     void submitExam(attemptId);
   }, [timeExpired, attemptId, loading, saving, submitting, examFinished]);
 
+  /* LOADING                                                                */
+
   if (loading && questions.length === 0) {
     return (
       <View style={styles.loadingContainer}>
@@ -1535,6 +1494,8 @@ export default function ExamScreen() {
       </View>
     );
   }
+
+  /* EMPTY                                                                  */
 
   if (questions.length === 0) {
     return (
@@ -1564,81 +1525,23 @@ export default function ExamScreen() {
     );
   }
 
+  /* MAIN UI                                                                */
+
   return (
     <View style={styles.container}>
-      {/* ── Compact top bar (thay thế AppHeader) ── */}
-      <View style={[styles.examTopBar, { paddingTop: insets.top + 8 }]}>
-        {/* Hàng 1: Tên đề thi */}
-        <View style={styles.examTopBarTitleRow}>
-          <TouchableOpacity
-            style={styles.examBackButton}
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.75}
-          >
-            <Ionicons name="arrow-back" size={20} color={COLORS.text} />
-          </TouchableOpacity>
-
-          <View style={styles.examTopBarTitleBox}>
-            <Text style={styles.examTopBarTitle} numberOfLines={1}>
-              {quizName}
-            </Text>
-
-            <Text style={styles.examTopBarSubtitle}>
-              {answeredCount}/{totalQuestions} câu · Trang {currentPage + 1}
-            </Text>
-          </View>
-        </View>
-
-        {/* Hàng 2: Câu hỏi + Timer cùng 1 hàng */}
-        <View style={styles.examTopBarRow2}>
-          {/* Nút câu hỏi */}
-          <TouchableOpacity
-            style={styles.questionMenuButton}
-            onPress={() => setQuestionMenuVisible(true)}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="grid-outline" size={17} color={COLORS.primary} />
-            <Text style={styles.questionMenuButtonText}>Câu hỏi</Text>
-          </TouchableOpacity>
-
-          {/* Tiến độ % */}
-          <View style={styles.progressBarInline}>
-            <View style={styles.progressTrackInline}>
-              <View
-                style={[
-                  styles.progressFillInline,
-                  { width: `${progressPercent}%` as any },
-                ]}
-              />
-            </View>
-            <Text style={styles.progressPercentInline}>{progressPercent}%</Text>
-          </View>
-
-          {/* Timer */}
-          {deadlineLoaded && !examFinished ? (
-            <View
-              style={[
-                styles.timerInline,
-                timerIsUrgent && styles.timerInlineUrgent,
-                timeExpired && styles.timerInlineExpired,
-              ]}
-            >
-              <Ionicons
-                name={timeExpired ? "alert-circle-outline" : "time-outline"}
-                size={15}
-                color={
-                  timeExpired
-                    ? COLORS.error
-                    : timerIsUrgent
-                      ? COLORS.warning
-                      : COLORS.primary
-                }
-              />
-              <ExamTimer seconds={secondsRemaining} compact />
-            </View>
-          ) : null}
-        </View>
-      </View>
+      <ExamTopBar
+        quizName={quizName}
+        answeredCount={answeredCount}
+        totalQuestions={totalQuestions}
+        currentPage={currentPage}
+        progressPercent={progressPercent}
+        deadlineLoaded={deadlineLoaded}
+        examFinished={examFinished}
+        timerIsUrgent={timerIsUrgent}
+        timeExpired={timeExpired}
+        secondsRemaining={secondsRemaining}
+        onMenuPress={() => setQuestionMenuVisible(true)}
+      />
 
       {timeExpired && !submitting && (
         <View style={styles.expiredBox}>
@@ -1687,191 +1590,49 @@ export default function ExamScreen() {
         </View>
       )}
 
-      <ScrollView
-        ref={scrollRef}
+      <NestableScrollContainer
+        ref={scrollRef as any}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {questions.map((questionItem, questionIndex) => {
-          const answers = parseQuestionHtml(questionItem.html);
-
           const slot = getQuestionSlot(questionItem);
 
           const isFlagged = Boolean(
             flaggedQuestions[slot] ?? questionItem.flagged,
           );
 
-          return (
-            <View
-              key={`${questionItem.slot}-${questionItem.questionnumber}`}
-              style={styles.questionContainer}
-              onLayout={(event) => {
-                questionPositionsRef.current[slot] = event.nativeEvent.layout.y;
-              }}
-            >
-              <View style={styles.questionBox}>
-                <View style={styles.questionHeader}>
-                  <View style={styles.questionHeaderLeft}>
-                    <View style={styles.questionNumber}>
-                      <Text style={styles.questionNumberText}>
-                        {questionItem.questionnumber || questionIndex + 1}
-                      </Text>
-                    </View>
-
-                    <Text style={styles.questionLabel}>Câu hỏi</Text>
-                  </View>
-
-                  <TouchableOpacity
-                    style={[
-                      styles.flagButton,
-                      isFlagged && styles.flagButtonActive,
-                    ]}
-                    onPress={() => void toggleQuestionFlag(questionItem)}
-                    disabled={submitting || examFinished || answersLocked}
-                    activeOpacity={0.75}
-                  >
-                    <Ionicons
-                      name={isFlagged ? "flag" : "flag-outline"}
-                      size={19}
-                      color={isFlagged ? COLORS.warning : COLORS.textLight}
-                    />
-
-                    <Text
-                      style={[
-                        styles.flagText,
-                        isFlagged && styles.flagTextActive,
-                      ]}
-                    >
-                      {isFlagged ? "Đã đánh dấu" : "Đánh dấu"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                <Text style={styles.questionText}>
-                  {extractQuestionText(questionItem.html)}
-                </Text>
-              </View>
-
-              <View style={styles.answerBox}>
-                <Text style={styles.answerTitle}>Chọn đáp án</Text>
-
-                {answers.map((answer, answerIndex) => {
-                  const isSelected =
-                    selectedAnswers[answer.name] === answer.value;
-
-                  return (
-                    <TouchableOpacity
-                      key={`${answer.name}-${answer.value}-${answerIndex}`}
-                      style={[
-                        styles.answerOption,
-                        isSelected && styles.answerSelected,
-                      ]}
-                      onPress={() => handleSelectAnswer(answer)}
-                      disabled={
-                        saving ||
-                        submitting ||
-                        examFinished ||
-                        timeExpired ||
-                        answersLocked
-                      }
-                      activeOpacity={0.75}
-                    >
-                      <View
-                        style={[
-                          styles.radioOuter,
-                          isSelected && styles.radioOuterSelected,
-                        ]}
-                      >
-                        {isSelected && <View style={styles.radioInner} />}
-                      </View>
-
-                      <Text
-                        style={[
-                          styles.answerText,
-                          isSelected && styles.answerTextSelected,
-                        ]}
-                      >
-                        {getAnswerLabel(answerIndex, answer.label)}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
+          const parsedQuestion: ParsedQuestion = parseQuestion(
+            questionItem.html,
           );
-        })}
 
-        <View style={styles.navigation}>
-          <TouchableOpacity
-            style={[
-              styles.navButton,
-              styles.previousButton,
-              currentPage === 0 && styles.navButtonDisabled,
-            ]}
-            disabled={
-              currentPage === 0 ||
-              saving ||
-              submitting ||
-              examFinished ||
-              timeExpired ||
-              answersLocked
-            }
-            onPress={handlePrevious}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="arrow-back" size={18} color={COLORS.text} />
-
-            <Text style={styles.previousButtonText}>Trang trước</Text>
-          </TouchableOpacity>
-
-          {!isLastPage ? (
-            <TouchableOpacity
-              style={[
-                styles.navButton,
-                styles.nextButton,
-                saving && styles.navButtonDisabled,
-              ]}
-              disabled={
+          return (
+            <ExamQuestionItem
+              key={`${questionItem.slot}-${questionItem.questionnumber}`}
+              questionNumberText={
+                questionItem.questionnumber || String(questionIndex + 1)
+              }
+              questionText={parsedQuestion.text}
+              question={parsedQuestion}
+              isFlagged={isFlagged}
+              selectedAnswers={selectedAnswers}
+              disabled={submitting || examFinished || answersLocked}
+              flagDisabled={submitting || examFinished || answersLocked}
+              answerDisabled={
                 saving ||
                 submitting ||
                 examFinished ||
                 timeExpired ||
                 answersLocked
               }
-              onPress={handleNext}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.nextButtonText}>
-                {saving ? "Đang lưu..." : "Trang tiếp"}
-              </Text>
-
-              {!saving && (
-                <Ionicons name="arrow-forward" size={18} color={COLORS.white} />
-              )}
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={[
-                styles.navButton,
-                styles.submitButton,
-                submitting && styles.navButtonDisabled,
-              ]}
-              disabled={saving || submitting || examFinished || answersLocked}
-              onPress={handleSubmit}
-              activeOpacity={0.8}
-            >
-              <Ionicons
-                name="checkmark-circle-outline"
-                size={19}
-                color={COLORS.white}
-              />
-
-              <Text style={styles.submitButtonText}>
-                {submitting ? "Đang nộp..." : "Nộp bài"}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
+              onFlagToggle={() => void toggleQuestionFlag(questionItem)}
+              onAnswerChange={handleAnswerChange}
+              onLayout={(event) => {
+                questionPositionsRef.current[slot] = event.nativeEvent.layout.y;
+              }}
+            />
+          );
+        })}
 
         {loading && (
           <View style={styles.loadingMore}>
@@ -1882,7 +1643,22 @@ export default function ExamScreen() {
             />
           </View>
         )}
-      </ScrollView>
+      </NestableScrollContainer>
+
+      <SafeAreaView edges={["bottom"]} style={styles.navigationFooter}>
+        <ExamNavigation
+          currentPage={currentPage}
+          isLastPage={isLastPage}
+          saving={saving}
+          submitting={submitting}
+          examFinished={examFinished}
+          timeExpired={timeExpired}
+          answersLocked={answersLocked}
+          onPrevious={() => void handlePrevious()}
+          onNext={() => void handleNext()}
+          onSubmit={() => void handleSubmit()}
+        />
+      </SafeAreaView>
 
       {monitoring.hidden && (
         <View style={styles.privacyOverlay}>
@@ -1898,118 +1674,17 @@ export default function ExamScreen() {
         </View>
       )}
 
-      <Modal
+      <ExamQuestionMenu
         visible={questionMenuVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setQuestionMenuVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.questionMenuModal}>
-            <View style={styles.menuHeader}>
-              <View>
-                <Text style={styles.menuTitle}>Tổng quan câu hỏi</Text>
+        onClose={() => setQuestionMenuVisible(false)}
+        answeredCount={answeredCount}
+        totalQuestions={totalQuestions}
+        questionOverview={questionOverview}
+        selectedAnswers={selectedAnswers}
+        flaggedQuestions={flaggedQuestions}
+        onGoToQuestion={(item) => void goToQuestion(item)}
+      />
 
-                <Text style={styles.menuSubtitle}>
-                  {answeredCount}/{totalQuestions} câu đã trả lời
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={() => setQuestionMenuVisible(false)}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="close" size={22} color={COLORS.text} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.legend}>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, styles.legendAnswered]} />
-
-                <Text style={styles.legendText}>Đã trả lời</Text>
-              </View>
-
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, styles.legendUnanswered]} />
-
-                <Text style={styles.legendText}>Chưa trả lời</Text>
-              </View>
-
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, styles.legendFlagged]} />
-
-                <Text style={styles.legendText}>Đã đánh dấu</Text>
-              </View>
-            </View>
-
-            <ScrollView
-              style={styles.questionGridScroll}
-              contentContainerStyle={styles.questionGrid}
-              showsVerticalScrollIndicator={false}
-            >
-              {questionOverview.map((item) => {
-                const answered =
-                  !!item.answerName && !!selectedAnswers[item.answerName];
-
-                const flagged = Boolean(
-                  flaggedQuestions[item.slot] ?? item.flagged,
-                );
-
-                return (
-                  <TouchableOpacity
-                    key={item.slot}
-                    style={[
-                      styles.questionGridItem,
-                      answered && !flagged && styles.questionGridAnswered,
-                      !answered && !flagged && styles.questionGridUnanswered,
-                      flagged && styles.questionGridFlagged,
-                    ]}
-                    onPress={() => void goToQuestion(item)}
-                    activeOpacity={0.75}
-                  >
-                    <Text
-                      style={[
-                        styles.questionGridNumber,
-                        answered &&
-                          !flagged &&
-                          styles.questionGridNumberAnswered,
-                        flagged && styles.questionGridNumberFlagged,
-                      ]}
-                    >
-                      {item.questionNumber || item.slot}
-                    </Text>
-
-                    {flagged && (
-                      <Ionicons
-                        name="flag"
-                        size={11}
-                        color={COLORS.warning}
-                        style={styles.gridFlagIcon}
-                      />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-
-            <View style={styles.menuFooter}>
-              <Ionicons
-                name="information-circle-outline"
-                size={17}
-                color={COLORS.textSecondary}
-              />
-
-              <Text style={styles.menuFooterText}>
-                Chạm vào số câu để xem nhanh câu hỏi cần kiểm tra.
-              </Text>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ── Submitting Overlay ── */}
       <Modal
         visible={submitting}
         transparent
@@ -2022,14 +1697,15 @@ export default function ExamScreen() {
   );
 }
 
-// ─────────────────────────── Submitting Overlay ─────────────────────────────
+/* -------------------------------------------------------------------------- */
+/* SUBMITTING OVERLAY                                                         */
+/* -------------------------------------------------------------------------- */
 
 function SubmittingOverlay() {
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const spinAnim = useRef(new Animated.Value(0)).current;
+  const [pulseAnim] = useState(() => new Animated.Value(1));
 
   useEffect(() => {
-    Animated.loop(
+    const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
           toValue: 1.12,
@@ -2042,8 +1718,14 @@ function SubmittingOverlay() {
           useNativeDriver: true,
         }),
       ]),
-    ).start();
-  }, []);
+    );
+
+    animation.start();
+
+    return () => {
+      animation.stop();
+    };
+  }, [pulseAnim]);
 
   return (
     <View style={overlayStyles.backdrop}>
@@ -2051,11 +1733,16 @@ function SubmittingOverlay() {
         colors={["rgba(0,110,39,0.96)", "rgba(0,61,24,0.98)"]}
         style={overlayStyles.container}
       >
-        {/* Pulsing icon ring */}
         <Animated.View
           style={[
             overlayStyles.iconRing,
-            { transform: [{ scale: pulseAnim }] },
+            {
+              transform: [
+                {
+                  scale: pulseAnim,
+                },
+              ],
+            },
           ]}
         >
           <View style={overlayStyles.iconInner}>
@@ -2069,10 +1756,9 @@ function SubmittingOverlay() {
           Vui lòng không thoát ứng dụng trong lúc này.
         </Text>
 
-        {/* Dots */}
         <View style={overlayStyles.dotsRow}>
-          {[0, 1, 2].map((i) => (
-            <DotsIndicator key={i} delay={i * 220} />
+          {[0, 1, 2].map((index) => (
+            <DotsIndicator key={index} delay={index * 220} />
           ))}
         </View>
       </LinearGradient>
@@ -2080,11 +1766,15 @@ function SubmittingOverlay() {
   );
 }
 
+/* -------------------------------------------------------------------------- */
+/* DOT INDICATOR                                                              */
+/* -------------------------------------------------------------------------- */
+
 function DotsIndicator({ delay }: { delay: number }) {
-  const anim = useRef(new Animated.Value(0.3)).current;
+  const anim = useMemo(() => new Animated.Value(0.3), []);
 
   useEffect(() => {
-    Animated.loop(
+    const animation = Animated.loop(
       Animated.sequence([
         Animated.delay(delay),
         Animated.timing(anim, {
@@ -2098,83 +1788,30 @@ function DotsIndicator({ delay }: { delay: number }) {
           useNativeDriver: true,
         }),
       ]),
-    ).start();
-  }, []);
+    );
 
-  return <Animated.View style={[overlayStyles.dot, { opacity: anim }]} />;
+    animation.start();
+
+    return () => {
+      animation.stop();
+    };
+  }, [anim, delay]);
+
+  return (
+    <Animated.View
+      style={[
+        overlayStyles.dot,
+        {
+          opacity: anim,
+        },
+      ]}
+    />
+  );
 }
 
-const overlayStyles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  container: {
-    width: 280,
-    borderRadius: 28,
-    paddingVertical: 40,
-    paddingHorizontal: 32,
-    alignItems: "center",
-    gap: 14,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    elevation: 20,
-  },
-  iconRing: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  iconInner: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: "rgba(255,255,255,0.12)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: "#fff",
-    letterSpacing: 0.2,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: "rgba(255,255,255,0.72)",
-    textAlign: "center",
-    lineHeight: 19,
-  },
-  dotsRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 8,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "rgba(255,255,255,0.85)",
-  },
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-const getAnswerLabel = (index: number, label: string) => {
-  const letters = ["A", "B", "C", "D", "E", "F"];
-
-  const prefix = letters[index] ?? String(index + 1);
-
-  return `${prefix}. ${label}`;
-};
+/* -------------------------------------------------------------------------- */
+/* STYLES                                                                     */
+/* -------------------------------------------------------------------------- */
 
 const styles = StyleSheet.create({
   container: {
@@ -2182,102 +1819,18 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.backgroundSoft,
   },
 
-  examTopBar: {
-    backgroundColor: COLORS.white,
-    paddingHorizontal: 16,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-
-  examTopBarTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-
-  examBackButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: COLORS.backgroundSoft,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 10,
-  },
-
-  examTopBarTitleBox: {
-    flex: 1,
-  },
-
-  examTopBarTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: COLORS.text,
-  },
-
-  examTopBarSubtitle: {
-    fontSize: 11,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-
-  examTopBarRow2: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-
-  progressBarInline: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-
-  progressTrackInline: {
-    flex: 1,
-    height: 6,
-    backgroundColor: COLORS.border,
-    borderRadius: 999,
-    overflow: "hidden",
-  },
-
-  progressFillInline: {
-    height: "100%",
-    backgroundColor: COLORS.primary,
-    borderRadius: 999,
-  },
-
-  progressPercentInline: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: COLORS.primary,
-    minWidth: 32,
-    textAlign: "right",
-  },
-
-  timerInline: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-    backgroundColor: COLORS.backgroundSoft,
-  },
-
-  timerInlineUrgent: {
-    backgroundColor: "#FFF0C7",
-  },
-
-  timerInlineExpired: {
-    backgroundColor: "#FBE1E1",
-  },
-
   scrollContent: {
     padding: 20,
-    paddingBottom: 40,
+    paddingBottom: 24,
+  },
+
+  navigationFooter: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 8,
+    backgroundColor: COLORS.surface,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
   },
 
   loadingContainer: {
@@ -2289,75 +1842,6 @@ const styles = StyleSheet.create({
 
   loadingMore: {
     marginTop: 12,
-  },
-
-  timerCard: {
-    marginHorizontal: 20,
-    marginTop: 10,
-    padding: 14,
-    borderRadius: 18,
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-
-  timerCardUrgent: {
-    borderColor: "#E9C56A",
-    backgroundColor: "#FFF9E8",
-  },
-
-  timerCardExpired: {
-    borderColor: "#E8BABA",
-    backgroundColor: "#FFF4F4",
-  },
-
-  timerInfo: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    marginRight: 12,
-  },
-
-  timerIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
-    backgroundColor: COLORS.backgroundSoft,
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 10,
-  },
-
-  timerIconUrgent: {
-    backgroundColor: "#FFF0C7",
-  },
-
-  timerIconExpired: {
-    backgroundColor: "#FBE1E1",
-  },
-
-  timerTextBox: {
-    flex: 1,
-  },
-
-  timerTitle: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: COLORS.text,
-  },
-
-  timerDescription: {
-    marginTop: 3,
-    fontSize: 11,
-    lineHeight: 16,
-    color: COLORS.textSecondary,
-  },
-
-  timerDescriptionExpired: {
-    color: COLORS.error,
   },
 
   expiredBox: {
@@ -2425,329 +1909,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: COLORS.primary,
     marginLeft: 8,
-  },
-
-  progressCard: {
-    marginBottom: 16,
-    padding: 16,
-    backgroundColor: COLORS.surface,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-
-  progressHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-
-  progressTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: COLORS.text,
-    marginBottom: 4,
-  },
-
-  progressCount: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-  },
-
-  questionMenuButton: {
-    height: 36,
-    paddingHorizontal: 10,
-    borderRadius: 11,
-    backgroundColor: COLORS.backgroundSoft,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    marginRight: 8,
-  },
-
-  questionMenuButtonText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: COLORS.primary,
-  },
-
-  progressPercentBox: {
-    minWidth: 52,
-    height: 36,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-    backgroundColor: COLORS.backgroundSoft,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  progressPercent: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: COLORS.primary,
-  },
-
-  progressTrack: {
-    height: 8,
-    marginTop: 14,
-    backgroundColor: COLORS.border,
-    borderRadius: 999,
-    overflow: "hidden",
-  },
-
-  progressFill: {
-    height: "100%",
-    backgroundColor: COLORS.primary,
-    borderRadius: 999,
-  },
-
-  progressFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 8,
-  },
-
-  progressFooterText: {
-    fontSize: 12,
-    color: COLORS.textLight,
-  },
-
-  quizHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.white,
-    borderRadius: 18,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    marginBottom: 16,
-  },
-
-  quizHeaderIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 15,
-    backgroundColor: COLORS.backgroundSoft,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 13,
-  },
-
-  quizHeaderContent: {
-    flex: 1,
-  },
-
-  quizName: {
-    fontSize: 17,
-    lineHeight: 22,
-    fontWeight: "700",
-    color: COLORS.text,
-  },
-
-  counterRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 7,
-  },
-
-  questionCounter: {
-    marginLeft: 6,
-    fontSize: 12,
-    fontWeight: "600",
-    color: COLORS.primaryDark,
-  },
-
-  questionContainer: {
-    marginBottom: 4,
-  },
-
-  questionBox: {
-    backgroundColor: COLORS.white,
-    borderRadius: 18,
-    padding: 18,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-
-  questionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 15,
-  },
-
-  questionHeaderLeft: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  questionNumber: {
-    width: 34,
-    height: 34,
-    borderRadius: 11,
-    backgroundColor: COLORS.primary,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 10,
-  },
-
-  questionNumberText: {
-    color: COLORS.white,
-    fontSize: 14,
-    fontWeight: "700",
-  },
-
-  questionLabel: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: COLORS.text,
-  },
-
-  flagButton: {
-    minHeight: 34,
-    paddingHorizontal: 9,
-    borderRadius: 10,
-    backgroundColor: COLORS.backgroundSoft,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-  },
-
-  flagButtonActive: {
-    backgroundColor: "#FFF4D6",
-  },
-
-  flagText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: COLORS.textLight,
-  },
-
-  flagTextActive: {
-    color: COLORS.warning,
-  },
-
-  questionText: {
-    fontSize: 16,
-    lineHeight: 25,
-    color: COLORS.text,
-  },
-
-  answerBox: {
-    marginBottom: 14,
-  },
-
-  answerTitle: {
-    marginBottom: 10,
-    fontSize: 14,
-    fontWeight: "700",
-    color: COLORS.text,
-  },
-
-  answerOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    minHeight: 56,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 9,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 15,
-    backgroundColor: COLORS.white,
-  },
-
-  answerSelected: {
-    borderColor: COLORS.primary,
-    backgroundColor: "#EFF8F2",
-  },
-
-  radioOuter: {
-    width: 22,
-    height: 22,
-    marginRight: 12,
-    borderWidth: 2,
-    borderColor: "#AAB6B0",
-    borderRadius: 11,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  radioOuterSelected: {
-    borderColor: COLORS.primary,
-  },
-
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: COLORS.primary,
-  },
-
-  answerText: {
-    flex: 1,
-    fontSize: 15,
-    lineHeight: 22,
-    color: COLORS.textSecondary,
-  },
-
-  answerTextSelected: {
-    color: COLORS.primaryDark,
-    fontWeight: "600",
-  },
-
-  navigation: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 20,
-  },
-
-  navButton: {
-    flex: 1,
-    minHeight: 50,
-    borderRadius: 15,
-    justifyContent: "center",
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 7,
-  },
-
-  previousButton: {
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-
-  previousButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.text,
-  },
-
-  nextButton: {
-    backgroundColor: COLORS.primaryDark,
-  },
-
-  nextButtonText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: COLORS.white,
-  },
-
-  submitButton: {
-    backgroundColor: COLORS.primary,
-  },
-
-  submitButtonText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: COLORS.white,
-  },
-
-  navButtonDisabled: {
-    opacity: 0.45,
   },
 
   emptyContainer: {
@@ -2827,163 +1988,76 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     color: COLORS.error,
   },
+});
 
-  modalOverlay: {
+const overlayStyles = StyleSheet.create({
+  backdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
+    backgroundColor: "rgba(0,0,0,0.55)",
     justifyContent: "center",
-    paddingHorizontal: 20,
-  },
-
-  questionMenuModal: {
-    maxHeight: "78%",
-    backgroundColor: COLORS.white,
-    borderRadius: 24,
-    padding: 18,
-  },
-
-  menuHeader: {
-    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 14,
   },
 
-  menuTitle: {
-    fontSize: 18,
+  container: {
+    width: 280,
+    borderRadius: 28,
+    paddingVertical: 40,
+    paddingHorizontal: 32,
+    alignItems: "center",
+    gap: 14,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 12,
+    },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+
+  iconRing: {
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+
+  iconInner: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  title: {
+    fontSize: 20,
     fontWeight: "800",
-    color: COLORS.text,
+    color: "#fff",
+    letterSpacing: 0.2,
   },
 
-  menuSubtitle: {
-    marginTop: 4,
-    fontSize: 12,
-    color: COLORS.textSecondary,
-  },
-
-  closeButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: COLORS.backgroundSoft,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  legend: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: COLORS.border,
-    marginBottom: 14,
-  },
-
-  legendItem: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  legendDot: {
-    width: 13,
-    height: 13,
-    borderRadius: 5,
-    marginRight: 5,
-    borderWidth: 1,
-  },
-
-  legendAnswered: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-
-  legendUnanswered: {
-    backgroundColor: COLORS.white,
-    borderColor: "#B8C1BD",
-  },
-
-  legendFlagged: {
-    backgroundColor: "#FFF0C7",
-    borderColor: COLORS.warning,
-  },
-
-  legendText: {
-    fontSize: 11,
-    color: COLORS.textSecondary,
-  },
-
-  questionGridScroll: {
-    maxHeight: 390,
-  },
-
-  questionGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 9,
-    paddingBottom: 10,
-  },
-
-  questionGridItem: {
-    width: 43,
-    height: 43,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    position: "relative",
-  },
-
-  questionGridAnswered: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-
-  questionGridUnanswered: {
-    backgroundColor: COLORS.white,
-    borderColor: "#B8C1BD",
-  },
-
-  questionGridFlagged: {
-    backgroundColor: "#FFF0C7",
-    borderColor: COLORS.warning,
-  },
-
-  questionGridNumber: {
+  subtitle: {
     fontSize: 13,
-    fontWeight: "800",
-    color: COLORS.textSecondary,
+    color: "rgba(255,255,255,0.72)",
+    textAlign: "center",
+    lineHeight: 19,
   },
 
-  questionGridNumberAnswered: {
-    color: COLORS.white,
-  },
-
-  questionGridNumberFlagged: {
-    color: "#8A6414",
-  },
-
-  gridFlagIcon: {
-    position: "absolute",
-    right: 4,
-    top: 4,
-  },
-
-  menuFooter: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
+  dotsRow: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
+    gap: 8,
+    marginTop: 8,
   },
 
-  menuFooterText: {
-    flex: 1,
-    fontSize: 11,
-    lineHeight: 16,
-    color: COLORS.textSecondary,
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "rgba(255,255,255,0.85)",
   },
 });

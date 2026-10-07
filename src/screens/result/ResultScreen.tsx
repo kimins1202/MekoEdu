@@ -2,18 +2,27 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
 
-import { getQuizzesByCourses } from "../../api/quizApi";
+import {
+  getAttemptReview,
+  getQuizFeedbackForGrade,
+  getQuizzesByCourses,
+  getUserBestGrade,
+} from "../../api/quizApi";
+
+import AppButton from "../../components/common/AppButton";
+import AppCard from "../../components/common/AppCard";
 import AppHeader from "../../components/common/AppHeader";
+import AppProgressBar from "../../components/common/AppProgressBar";
+import Loading from "../../components/common/Loading";
+
 import COLORS from "../../constants/colors";
 import { AppStackParamList } from "../../types/navigation";
 
@@ -30,16 +39,6 @@ type ResultRoute = {
   };
 };
 
-type GradeItem = {
-  id?: number;
-  iteminstance?: number;
-  itemmodule?: string;
-  itemname?: string;
-  gradeformatted?: string;
-  graderaw?: number;
-  grademax?: number;
-};
-
 export default function ResultScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<ResultRoute>();
@@ -49,17 +48,13 @@ export default function ResultScreen() {
   const [loading, setLoading] = useState(true);
   const [score, setScore] = useState<number | null>(null);
   const [gradeMax, setGradeMax] = useState<number | null>(null);
-  const [correctAnswers, setCorrectAnswers] = useState<number>(0);
-  const [totalQuestions, setTotalQuestions] = useState<number>(0);
+  const [correctAnswers, setCorrectAnswers] = useState(0);
+  const [totalQuestions, setTotalQuestions] = useState(0);
   const [bestGrade, setBestGrade] = useState<number | null>(null);
-  const [feedback, setFeedback] = useState<string>("");
+  const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    loadResult();
-  }, []);
-
-  const loadResult = async () => {
+  const loadResult = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
@@ -76,22 +71,25 @@ export default function ResultScreen() {
         throw new Error("User ID không hợp lệ.");
       }
 
-      // 1. Lấy thông tin chi tiết bài làm bằng getAttemptReview
-      const { getAttemptReview, getUserBestGrade, getQuizFeedbackForGrade } = await import("../../api/quizApi");
+      // Lấy chi tiết bài làm
       const reviewResponse = await getAttemptReview(attemptid);
 
-      if (!reviewResponse || !reviewResponse.attempt) {
+      if (!reviewResponse?.attempt) {
         throw new Error("Chưa tìm thấy kết quả bài thi.");
       }
 
-      // 2. Tính số câu đúng và tổng số câu
-      const questions = Array.isArray(reviewResponse.questions) ? reviewResponse.questions : [];
+      // Tính số câu đúng
+      const questions = Array.isArray(reviewResponse.questions)
+        ? reviewResponse.questions
+        : [];
+
       const totalQ = questions.length;
+
       let correctQ = 0;
 
-      questions.forEach((q: any) => {
-        const mark = Number(q.mark);
-        const maxMark = Number(q.maxmark);
+      questions.forEach((question: any) => {
+        const mark = Number(question.mark);
+        const maxMark = Number(question.maxmark);
 
         if (
           Number.isFinite(mark) &&
@@ -106,59 +104,100 @@ export default function ResultScreen() {
       setTotalQuestions(totalQ);
       setCorrectAnswers(correctQ);
 
-      // 3. Lấy điểm và quy đổi (nếu có grade thì là điểm đã quy đổi)
-      let finalScore = (reviewResponse.grade !== null && reviewResponse.grade !== undefined)
-        ? Number(reviewResponse.grade)
-        : Number(reviewResponse.attempt?.sumgrades || 0);
-      let maxScore = null;
+      // Lấy điểm bài thi
+      let finalScore =
+        reviewResponse.grade !== null && reviewResponse.grade !== undefined
+          ? Number(reviewResponse.grade)
+          : Number(reviewResponse.attempt?.sumgrades || 0);
+
+      let maxScore: number | null = null;
 
       try {
-        const quizzesResponse = await getQuizzesByCourses(courseid ? [courseid] : []);
-        const quizzes = Array.isArray(quizzesResponse?.quizzes) ? quizzesResponse.quizzes : [];
-        const foundQuiz = quizzes.find((q: any) => Number(q.id) === Number(quizid));
+        const quizzesResponse = await getQuizzesByCourses(
+          courseid ? [courseid] : [],
+        );
+
+        const quizzes = Array.isArray(quizzesResponse?.quizzes)
+          ? quizzesResponse.quizzes
+          : [];
+
+        const foundQuiz = quizzes.find(
+          (quiz: any) => Number(quiz.id) === Number(quizid),
+        );
 
         if (foundQuiz) {
           maxScore = Number(foundQuiz.grade);
 
-          if ((reviewResponse.grade === null || reviewResponse.grade === undefined) && Number(foundQuiz.sumgrades) > 0) {
-            // Nếu Moodle chưa trả về grade (ví dụ bài tự luận chưa chấm xong hết), tự scale theo sumgrades
-            if (maxScore > 0) {
-              finalScore = (finalScore / Number(foundQuiz.sumgrades)) * maxScore;
-            }
+          if (
+            (reviewResponse.grade === null ||
+              reviewResponse.grade === undefined) &&
+            Number(foundQuiz.sumgrades) > 0 &&
+            maxScore > 0
+          ) {
+            finalScore = (finalScore / Number(foundQuiz.sumgrades)) * maxScore;
           }
         }
-      } catch (err) {
-        // Fallback
+      } catch {
+        // Giữ điểm từ review nếu không lấy được thông tin quiz
       }
 
       setScore(Number.isFinite(finalScore) ? finalScore : null);
-      setGradeMax(Number.isFinite(maxScore) ? maxScore : null);
+      setGradeMax(
+        maxScore !== null && Number.isFinite(maxScore) ? maxScore : null,
+      );
 
+      // Lấy feedback
       if (Number.isFinite(finalScore)) {
         try {
-          const feedbackRes = await getQuizFeedbackForGrade(quizid, finalScore);
-          if (feedbackRes && feedbackRes.feedbacktext) {
-            setFeedback(feedbackRes.feedbacktext.replace(/(<([^>]+)>)/gi, ""));
+          const feedbackResponse = await getQuizFeedbackForGrade(
+            quizid,
+            finalScore,
+          );
+
+          if (feedbackResponse?.feedbacktext) {
+            setFeedback(
+              feedbackResponse.feedbacktext.replace(/(<([^>]+)>)/gi, ""),
+            );
           }
-        } catch (err) {
-          console.log("Error getting feedback", err);
+        } catch {
+          setFeedback("");
         }
       }
 
+      // Lấy điểm cao nhất
       try {
-        const bestGradeRes = await getUserBestGrade(quizid, userid);
-        if (bestGradeRes && bestGradeRes.hasgrade) {
-          setBestGrade(Number(bestGradeRes.grade));
+        const bestGradeResponse = await getUserBestGrade(quizid, userid);
+
+        if (bestGradeResponse?.hasgrade) {
+          setBestGrade(Number(bestGradeResponse.grade));
         }
-      } catch (err) {
-        console.log("Error getting best grade", err);
+      } catch {
+        setBestGrade(null);
       }
     } catch (error: any) {
       setError(error?.message || "Không thể tải kết quả bài thi.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [attemptid, courseid, quizid]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const runLoad = async () => {
+      if (!isMounted) {
+        return;
+      }
+
+      await loadResult();
+    };
+
+    void runLoad();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [loadResult]);
 
   const getScoreText = () => {
     if (score === null) {
@@ -199,8 +238,7 @@ export default function ResultScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Đang tải kết quả...</Text>
+        <Loading message="Đang tải kết quả bài thi..." />
       </View>
     );
   }
@@ -213,99 +251,127 @@ export default function ResultScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.successIcon}>
-          <Ionicons name="checkmark" size={42} color={COLORS.white} />
+        {/* Result header */}
+        <View style={styles.resultHeader}>
+          <View style={styles.successIcon}>
+            <Ionicons name="checkmark" size={42} color={COLORS.white} />
+          </View>
+
+          <Text style={styles.title}>Đã hoàn thành bài thi</Text>
+
+          <Text style={styles.quizName} numberOfLines={2}>
+            {quizName}
+          </Text>
         </View>
 
-        <Text style={styles.title}>Đã hoàn thành bài thi</Text>
-
-        <Text style={styles.quizName}>{quizName}</Text>
-
-        <View style={styles.scoreCard}>
+        {/* Score */}
+        <AppCard style={styles.scoreCard}>
           <Text style={styles.scoreLabel}>Điểm của bạn</Text>
 
           <Text style={styles.score}>{getScoreText()}</Text>
 
           <Text style={styles.scoreMax}>{getGradeText()}</Text>
 
-          <View style={styles.progressBackground}>
-            <View style={[styles.progress, { width: `${getPercent()}%` }]} />
+          <View style={styles.progressWrapper}>
+            <AppProgressBar progress={getPercent()} height={9} />
           </View>
 
           <Text style={styles.percent}>{getPercent().toFixed(0)}%</Text>
 
           {bestGrade !== null && (
             <View style={styles.bestGradeContainer}>
-              <Text style={styles.bestGradeText}>Điểm cao nhất: {Number.isInteger(bestGrade) ? bestGrade : bestGrade.toFixed(2)}</Text>
+              <Ionicons
+                name="trophy-outline"
+                size={18}
+                color={COLORS.primary}
+              />
+
+              <Text style={styles.bestGradeText}>
+                Điểm cao nhất:{" "}
+                {Number.isInteger(bestGrade) ? bestGrade : bestGrade.toFixed(2)}
+              </Text>
             </View>
           )}
 
           {feedback ? (
             <View style={styles.feedbackContainer}>
+              <View style={styles.feedbackHeader}>
+                <Ionicons
+                  name="chatbubble-ellipses-outline"
+                  size={18}
+                  color={COLORS.primary}
+                />
+
+                <Text style={styles.feedbackTitle}>Nhận xét</Text>
+              </View>
+
               <Text style={styles.feedbackText}>{feedback}</Text>
             </View>
           ) : null}
-        </View>
+        </AppCard>
 
+        {/* Correct answers */}
         {totalQuestions > 0 && (
-          <View style={styles.infoCard}>
+          <AppCard style={styles.infoCard}>
             <View style={styles.infoRow}>
               <View style={styles.infoIcon}>
-                <Ionicons name="checkmark-circle" size={24} color={COLORS.primary} />
+                <Ionicons
+                  name="checkmark-circle"
+                  size={24}
+                  color={COLORS.primary}
+                />
               </View>
+
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>Số câu đúng</Text>
+
                 <Text style={styles.infoValue}>
                   {correctAnswers} / {totalQuestions} câu
                 </Text>
               </View>
             </View>
-          </View>
+          </AppCard>
         )}
 
-        {error ? (
-          <View style={styles.errorCard}>
-            <Ionicons
-              name="alert-circle-outline"
-              size={22}
-              color={COLORS.error}
-            />
-
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        ) : (
-          <View style={styles.successCard}>
-            <Ionicons
-              name="checkmark-circle-outline"
-              size={22}
-              color={COLORS.success}
-            />
-
-            <Text style={styles.successText}>
-              Kết quả đã được ghi nhận trên hệ thống.
-            </Text>
-          </View>
-        )}
-
-        <TouchableOpacity
-          style={styles.reviewButton}
-          activeOpacity={0.85}
-          onPress={handleReview}
+        {/* Result status */}
+        <AppCard
+          style={[
+            styles.statusCard,
+            error ? styles.errorCard : styles.successCard,
+          ]}
         >
-          <Ionicons name="eye-outline" size={20} color={COLORS.white} />
+          <Ionicons
+            name={error ? "alert-circle-outline" : "checkmark-circle-outline"}
+            size={22}
+            color={error ? COLORS.error : COLORS.success}
+          />
 
-          <Text style={styles.reviewButtonText}>Xem lại bài làm</Text>
-        </TouchableOpacity>
+          <Text
+            style={[
+              styles.statusText,
+              {
+                color: error ? COLORS.error : COLORS.success,
+              },
+            ]}
+          >
+            {error ? error : "Kết quả đã được ghi nhận trên hệ thống."}
+          </Text>
+        </AppCard>
 
-        <TouchableOpacity
-          style={styles.homeButton}
-          activeOpacity={0.85}
-          onPress={handleHome}
-        >
-          <Ionicons name="home-outline" size={20} color={COLORS.primary} />
+        {/* Actions */}
+        <View style={styles.actions}>
+          <AppButton
+            title="Xem lại bài làm"
+            onPress={handleReview}
+            style={styles.reviewButton}
+          />
 
-          <Text style={styles.homeButtonText}>Về trang chủ</Text>
-        </TouchableOpacity>
+          <AppButton
+            title="Về trang chủ"
+            onPress={handleHome}
+            style={styles.homeButton}
+          />
+        </View>
       </ScrollView>
     </View>
   );
@@ -317,12 +383,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.backgroundSoft,
   },
 
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 28,
-    paddingBottom: 32,
-  },
-
   loadingContainer: {
     flex: 1,
     alignItems: "center",
@@ -330,32 +390,36 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.backgroundSoft,
   },
 
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: COLORS.textSecondary,
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 32,
+  },
+
+  resultHeader: {
+    alignItems: "center",
+    marginBottom: 18,
   },
 
   successIcon: {
-    width: 78,
-    height: 78,
-    borderRadius: 39,
-    alignSelf: "center",
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: COLORS.primary,
-    marginBottom: 16,
+    marginBottom: 14,
   },
 
   title: {
     textAlign: "center",
-    fontSize: 23,
+    fontSize: 22,
     fontWeight: "800",
     color: COLORS.text,
   },
 
   quizName: {
-    marginTop: 7,
+    marginTop: 6,
     textAlign: "center",
     fontSize: 14,
     lineHeight: 20,
@@ -363,13 +427,9 @@ const styles = StyleSheet.create({
   },
 
   scoreCard: {
-    marginTop: 24,
-    padding: 24,
-    borderRadius: 24,
     alignItems: "center",
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    padding: 22,
+    marginBottom: 14,
   },
 
   scoreLabel: {
@@ -379,49 +439,83 @@ const styles = StyleSheet.create({
   },
 
   score: {
-    marginTop: 6,
-    fontSize: 52,
-    lineHeight: 60,
+    marginTop: 4,
+    fontSize: 50,
+    lineHeight: 58,
     fontWeight: "800",
     color: COLORS.primary,
   },
 
   scoreMax: {
     marginTop: 2,
-    fontSize: 15,
+    fontSize: 14,
     color: COLORS.textSecondary,
   },
 
-  progressBackground: {
+  progressWrapper: {
     width: "100%",
-    height: 9,
-    marginTop: 20,
-    borderRadius: 5,
-    overflow: "hidden",
-    backgroundColor: COLORS.backgroundSoft,
-  },
-
-  progress: {
-    height: "100%",
-    borderRadius: 5,
-    backgroundColor: COLORS.primary,
+    marginTop: 18,
   },
 
   percent: {
-    marginTop: 9,
+    marginTop: 8,
     fontSize: 13,
     fontWeight: "700",
     color: COLORS.primary,
   },
 
-  infoCard: {
+  bestGradeContainer: {
+    width: "100%",
     marginTop: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    backgroundColor: COLORS.backgroundSoft,
+  },
+
+  bestGradeText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: COLORS.primary,
+  },
+
+  feedbackContainer: {
+    width: "100%",
+    marginTop: 14,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: "#F0F8FF",
+    borderWidth: 1,
+    borderColor: "#B0E0E6",
+  },
+
+  feedbackHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    marginBottom: 7,
+  },
+
+  feedbackTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: COLORS.primary,
+  },
+
+  feedbackText: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: COLORS.text,
+  },
+
+  infoCard: {
+    marginBottom: 14,
     paddingHorizontal: 18,
     paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border,
   },
 
   infoRow: {
@@ -456,106 +550,39 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
 
-  divider: {
-    height: 1,
-    backgroundColor: COLORS.border,
+  statusCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 15,
+    marginBottom: 18,
+    gap: 10,
   },
 
   successCard: {
-    marginTop: 16,
-    padding: 15,
-    borderRadius: 16,
-    flexDirection: "row",
-    alignItems: "center",
     backgroundColor: "#EAF7EF",
-  },
-
-  successText: {
-    flex: 1,
-    marginLeft: 10,
-    fontSize: 13,
-    lineHeight: 19,
-    color: COLORS.success,
+    borderColor: "#C3E6CC",
   },
 
   errorCard: {
-    marginTop: 16,
-    padding: 15,
-    borderRadius: 16,
-    flexDirection: "row",
-    alignItems: "center",
     backgroundColor: "#FFF1F1",
+    borderColor: "#F3C4C4",
   },
 
-  errorText: {
+  statusText: {
     flex: 1,
-    marginLeft: 10,
     fontSize: 13,
     lineHeight: 19,
-    color: COLORS.error,
+  },
+
+  actions: {
+    gap: 12,
   },
 
   reviewButton: {
-    height: 52,
-    marginTop: 24,
-    borderRadius: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: COLORS.primary,
-  },
-
-  reviewButtonText: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: COLORS.white,
+    minHeight: 52,
   },
 
   homeButton: {
-    height: 52,
-    marginTop: 12,
-    borderRadius: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-  },
-
-  homeButtonText: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: COLORS.primary,
-  },
-  bestGradeContainer: {
-    marginTop: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: COLORS.backgroundSoft,
-    borderRadius: 12,
-  },
-  bestGradeText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: COLORS.primary,
-  },
-  feedbackContainer: {
-    marginTop: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: "#F0F8FF",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#B0E0E6",
-    width: "100%",
-  },
-  feedbackText: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: COLORS.text,
-    textAlign: "center",
+    minHeight: 52,
   },
 });

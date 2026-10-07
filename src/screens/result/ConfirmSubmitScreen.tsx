@@ -5,8 +5,8 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
 import {
-  Animated,
   Alert,
+  Animated,
   DeviceEventEmitter,
   RefreshControl,
   ScrollView,
@@ -17,10 +17,16 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import AppCard from "../../components/common/AppCard";
+import AppProgressBar from "../../components/common/AppProgressBar";
 import COLORS from "../../constants/colors";
-import { AppStackParamList } from "../../types/navigation";
-import { OfflineExam, readOfflineExam, subscribeExamSync } from "../../services/examStorageService";
+import {
+  OfflineExam,
+  readOfflineExam,
+  subscribeExamSync,
+} from "../../services/examStorageService";
 import { syncExam } from "../../services/syncService";
+import { AppStackParamList } from "../../types/navigation";
 
 type QuestionStatus = "answered" | "unanswered";
 
@@ -38,6 +44,7 @@ type RouteProp = {
   key: string;
   name: "ConfirmSubmit";
   params: {
+    courseid: number;
     quizid: number;
     quizName: string;
     attemptid: number;
@@ -51,37 +58,90 @@ export default function ConfirmSubmitScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteProp>();
 
-  const { quizid, quizName, attemptid, questions = [] } = route.params;
+  const {
+    courseid,
+    quizid,
+    quizName,
+    attemptid,
+    questions = [],
+  } = route.params;
+
+  // ---------------------------------------------------------------------------
+  // State
+  // ---------------------------------------------------------------------------
+
   const [saveStatus, setSaveStatus] = useState<SaveStatus | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  // ---------------------------------------------------------------------------
+  // Refs
+  // ---------------------------------------------------------------------------
+
   const refreshLock = useRef(false);
   const submitLock = useRef(false);
   const mounted = useRef(true);
 
+  // ---------------------------------------------------------------------------
+  // Animation
+  // ---------------------------------------------------------------------------
+
+  const [fadeAnim] = useState(() => new Animated.Value(0));
+  const [slideAnim] = useState(() => new Animated.Value(24));
+
+  // ---------------------------------------------------------------------------
+  // Sync status
+  // ---------------------------------------------------------------------------
+
   const applySyncStatus = (exam: OfflineExam) => {
     if (!mounted.current) return;
-    setSaveStatus(exam.status === "Synced" ? "saved" : "not_saved");
+
+    setSaveStatus(
+      exam.status === "Synced"
+        ? "saved"
+        : exam.status === "Pending"
+          ? "saving"
+          : "not_saved",
+    );
   };
 
   useEffect(() => {
     mounted.current = true;
+
     let active = true;
     let unsubscribe = () => {};
+
     void (async () => {
       try {
         const userid = Number(await AsyncStorage.getItem("userid"));
+
         if (!active || !userid) return;
+
         unsubscribe = subscribeExamSync((exam) => {
-          if (exam.userid === userid && exam.quizid === quizid && exam.attemptid === attemptid) {
+          if (
+            exam.userid === userid &&
+            exam.quizid === quizid &&
+            exam.attemptid === attemptid
+          ) {
             applySyncStatus(exam);
           }
         });
-        const exam = await readOfflineExam({ userid, quizid, attemptid });
-        if (active && exam) applySyncStatus(exam);
+
+        const exam = await readOfflineExam({
+          userid,
+          quizid,
+          attemptid,
+        });
+
+        if (active && exam) {
+          applySyncStatus(exam);
+        }
       } catch {
-        if (active) setSaveStatus("not_saved");
+        if (active) {
+          setSaveStatus("not_saved");
+        }
       }
     })();
+
     return () => {
       active = false;
       mounted.current = false;
@@ -89,39 +149,79 @@ export default function ConfirmSubmitScreen() {
     };
   }, [quizid, attemptid]);
 
+  // ---------------------------------------------------------------------------
+  // Refresh / retry sync
+  // ---------------------------------------------------------------------------
+
   const handleRefresh = async () => {
-    if (refreshLock.current || submitLock.current) return;
+    if (refreshLock.current || submitLock.current) {
+      return;
+    }
+
     refreshLock.current = true;
     setRefreshing(true);
+
     try {
       const userid = Number(await AsyncStorage.getItem("userid"));
-      if (!userid) throw new Error("Không tìm thấy thông tin người dùng.");
-      const context = { userid, quizid, attemptid };
+
+      if (!userid) {
+        throw new Error("Không tìm thấy thông tin người dùng.");
+      }
+
+      const context = {
+        userid,
+        quizid,
+        attemptid,
+      };
+
       await syncExam(context, true);
+
       const exam = await readOfflineExam(context);
-      if (!exam) throw new Error("Không tìm thấy dữ liệu bài làm.");
+
+      if (!exam) {
+        throw new Error("Không tìm thấy dữ liệu bài làm.");
+      }
+
       applySyncStatus(exam);
+
       if (exam.status !== "Synced") {
-        throw new Error(exam.error || "Chưa đồng bộ được bài làm. Vui lòng thử lại.");
+        throw new Error(
+          exam.error || "Chưa đồng bộ được bài làm. Vui lòng thử lại.",
+        );
       }
     } catch (error) {
       if (mounted.current) {
         setSaveStatus("not_saved");
-        Alert.alert("Không thể tải lại", error instanceof Error ? error.message : "Vui lòng thử lại.");
+
+        Alert.alert(
+          "Không thể tải lại",
+          error instanceof Error ? error.message : "Vui lòng thử lại.",
+        );
       }
     } finally {
       refreshLock.current = false;
-      if (mounted.current) setRefreshing(false);
+
+      if (mounted.current) {
+        setRefreshing(false);
+      }
     }
   };
 
-  const questionSaveStatus = (question: QuestionSummary): SaveStatus =>
-    refreshing ? "saving" : saveStatus ?? question.saveStatus ?? "not_saved";
+  // ---------------------------------------------------------------------------
+  // Question save status
+  // ---------------------------------------------------------------------------
 
-  // Animation refs
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(24)).current;
-  const progressAnim = useRef(new Animated.Value(0)).current;
+  const questionSaveStatus = (question: QuestionSummary): SaveStatus => {
+    if (refreshing) {
+      return "saving";
+    }
+
+    return saveStatus ?? question.saveStatus ?? "not_saved";
+  };
+
+  // ---------------------------------------------------------------------------
+  // Statistics
+  // ---------------------------------------------------------------------------
 
   const answeredCount = questions.filter(
     (question) => question.status === "answered",
@@ -147,7 +247,12 @@ export default function ConfirmSubmitScreen() {
     questions.length > 0 ? answeredCount / questions.length : 0;
 
   const allSaved = savingCount === 0 && notSavedCount === 0;
+
   const canSubmit = questions.length > 0 && allSaved && !refreshing;
+
+  // ---------------------------------------------------------------------------
+  // Animation
+  // ---------------------------------------------------------------------------
 
   useEffect(() => {
     Animated.parallel([
@@ -156,6 +261,7 @@ export default function ConfirmSubmitScreen() {
         duration: 350,
         useNativeDriver: true,
       }),
+
       Animated.spring(slideAnim, {
         toValue: 0,
         tension: 65,
@@ -163,106 +269,154 @@ export default function ConfirmSubmitScreen() {
         useNativeDriver: true,
       }),
     ]).start();
-
   }, [fadeAnim, slideAnim]);
 
-  useEffect(() => {
-    Animated.timing(progressAnim, {
-      toValue: progressPercent,
-      duration: 900,
-      delay: 250,
-      useNativeDriver: false,
-    }).start();
-  }, [progressAnim, progressPercent]);
+  // ---------------------------------------------------------------------------
+  // Navigation
+  // ---------------------------------------------------------------------------
 
   const handleBackToExam = () => {
     navigation.goBack();
   };
 
   const handleReviewQuestion = (slot: number) => {
-    if (submitLock.current) return;
-    navigation.popTo("Exam", {
-      quizid,
-      quizName,
-      attemptid,
-      targetQuestionSlot: slot,
-    }, { merge: true });
+    if (submitLock.current) {
+      return;
+    }
+
+    navigation.popTo(
+      "Exam",
+      {
+        courseid,
+        quizid,
+        quizName,
+        attemptid,
+        targetQuestionSlot: slot,
+      },
+      {
+        merge: true,
+      },
+    );
   };
 
   const handleConfirmSubmit = () => {
-    if (!canSubmit || submitLock.current) return;
+    if (!canSubmit || submitLock.current) {
+      return;
+    }
+
     submitLock.current = true;
+
     DeviceEventEmitter.emit("submitExamConfirmed", attemptid);
+
     navigation.goBack();
   };
+
+  // ---------------------------------------------------------------------------
+  // UI helpers
+  // ---------------------------------------------------------------------------
 
   const getSaveStatusColor = (status?: SaveStatus) => {
     switch (status) {
       case "saved":
         return COLORS.success;
+
       case "saving":
         return COLORS.warning;
+
       default:
         return COLORS.error;
     }
   };
 
   const getSaveStatusBadge = () => {
-    if (notSavedCount > 0)
-      return { label: "Chưa lưu", color: COLORS.error, bg: "#FCEDED" };
-    if (savingCount > 0)
-      return { label: "Đang lưu", color: COLORS.warning, bg: "#FFF6E4" };
-    return { label: "Đã lưu", color: COLORS.success, bg: "#EAF6EF" };
+    if (notSavedCount > 0) {
+      return {
+        label: "Chưa lưu",
+        color: COLORS.error,
+        bg: "#FCEDED",
+      };
+    }
+
+    if (savingCount > 0) {
+      return {
+        label: "Đang lưu",
+        color: COLORS.warning,
+        bg: "#FFF6E4",
+      };
+    }
+
+    return {
+      label: "Đã lưu",
+      color: COLORS.success,
+      bg: "#EAF6EF",
+    };
   };
 
   const statusBadge = getSaveStatusBadge();
 
-  const progressWidth = progressAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0%", "100%"],
-  });
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
 
   return (
     <View style={styles.container}>
-      {/* ── Gradient Header ── */}
+      {/* ================================================================
+          HEADER
+      ================================================================= */}
+
       <LinearGradient
-        colors={["#006E27", "#005220", "#003d18"]}
+        colors={[COLORS.primary, "#005220", "#003D18"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.headerGradient}
       >
         <SafeAreaView edges={["top"]} style={styles.safeHeader}>
-          {/* Top row */}
           <View style={styles.headerRow}>
+            {/* Back */}
+
             <TouchableOpacity
               style={styles.backBtn}
               onPress={handleBackToExam}
               activeOpacity={0.7}
             >
-              <Ionicons name="arrow-back" size={20} color="#fff" />
+              <Ionicons name="arrow-back" size={20} color={COLORS.white} />
             </TouchableOpacity>
 
+            {/* Title */}
+
             <View style={styles.headerCenter}>
-              <Text style={styles.headerLabel}>Xác nhận nộp bài</Text>
+              <Text style={styles.headerLabel}>XÁC NHẬN NỘP BÀI</Text>
+
               <Text style={styles.headerQuizName} numberOfLines={1}>
                 {quizName}
               </Text>
             </View>
 
-            {/* Save status pill */}
+            {/* Sync status */}
+
             <View
-              style={[styles.statusPill, { backgroundColor: statusBadge.bg }]}
+              style={[
+                styles.statusPill,
+                {
+                  backgroundColor: statusBadge.bg,
+                },
+              ]}
             >
               <View
                 style={[
                   styles.statusDot,
-                  { backgroundColor: statusBadge.color },
+                  {
+                    backgroundColor: statusBadge.color,
+                  },
                 ]}
               />
+
               <Text
                 style={[
                   styles.statusPillText,
-                  { color: statusBadge.color },
+                  {
+                    color: statusBadge.color,
+                  },
                 ]}
               >
                 {statusBadge.label}
@@ -270,20 +424,17 @@ export default function ConfirmSubmitScreen() {
             </View>
           </View>
 
-          {/* Progress bar */}
+          {/* Progress */}
+
           <View style={styles.progressSection}>
-            <View style={styles.progressTrack}>
-              <Animated.View
-                style={[
-                  styles.progressFill,
-                  {
-                    width: progressWidth,
-                    backgroundColor:
-                      progressPercent === 1 ? "#7DBA18" : "#FFD740",
-                  },
-                ]}
-              />
-            </View>
+            <AppProgressBar
+              progress={progressPercent}
+              height={5}
+              color={progressPercent === 1 ? "#7DBA18" : "#FFD740"}
+              trackColor="rgba(255,255,255,0.22)"
+              showPercent={false}
+            />
+
             <Text style={styles.progressLabel}>
               {answeredCount}/{questions.length} câu đã trả lời
             </Text>
@@ -291,10 +442,19 @@ export default function ConfirmSubmitScreen() {
         </SafeAreaView>
       </LinearGradient>
 
+      {/* ================================================================
+          CONTENT
+      ================================================================= */}
+
       <ScrollView
         alwaysBounceVertical
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[COLORS.primary]} tintColor={COLORS.primary} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[COLORS.primary]}
+            tintColor={COLORS.primary}
+          />
         }
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
@@ -302,82 +462,115 @@ export default function ConfirmSubmitScreen() {
         <Animated.View
           style={{
             opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
+            transform: [
+              {
+                translateY: slideAnim,
+              },
+            ],
           }}
         >
-          {/* ── Stat Cards ── */}
+          {/* ============================================================
+              STATISTICS
+          ============================================================= */}
+
           <View style={styles.statsRow}>
+            {/* Đã làm */}
+
             <View style={styles.statCard}>
-              <View style={[styles.statIcon, { backgroundColor: "#EAF6EF" }]}>
+              <View
+                style={[
+                  styles.statIcon,
+                  {
+                    backgroundColor: "#EAF6EF",
+                  },
+                ]}
+              >
                 <Ionicons
                   name="checkmark-circle"
                   size={22}
                   color={COLORS.success}
                 />
               </View>
+
               <Text
                 style={[
                   styles.statValue,
                   {
                     color:
-                      answeredCount > 0
-                        ? COLORS.success
-                        : COLORS.textSecondary,
+                      answeredCount > 0 ? COLORS.success : COLORS.textSecondary,
                   },
                 ]}
               >
                 {answeredCount}
               </Text>
+
               <Text style={styles.statLabel}>Đã làm</Text>
             </View>
 
+            {/* Chưa làm */}
+
             <View style={styles.statCard}>
-              <View style={[styles.statIcon, { backgroundColor: "#FCEDED" }]}>
-                <Ionicons
-                  name="help-circle"
-                  size={22}
-                  color={COLORS.error}
-                />
+              <View
+                style={[
+                  styles.statIcon,
+                  {
+                    backgroundColor: "#FCEDED",
+                  },
+                ]}
+              >
+                <Ionicons name="help-circle" size={22} color={COLORS.error} />
               </View>
+
               <Text
                 style={[
                   styles.statValue,
                   {
                     color:
-                      unansweredCount > 0
-                        ? COLORS.error
-                        : COLORS.textSecondary,
+                      unansweredCount > 0 ? COLORS.error : COLORS.textSecondary,
                   },
                 ]}
               >
                 {unansweredCount}
               </Text>
+
               <Text style={styles.statLabel}>Chưa làm</Text>
             </View>
 
+            {/* Đánh dấu */}
+
             <View style={styles.statCard}>
-              <View style={[styles.statIcon, { backgroundColor: "#FFF6E4" }]}>
+              <View
+                style={[
+                  styles.statIcon,
+                  {
+                    backgroundColor: "#FFF6E4",
+                  },
+                ]}
+              >
                 <Ionicons name="flag" size={22} color={COLORS.warning} />
               </View>
+
               <Text
                 style={[
                   styles.statValue,
                   {
                     color:
-                      flaggedCount > 0
-                        ? COLORS.warning
-                        : COLORS.textSecondary,
+                      flaggedCount > 0 ? COLORS.warning : COLORS.textSecondary,
                   },
                 ]}
               >
                 {flaggedCount}
               </Text>
+
               <Text style={styles.statLabel}>Đánh dấu</Text>
             </View>
           </View>
 
-          {/* ── Save Status Card ── */}
-          <View style={styles.card}>
+          {/* ============================================================
+              SAVE STATUS
+          ============================================================= */}
+
+          <AppCard style={styles.card}>
             <View style={styles.cardHeader}>
               <View style={styles.cardHeaderLeft}>
                 <Ionicons
@@ -385,6 +578,7 @@ export default function ConfirmSubmitScreen() {
                   size={20}
                   color={COLORS.primary}
                 />
+
                 <Text style={styles.cardTitle}>Trạng thái lưu bài</Text>
               </View>
 
@@ -401,6 +595,7 @@ export default function ConfirmSubmitScreen() {
                   size={11}
                   color={allSaved ? COLORS.success : COLORS.error}
                 />
+
                 <Text
                   style={[
                     styles.syncBadgeText,
@@ -421,11 +616,18 @@ export default function ConfirmSubmitScreen() {
                   size={18}
                   color={COLORS.success}
                 />
+
                 <Text
-                  style={[styles.saveStatValue, { color: COLORS.success }]}
+                  style={[
+                    styles.saveStatValue,
+                    {
+                      color: COLORS.success,
+                    },
+                  ]}
                 >
                   {savedCount}
                 </Text>
+
                 <Text style={styles.saveStatLabel}>Đã lưu</Text>
               </View>
 
@@ -437,11 +639,18 @@ export default function ConfirmSubmitScreen() {
                   size={18}
                   color={COLORS.warning}
                 />
+
                 <Text
-                  style={[styles.saveStatValue, { color: COLORS.warning }]}
+                  style={[
+                    styles.saveStatValue,
+                    {
+                      color: COLORS.warning,
+                    },
+                  ]}
                 >
                   {savingCount}
                 </Text>
+
                 <Text style={styles.saveStatLabel}>Đang lưu</Text>
               </View>
 
@@ -453,41 +662,63 @@ export default function ConfirmSubmitScreen() {
                   size={18}
                   color={COLORS.error}
                 />
+
                 <Text
-                  style={[styles.saveStatValue, { color: COLORS.error }]}
+                  style={[
+                    styles.saveStatValue,
+                    {
+                      color: COLORS.error,
+                    },
+                  ]}
                 >
                   {notSavedCount}
                 </Text>
+
                 <Text style={styles.saveStatLabel}>Chưa lưu</Text>
               </View>
             </View>
-          </View>
+          </AppCard>
 
-          {/* ── Warning / Success Banner ── */}
+          {/* ============================================================
+              WARNING / SUCCESS
+          ============================================================= */}
+
           {unansweredCount > 0 || !allSaved ? (
             <View style={styles.warningBanner}>
               <View style={styles.warningIconWrap}>
-                <Ionicons
-                  name="warning"
-                  size={18}
-                  color={COLORS.warning}
-                />
+                <Ionicons name="warning" size={18} color={COLORS.warning} />
               </View>
+
               <View style={styles.warningContent}>
                 <Text style={styles.warningTitle}>Lưu ý trước khi nộp</Text>
+
                 {unansweredCount > 0 && (
                   <Text style={styles.warningLine}>
                     • Còn {unansweredCount} câu chưa được trả lời
                   </Text>
                 )}
+
                 {notSavedCount > 0 && (
-                  <Text style={[styles.warningLine, { color: COLORS.error }]}>
+                  <Text
+                    style={[
+                      styles.warningLine,
+                      {
+                        color: COLORS.error,
+                      },
+                    ]}
+                  >
                     • {notSavedCount} câu chưa được lưu lên máy chủ
                   </Text>
                 )}
+
                 {savingCount > 0 && (
                   <Text
-                    style={[styles.warningLine, { color: COLORS.warning }]}
+                    style={[
+                      styles.warningLine,
+                      {
+                        color: COLORS.warning,
+                      },
+                    ]}
                   >
                     • {savingCount} câu đang trong quá trình lưu
                   </Text>
@@ -501,14 +732,18 @@ export default function ConfirmSubmitScreen() {
                 size={22}
                 color={COLORS.success}
               />
+
               <Text style={styles.successText}>
                 Tất cả câu hỏi đã trả lời và lưu thành công!
               </Text>
             </View>
           )}
 
-          {/* ── Question Grid ── */}
-          <View style={styles.card}>
+          {/* ============================================================
+              QUESTION LIST
+          ============================================================= */}
+
+          <AppCard style={styles.card}>
             <View style={styles.cardHeader}>
               <View style={styles.cardHeaderLeft}>
                 <Ionicons
@@ -516,6 +751,7 @@ export default function ConfirmSubmitScreen() {
                   size={20}
                   color={COLORS.primary}
                 />
+
                 <Text style={styles.cardTitle}>Danh sách câu hỏi</Text>
               </View>
             </View>
@@ -523,7 +759,8 @@ export default function ConfirmSubmitScreen() {
             <View style={styles.questionGrid}>
               {questions.map((question) => {
                 const answered = question.status === "answered";
-                const flagged = question.flagged;
+
+                const flagged = Boolean(question.flagged);
 
                 return (
                   <TouchableOpacity
@@ -537,22 +774,27 @@ export default function ConfirmSubmitScreen() {
                     <View
                       style={[
                         styles.questionBubble,
+
                         answered && !flagged && styles.bubbleAnswered,
+
                         flagged && styles.bubbleFlagged,
+
                         !answered && !flagged && styles.bubbleUnanswered,
                       ]}
                     >
                       <Text
                         style={[
                           styles.bubbleText,
-                          (answered && !flagged) && styles.bubbleTextLight,
+
+                          answered && !flagged && styles.bubbleTextLight,
                         ]}
                       >
                         {question.number}
                       </Text>
                     </View>
 
-                    {/* Save status indicator dot */}
+                    {/* Save status */}
+
                     <View
                       style={[
                         styles.saveDot,
@@ -569,11 +811,21 @@ export default function ConfirmSubmitScreen() {
             </View>
 
             {/* Legend */}
+
             <View style={styles.legendRow}>
               <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: COLORS.primary }]} />
+                <View
+                  style={[
+                    styles.legendDot,
+                    {
+                      backgroundColor: COLORS.primary,
+                    },
+                  ]}
+                />
+
                 <Text style={styles.legendText}>Đã làm</Text>
               </View>
+
               <View style={styles.legendItem}>
                 <View
                   style={[
@@ -585,22 +837,34 @@ export default function ConfirmSubmitScreen() {
                     },
                   ]}
                 />
+
                 <Text style={styles.legendText}>Chưa làm</Text>
               </View>
+
               <View style={styles.legendItem}>
                 <View
                   style={[
                     styles.legendDot,
-                    { backgroundColor: "#FFE9A0", borderWidth: 1.5, borderColor: COLORS.warning },
+                    {
+                      backgroundColor: "#FFE9A0",
+                      borderWidth: 1.5,
+                      borderColor: COLORS.warning,
+                    },
                   ]}
                 />
+
                 <Text style={styles.legendText}>Đánh dấu</Text>
               </View>
             </View>
-          </View>
+          </AppCard>
 
-          {/* ── Bottom Actions ── */}
+          {/* ============================================================
+              ACTIONS
+          ============================================================= */}
+
           <View style={styles.actionsRow}>
+            {/* Làm tiếp */}
+
             <TouchableOpacity
               style={styles.backButton}
               onPress={handleBackToExam}
@@ -611,8 +875,11 @@ export default function ConfirmSubmitScreen() {
                 size={18}
                 color={COLORS.primaryDark}
               />
+
               <Text style={styles.backButtonText}>Làm tiếp</Text>
             </TouchableOpacity>
+
+            {/* Submit */}
 
             <TouchableOpacity
               style={[
@@ -626,14 +893,19 @@ export default function ConfirmSubmitScreen() {
               <LinearGradient
                 colors={
                   canSubmit
-                    ? ["#006E27", "#00561f"]
+                    ? [COLORS.primary, "#00561F"]
                     : ["#9E9E9E", "#757575"]
                 }
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.submitGradient}
               >
-                <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                <Ionicons
+                  name="checkmark-circle"
+                  size={20}
+                  color={COLORS.white}
+                />
+
                 <Text style={styles.submitButtonText}>
                   {canSubmit ? "Xác nhận nộp bài" : "Đang lưu bài..."}
                 </Text>
@@ -650,7 +922,9 @@ export default function ConfirmSubmitScreen() {
   );
 }
 
-// ─────────────────────────────── Styles ──────────────────────────────────────
+// ============================================================================
+// Styles
+// ============================================================================
 
 const styles = StyleSheet.create({
   container: {
@@ -658,7 +932,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.backgroundSoft,
   },
 
+  // --------------------------------------------------------------------------
   // Header
+  // --------------------------------------------------------------------------
+
   headerGradient: {
     paddingBottom: 18,
   },
@@ -699,7 +976,7 @@ const styles = StyleSheet.create({
   headerQuizName: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#fff",
+    color: COLORS.white,
     marginTop: 2,
   },
 
@@ -723,21 +1000,12 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
+  // --------------------------------------------------------------------------
   // Progress
+  // --------------------------------------------------------------------------
+
   progressSection: {
     gap: 7,
-  },
-
-  progressTrack: {
-    height: 5,
-    backgroundColor: "rgba(255,255,255,0.22)",
-    borderRadius: 3,
-    overflow: "hidden",
-  },
-
-  progressFill: {
-    height: "100%",
-    borderRadius: 3,
   },
 
   progressLabel: {
@@ -746,13 +1014,19 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
+  // --------------------------------------------------------------------------
   // Content
+  // --------------------------------------------------------------------------
+
   content: {
     padding: 16,
     paddingBottom: 32,
   },
 
-  // Stat cards
+  // --------------------------------------------------------------------------
+  // Statistics
+  // --------------------------------------------------------------------------
+
   statsRow: {
     flexDirection: "row",
     gap: 10,
@@ -767,8 +1041,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     alignItems: "center",
     gap: 5,
+
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
     shadowOpacity: 0.06,
     shadowRadius: 6,
     elevation: 3,
@@ -793,14 +1071,20 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
 
+  // --------------------------------------------------------------------------
   // Card
+  // --------------------------------------------------------------------------
+
   card: {
-    backgroundColor: COLORS.white,
+    borderWidth: 0,
     borderRadius: 20,
-    padding: 18,
     marginBottom: 14,
+
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 3,
@@ -825,6 +1109,10 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
 
+  // --------------------------------------------------------------------------
+  // Sync status
+  // --------------------------------------------------------------------------
+
   syncBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -839,7 +1127,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  // Save stats
   saveStatsRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -867,7 +1154,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.border,
   },
 
-  // Warning banner
+  // --------------------------------------------------------------------------
+  // Warning
+  // --------------------------------------------------------------------------
+
   warningBanner: {
     flexDirection: "row",
     backgroundColor: "#FFF9EC",
@@ -906,6 +1196,10 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 
+  // --------------------------------------------------------------------------
+  // Success
+  // --------------------------------------------------------------------------
+
   successBanner: {
     flexDirection: "row",
     alignItems: "center",
@@ -926,7 +1220,10 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 
+  // --------------------------------------------------------------------------
   // Question grid
+  // --------------------------------------------------------------------------
+
   questionGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -1013,7 +1310,10 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
 
+  // --------------------------------------------------------------------------
   // Actions
+  // --------------------------------------------------------------------------
+
   actionsRow: {
     flexDirection: "row",
     gap: 10,
@@ -1043,8 +1343,12 @@ const styles = StyleSheet.create({
     flex: 2,
     borderRadius: 16,
     overflow: "hidden",
+
     shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
@@ -1068,7 +1372,7 @@ const styles = StyleSheet.create({
   submitButtonText: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#fff",
+    color: COLORS.white,
   },
 
   disclaimer: {

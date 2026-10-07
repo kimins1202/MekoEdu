@@ -1,6 +1,13 @@
+/**
+ * @deprecated Hãy import trực tiếp từ "@/config" thay vì dùng file này.
+ * File này chỉ giữ lại để backward compatibility.
+ */
+import { apiConfig } from "../config";
+
+/** @deprecated Dùng apiConfig từ "@/config" */
 export const API_CONFIG = {
-  BASE_URL: "http://192.168.2.169:8080",
-  TIMEOUT: 10000,
+  BASE_URL: apiConfig.BASE_URL,
+  TIMEOUT: apiConfig.TIMEOUT,
 };
 
 export const MOODLE_CONFIG = {

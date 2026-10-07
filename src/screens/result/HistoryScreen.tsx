@@ -1,6 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useEffect, useMemo, useState } from "react";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   RefreshControl,
   ScrollView,
@@ -14,9 +16,11 @@ import {
   getUserAttempts,
   getUserCourses,
 } from "../../api/quizApi";
+import AppFilter from "../../components/common/AppFilter";
 import AppHeader from "../../components/common/AppHeader";
 import Loading from "../../components/common/Loading";
 import COLORS from "../../constants/colors";
+import { AppStackParamList } from "../../types/navigation";
 
 type Course = {
   id: number;
@@ -54,28 +58,29 @@ type HistoryItem = Attempt & {
 
 type SortType = "newest" | "oldest";
 
+type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
+
 const PAGE_SIZE = 5;
 
 export default function HistoryScreen() {
+  const navigation = useNavigation<NavigationProp>();
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
+  const [selectedQuizId, setSelectedQuizId] = useState<number | null>(null);
   const [sortType, setSortType] = useState<SortType>("newest");
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    loadHistory();
-  }, []);
-
-  const loadHistory = async () => {
+  const loadHistory = useCallback(async () => {
     try {
+      const storedUserId = await AsyncStorage.getItem("userid");
+
       setLoading(true);
       setError("");
-
-      const storedUserId = await AsyncStorage.getItem("userid");
 
       if (!storedUserId) {
         throw new Error("Không tìm thấy User ID. Vui lòng đăng nhập lại.");
@@ -102,6 +107,7 @@ export default function HistoryScreen() {
       setCourses(courseData);
 
       if (courseData.length === 0) {
+        setQuizzes([]);
         setHistory([]);
         setCurrentPage(1);
         return;
@@ -112,6 +118,7 @@ export default function HistoryScreen() {
         .filter((courseId) => Number.isFinite(courseId) && courseId > 0);
 
       if (courseIds.length === 0) {
+        setQuizzes([]);
         setHistory([]);
         setCurrentPage(1);
         return;
@@ -129,6 +136,8 @@ export default function HistoryScreen() {
         ? quizzesResponse.quizzes
         : [];
 
+      setQuizzes(quizzes);
+
       if (quizzes.length === 0) {
         setHistory([]);
         setCurrentPage(1);
@@ -143,13 +152,19 @@ export default function HistoryScreen() {
 
       const attemptResults = await Promise.all(
         quizzes.map(async (quiz) => {
-          try {
-            const quizId = Number(quiz.id);
-            const courseId = Number(quiz.course);
+          const quizId = Number(quiz.id);
+          const courseId = Number(quiz.course);
 
+          try {
             const response = await getUserAttempts(quizId, userId, "all");
 
-            if (response?.exception || !Array.isArray(response?.attempts)) {
+            if (response?.exception) {
+              console.error(`Quiz ${quizId} API error:`, response.message);
+              return [];
+            }
+
+            if (!Array.isArray(response?.attempts)) {
+              console.warn(`Quiz ${quizId} không có attempts array`, response);
               return [];
             }
 
@@ -164,7 +179,12 @@ export default function HistoryScreen() {
               quizGradeMax: Number(quiz.grade) || 0,
               quizSumGrades: Number(quiz.sumgrades) || 0,
             }));
-          } catch {
+          } catch (error: any) {
+            console.error(
+              `Không lấy được attempts của quiz ${quizId}:`,
+              error?.message || error,
+            );
+
             return [];
           }
         }),
@@ -180,7 +200,15 @@ export default function HistoryScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      void loadHistory();
+    }, 0);
+
+    return () => clearTimeout(timeoutId);
+  }, [loadHistory]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -189,6 +217,12 @@ export default function HistoryScreen() {
 
   const handleCourseChange = (courseId: number | null) => {
     setSelectedCourseId(courseId);
+    setSelectedQuizId(null);
+    setCurrentPage(1);
+  };
+
+  const handleQuizChange = (quizId: number | null) => {
+    setSelectedQuizId(quizId);
     setCurrentPage(1);
   };
 
@@ -198,10 +232,14 @@ export default function HistoryScreen() {
   };
 
   const filteredHistory = useMemo(() => {
-    const filtered =
+    const courseFiltered =
       selectedCourseId === null
         ? [...history]
         : history.filter((item) => item.courseId === selectedCourseId);
+    const filtered =
+      selectedQuizId === null
+        ? courseFiltered
+        : courseFiltered.filter((item) => item.quiz === selectedQuizId);
 
     return filtered.sort((a, b) => {
       const timeA = Number(a.timemodified || a.timefinish || a.timestart || 0);
@@ -210,27 +248,33 @@ export default function HistoryScreen() {
 
       return sortType === "newest" ? timeB - timeA : timeA - timeB;
     });
-  }, [history, selectedCourseId, sortType]);
+  }, [history, selectedCourseId, selectedQuizId, sortType]);
+
+  const courseQuizzes = useMemo(
+    () =>
+      selectedCourseId === null
+        ? []
+        : quizzes.filter((quiz) => Number(quiz.course) === selectedCourseId),
+    [quizzes, selectedCourseId],
+  );
 
   const totalPages = Math.max(1, Math.ceil(filteredHistory.length / PAGE_SIZE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
 
   const paginatedHistory = useMemo(() => {
-    const startIndex = (currentPage - 1) * PAGE_SIZE;
+    const startIndex = (safeCurrentPage - 1) * PAGE_SIZE;
     const endIndex = startIndex + PAGE_SIZE;
 
     return filteredHistory.slice(startIndex, endIndex);
-  }, [filteredHistory, currentPage]);
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
+  }, [filteredHistory, safeCurrentPage]);
 
   const startResult =
-    filteredHistory.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+    filteredHistory.length === 0 ? 0 : (safeCurrentPage - 1) * PAGE_SIZE + 1;
 
-  const endResult = Math.min(currentPage * PAGE_SIZE, filteredHistory.length);
+  const endResult = Math.min(
+    safeCurrentPage * PAGE_SIZE,
+    filteredHistory.length,
+  );
 
   const getPageNumbers = () => {
     if (totalPages <= 5) {
@@ -333,7 +377,9 @@ export default function HistoryScreen() {
   }
 
   const finishedCount = history.filter((i) => i.state === "finished").length;
-  const inProgressCount = history.filter((i) => i.state === "inprogress").length;
+  const inProgressCount = history.filter(
+    (i) => i.state === "inprogress",
+  ).length;
 
   return (
     <View style={styles.container}>
@@ -353,57 +399,76 @@ export default function HistoryScreen() {
         {error ? (
           <View style={styles.errorCard}>
             <View style={styles.errorIconWrap}>
-              <Ionicons name="cloud-offline-outline" size={32} color={COLORS.error} />
+              <Ionicons
+                name="cloud-offline-outline"
+                size={32}
+                color={COLORS.error}
+              />
             </View>
             <Text style={styles.emptyTitle}>Không thể tải dữ liệu</Text>
             <Text style={styles.emptyText}>{error}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={loadHistory} activeOpacity={0.8}>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={loadHistory}
+              activeOpacity={0.8}
+            >
               <Ionicons name="refresh-outline" size={16} color={COLORS.white} />
               <Text style={styles.retryText}>Thử lại</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <>
-
-
             {/* COURSE FILTER CHIPS */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.courseFilters}
-            >
-              <TouchableOpacity
-                style={[styles.courseChip, selectedCourseId === null && styles.courseChipActive]}
-                onPress={() => handleCourseChange(null)}
-                activeOpacity={0.8}
-              >
-                <Ionicons
-                  name="apps-outline"
-                  size={14}
-                  color={selectedCourseId === null ? COLORS.white : COLORS.primary}
-                />
-                <Text style={[styles.courseChipText, selectedCourseId === null && styles.courseChipTextActive]}>
-                  Tất cả
-                </Text>
-              </TouchableOpacity>
+            <Text style={styles.filterTitle}>Lọc theo khóa học</Text>
+            <AppFilter
+              filters={[
+                { key: "all", label: "Tất cả" },
+                ...courses.map((course) => ({
+                  key: String(course.id),
+                  label: course.shortname || course.fullname,
+                })),
+              ]}
+              activeFilter={
+                selectedCourseId === null ? "all" : String(selectedCourseId)
+              }
+              onChange={(key) =>
+                handleCourseChange(key === "all" ? null : Number(key))
+              }
+              style={styles.courseFilters}
+            />
 
-              {courses.map((course) => {
-                const active = selectedCourseId === Number(course.id);
-                return (
-                  <TouchableOpacity
-                    key={course.id}
-                    style={[styles.courseChip, active && styles.courseChipActive]}
-                    onPress={() => handleCourseChange(Number(course.id))}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="book-outline" size={14} color={active ? COLORS.white : COLORS.primary} />
-                    <Text numberOfLines={1} style={[styles.courseChipText, active && styles.courseChipTextActive]}>
-                      {course.shortname || course.fullname}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+            {selectedCourseId !== null && courseQuizzes.length > 0 && (
+              <>
+                <Text style={styles.filterTitle}>Lọc theo bài thi</Text>
+                <AppFilter
+                  filters={[
+                    {
+                      key: "all",
+                      label: "Tất cả bài thi",
+                      count: history.filter(
+                        (item) => item.courseId === selectedCourseId,
+                      ).length,
+                    },
+                    ...courseQuizzes.map((quiz) => ({
+                      key: String(quiz.id),
+                      label: quiz.name || "Bài kiểm tra",
+                      count: history.filter(
+                        (item) =>
+                          item.courseId === selectedCourseId &&
+                          item.quiz === Number(quiz.id),
+                      ).length,
+                    })),
+                  ]}
+                  activeFilter={
+                    selectedQuizId === null ? "all" : String(selectedQuizId)
+                  }
+                  onChange={(key) =>
+                    handleQuizChange(key === "all" ? null : Number(key))
+                  }
+                  style={styles.quizFilters}
+                />
+              </>
+            )}
 
             {/* HISTORY HEADER */}
             <View style={styles.historyHeader}>
@@ -418,31 +483,55 @@ export default function HistoryScreen() {
 
               <View style={styles.sortBox}>
                 <TouchableOpacity
-                  style={[styles.sortOption, sortType === "newest" && styles.sortOptionActive]}
+                  style={[
+                    styles.sortOption,
+                    sortType === "newest" && styles.sortOptionActive,
+                  ]}
                   onPress={() => handleSortChange("newest")}
                   activeOpacity={0.8}
                 >
                   <Ionicons
                     name="arrow-down"
                     size={13}
-                    color={sortType === "newest" ? COLORS.white : COLORS.textSecondary}
+                    color={
+                      sortType === "newest"
+                        ? COLORS.white
+                        : COLORS.textSecondary
+                    }
                   />
-                  <Text style={[styles.sortOptionText, sortType === "newest" && styles.sortOptionTextActive]}>
+                  <Text
+                    style={[
+                      styles.sortOptionText,
+                      sortType === "newest" && styles.sortOptionTextActive,
+                    ]}
+                  >
                     Mới nhất
                   </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.sortOption, sortType === "oldest" && styles.sortOptionActive]}
+                  style={[
+                    styles.sortOption,
+                    sortType === "oldest" && styles.sortOptionActive,
+                  ]}
                   onPress={() => handleSortChange("oldest")}
                   activeOpacity={0.8}
                 >
                   <Ionicons
                     name="arrow-up"
                     size={13}
-                    color={sortType === "oldest" ? COLORS.white : COLORS.textSecondary}
+                    color={
+                      sortType === "oldest"
+                        ? COLORS.white
+                        : COLORS.textSecondary
+                    }
                   />
-                  <Text style={[styles.sortOptionText, sortType === "oldest" && styles.sortOptionTextActive]}>
+                  <Text
+                    style={[
+                      styles.sortOptionText,
+                      sortType === "oldest" && styles.sortOptionTextActive,
+                    ]}
+                  >
                     Cũ nhất
                   </Text>
                 </TouchableOpacity>
@@ -453,7 +542,11 @@ export default function HistoryScreen() {
             {paginatedHistory.length === 0 ? (
               <View style={styles.emptyCard}>
                 <View style={styles.emptyIconWrap}>
-                  <Ionicons name="document-text-outline" size={32} color={COLORS.textLight} />
+                  <Ionicons
+                    name="document-text-outline"
+                    size={32}
+                    color={COLORS.textLight}
+                  />
                 </View>
                 <Text style={styles.emptyTitle}>Chưa có lịch sử</Text>
                 <Text style={styles.emptyText}>
@@ -477,11 +570,30 @@ export default function HistoryScreen() {
                       ? Math.min(100, (computedScore / item.quizGradeMax) * 100)
                       : 0;
 
+                  const isFinished = item.state === "finished";
+
                   return (
-                    <View key={`${item.id}-${item.attempt}`} style={styles.resultCard}>
+                    <TouchableOpacity
+                      key={`${item.id}-${item.attempt}`}
+                      style={styles.resultCard}
+                      activeOpacity={isFinished ? 0.75 : 1}
+                      disabled={!isFinished}
+                      onPress={() => {
+                        if (!isFinished) return;
+                        navigation.navigate("AnswerReview", {
+                          attemptid: item.id,
+                          quizid: item.quiz,
+                          quizName: item.quizName,
+                        });
+                      }}
+                    >
                       {/* LEFT ICON */}
                       <View style={styles.resultIconWrap}>
-                        <Ionicons name="document-text-outline" size={20} color={COLORS.primary} />
+                        <Ionicons
+                          name="document-text-outline"
+                          size={20}
+                          color={COLORS.primary}
+                        />
                       </View>
 
                       {/* CENTER INFO */}
@@ -491,7 +603,11 @@ export default function HistoryScreen() {
                         </Text>
 
                         <View style={styles.courseRow}>
-                          <Ionicons name="book-outline" size={12} color={COLORS.primary} />
+                          <Ionicons
+                            name="book-outline"
+                            size={12}
+                            color={COLORS.primary}
+                          />
                           <Text style={styles.courseName} numberOfLines={1}>
                             {item.courseName}
                           </Text>
@@ -499,20 +615,47 @@ export default function HistoryScreen() {
 
                         <View style={styles.metaRow}>
                           <View style={styles.metaBadge}>
-                            <Ionicons name="repeat-outline" size={11} color={COLORS.textLight} />
-                            <Text style={styles.metaText}>Lần {item.attempt}</Text>
+                            <Ionicons
+                              name="repeat-outline"
+                              size={11}
+                              color={COLORS.textLight}
+                            />
+                            <Text style={styles.metaText}>
+                              Lần {item.attempt}
+                            </Text>
                           </View>
                           <View style={styles.metaBadge}>
-                            <Ionicons name="calendar-outline" size={11} color={COLORS.textLight} />
+                            <Ionicons
+                              name="calendar-outline"
+                              size={11}
+                              color={COLORS.textLight}
+                            />
                             <Text style={styles.metaText}>
-                              {formatDate(item.timemodified || item.timefinish || item.timestart)}
+                              {formatDate(
+                                item.timemodified ||
+                                  item.timefinish ||
+                                  item.timestart,
+                              )}
                             </Text>
                           </View>
                         </View>
 
-                        <View style={[styles.statusBadge, { backgroundColor: status.background }]}>
-                          <Ionicons name={status.icon} size={11} color={status.color} />
-                          <Text style={[styles.statusText, { color: status.color }]}>{status.text}</Text>
+                        <View
+                          style={[
+                            styles.statusBadge,
+                            { backgroundColor: status.background },
+                          ]}
+                        >
+                          <Ionicons
+                            name={status.icon}
+                            size={11}
+                            color={status.color}
+                          />
+                          <Text
+                            style={[styles.statusText, { color: status.color }]}
+                          >
+                            {status.text}
+                          </Text>
                         </View>
                       </View>
 
@@ -521,9 +664,14 @@ export default function HistoryScreen() {
                         {computedScore !== null ? (
                           <>
                             <View style={styles.scoreCircleWrap}>
-                              <Text style={styles.scoreValue}>{computedScore.toFixed(1)}</Text>
+                              <Text style={styles.scoreValue}>
+                                {computedScore.toFixed(1)}
+                              </Text>
                               <Text style={styles.scoreMax}>
-                                /{item.quizGradeMax > 0 ? item.quizGradeMax : "—"}
+                                /
+                                {item.quizGradeMax > 0
+                                  ? item.quizGradeMax
+                                  : "—"}
                               </Text>
                             </View>
                             {item.quizGradeMax > 0 && (
@@ -549,7 +697,7 @@ export default function HistoryScreen() {
                           <Text style={styles.scoreDash}>—</Text>
                         )}
                       </View>
-                    </View>
+                    </TouchableOpacity>
                   );
                 })}
 
@@ -557,7 +705,10 @@ export default function HistoryScreen() {
                 {totalPages > 1 && (
                   <View style={styles.paginationCard}>
                     <TouchableOpacity
-                      style={[styles.pageArrow, currentPage === 1 && styles.pageArrowDisabled]}
+                      style={[
+                        styles.pageArrow,
+                        currentPage === 1 && styles.pageArrowDisabled,
+                      ]}
                       onPress={() => setCurrentPage((p) => Math.max(1, p - 1))}
                       disabled={currentPage === 1}
                       activeOpacity={0.8}
@@ -565,7 +716,9 @@ export default function HistoryScreen() {
                       <Ionicons
                         name="chevron-back"
                         size={17}
-                        color={currentPage === 1 ? COLORS.textLight : COLORS.primary}
+                        color={
+                          currentPage === 1 ? COLORS.textLight : COLORS.primary
+                        }
                       />
                     </TouchableOpacity>
 
@@ -573,7 +726,10 @@ export default function HistoryScreen() {
                       {getPageNumbers().map((pageNumber, index) => {
                         if (pageNumber === -1) {
                           return (
-                            <View key={`ellipsis-${index}`} style={styles.ellipsis}>
+                            <View
+                              key={`ellipsis-${index}`}
+                              style={styles.ellipsis}
+                            >
                               <Text style={styles.ellipsisText}>•••</Text>
                             </View>
                           );
@@ -582,11 +738,19 @@ export default function HistoryScreen() {
                         return (
                           <TouchableOpacity
                             key={pageNumber}
-                            style={[styles.pageNumber, active && styles.pageNumberActive]}
+                            style={[
+                              styles.pageNumber,
+                              active && styles.pageNumberActive,
+                            ]}
                             onPress={() => setCurrentPage(pageNumber)}
                             activeOpacity={0.8}
                           >
-                            <Text style={[styles.pageNumberText, active && styles.pageNumberTextActive]}>
+                            <Text
+                              style={[
+                                styles.pageNumberText,
+                                active && styles.pageNumberTextActive,
+                              ]}
+                            >
                               {pageNumber}
                             </Text>
                           </TouchableOpacity>
@@ -595,22 +759,33 @@ export default function HistoryScreen() {
                     </View>
 
                     <TouchableOpacity
-                      style={[styles.pageArrow, currentPage === totalPages && styles.pageArrowDisabled]}
-                      onPress={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      style={[
+                        styles.pageArrow,
+                        currentPage === totalPages && styles.pageArrowDisabled,
+                      ]}
+                      onPress={() =>
+                        setCurrentPage((p) => Math.min(totalPages, p + 1))
+                      }
                       disabled={currentPage === totalPages}
                       activeOpacity={0.8}
                     >
                       <Ionicons
                         name="chevron-forward"
                         size={17}
-                        color={currentPage === totalPages ? COLORS.textLight : COLORS.primary}
+                        color={
+                          currentPage === totalPages
+                            ? COLORS.textLight
+                            : COLORS.primary
+                        }
                       />
                     </TouchableOpacity>
                   </View>
                 )}
 
                 {totalPages > 1 && (
-                  <Text style={styles.pageInfo}>Trang {currentPage} / {totalPages}</Text>
+                  <Text style={styles.pageInfo}>
+                    Trang {currentPage} / {totalPages}
+                  </Text>
                 )}
               </>
             )}
@@ -694,32 +869,9 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
 
-  courseChip: {
-    height: 36,
-    paddingHorizontal: 13,
-    borderRadius: 12,
-    backgroundColor: COLORS.white,
-    borderWidth: 1.5,
-    borderColor: COLORS.primary,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-
-  courseChipActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-
-  courseChipText: {
-    maxWidth: 145,
-    fontSize: 12,
-    fontWeight: "700",
-    color: COLORS.primary,
-  },
-
-  courseChipTextActive: {
-    color: COLORS.white,
+  quizFilters: {
+    gap: 8,
+    paddingBottom: 20,
   },
 
   // ── HEADER ──────────────────────────────────
