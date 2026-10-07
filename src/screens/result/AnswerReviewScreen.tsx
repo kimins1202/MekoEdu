@@ -1,3 +1,5 @@
+import RenderHTML from "react-native-render-html";
+import { getReviewGrade, parseReviewHtml } from "@/parsers/reviewParser";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useEffect, useState } from "react";
@@ -8,6 +10,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from "react-native";
 
 import { getAttemptReview } from "../../api/quizApi";
@@ -31,344 +34,25 @@ type ReviewQuestion = {
   flagged: boolean;
   questionnumber?: string;
   state?: string;
+  stateclass?: string;
   mark?: string;
   maxmark?: number;
 };
 
-// Đáp án chỉ có 3 trạng thái:
-// - correct: đáp án đúng
-// - incorrect: người dùng chọn nhưng chọn sai
-// - neutral: đáp án không được chọn và không phải đáp án đúng
-type AnswerState = "correct" | "incorrect" | "neutral";
-
-type ParsedAnswer = {
-  label: string;
-  text: string;
-  state: AnswerState;
-};
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function stripHtml(html: string): string {
-  return html
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/p>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#039;/g, "'")
-    .replace(/&#39;/g, "'")
-    .replace(/&#x27;/gi, "'")
-    .replace(/&apos;/g, "'")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
-/**
- * Chuẩn hóa text để so sánh:
- * "Application Programming Interface"
- * và
- * " Application Programming Interface "
- * được xem là giống nhau.
- */
-function normalizeText(text: string): string {
-  return stripHtml(text).replace(/\s+/g, " ").trim().toLowerCase();
-}
-
-/**
- * Lấy nội dung đáp án đúng từ:
- *
- * <div class="rightanswer">
- *   The correct answer is: Application Programming Interface
- * </div>
- *
- * Moodle có thể dùng:
- * - The correct answer is:
- * - The correct answers are:
- */
-function parseCorrectAnswer(html: string): string {
-  const rightAnswerMatch = html.match(
-    /<div[^>]*class="[^"]*\brightanswer\b[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
-  );
-
-  if (!rightAnswerMatch) {
-    return "";
-  }
-
-  const rightAnswerText = stripHtml(rightAnswerMatch[1]);
-
-  const answerMatch = rightAnswerText.match(
-    /The correct answers?\s+(?:is|are)\s*:\s*([\s\S]*)/i,
-  );
-
-  if (answerMatch) {
-    return answerMatch[1].trim();
-  }
-
-  return rightAnswerText.trim();
-}
-
-/**
- * Parse từng answer row của Moodle.
- *
- * Response thực tế:
- *
- * <div class="r0">
- *   <input ... value="0" ... />
- *   <div ... id="..._label">
- *      <span class="answernumber">a. </span>
- *      <div>Application Programming Interface</div>
- *   </div>
- * </div>
- *
- * hoặc:
- *
- * <div class="r1 incorrect">
- *   <input ... value="1" ... checked="checked" />
- *   ...
- * </div>
- *
- * Ta không dựa vào class "correct" để tìm đáp án đúng,
- * vì Moodle response thực tế không thêm class "correct".
- *
- * Đáp án đúng được lấy từ .rightanswer.
- */
-function parseAnswerRows(
-  html: string,
-  correctAnswerText: string,
-): ParsedAnswer[] {
-  const answers: ParsedAnswer[] = [];
-  const letters = ["A", "B", "C", "D", "E", "F", "G", "H"];
-
-  // Tìm vị trí bắt đầu của tất cả row r0/r1.
-  const rowStarts: { index: number; className: string }[] = [];
-
-  const rowStartRegex = /<div[^>]*class="([^"]*\b(?:r0|r1)\b[^"]*)"[^>]*>/gi;
-
-  let rowMatch: RegExpExecArray | null;
-
-  while ((rowMatch = rowStartRegex.exec(html)) !== null) {
-    rowStarts.push({
-      index: rowMatch.index,
-      className: rowMatch[1],
-    });
-  }
-
-  const normalizedCorrectAnswer = normalizeText(correctAnswerText);
-
-  rowStarts.forEach((row, index) => {
-    const startIndex = row.index;
-
-    // Row hiện tại kết thúc ngay trước row tiếp theo.
-    const endIndex =
-      index + 1 < rowStarts.length ? rowStarts[index + 1].index : html.length;
-
-    const rowHtml = html.substring(startIndex, endIndex);
-
-    // Tìm input của answer.
-    const inputMatch = rowHtml.match(
-      /<input[^>]*type=["'](?:radio|checkbox)["'][^>]*>/i,
-    );
-
-    if (!inputMatch) {
-      return;
-    }
-
-    const inputHtml = inputMatch[0];
-
-    // Moodle dùng checked="checked" cho đáp án user đã chọn.
-    const isChecked =
-      /\bchecked\s*=\s*(?:"checked"|'checked'|checked)/i.test(inputHtml) ||
-      /\bchecked\b/i.test(inputHtml);
-
-    // Tìm label tương ứng.
-    const labelMatch = rowHtml.match(
-      /<div[^>]*data-region=["']answer-label["'][^>]*>([\s\S]*?)<\/div>\s*(?:<\/div>)?/i,
-    );
-
-    let answerText = "";
-
-    if (labelMatch) {
-      answerText = stripHtml(labelMatch[1]);
-    } else {
-      // Fallback nếu Moodle thay đổi cấu trúc label.
-      answerText = stripHtml(rowHtml);
-    }
-
-    // Xóa ký hiệu a. / b. / c. / d. nếu có.
-    answerText = answerText
-      .replace(/^\s*[a-z]\.\s*/i, "")
-      .replace(/^\s*\d+[\.\)]\s*/, "")
-      .trim();
-
-    if (!answerText) {
-      return;
-    }
-
-    const normalizedAnswer = normalizeText(answerText);
-
-    /**
-     * Xác định đây có phải đáp án đúng không.
-     *
-     * Moodle response:
-     *
-     * <div class="rightanswer">
-     *   The correct answer is: Application Programming Interface
-     * </div>
-     *
-     * Vì vậy không tìm class="correct" ở answer row.
-     */
-    let isCorrect = false;
-
-    if (normalizedCorrectAnswer && normalizedAnswer) {
-      isCorrect =
-        normalizedAnswer === normalizedCorrectAnswer ||
-        normalizedCorrectAnswer.includes(normalizedAnswer);
-    }
-
-    /**
-     * Logic trạng thái:
-     *
-     * 1. Đúng → correct
-     * 2. User chọn nhưng sai → incorrect
-     * 3. Còn lại → neutral
-     *
-     * Nếu user chọn đúng:
-     *    isCorrect = true
-     *    isChecked = true
-     *    => correct
-     *
-     * Nếu user chọn sai:
-     *    isCorrect = false
-     *    isChecked = true
-     *    => incorrect
-     *
-     * Nếu user không chọn nhưng đây là đáp án đúng:
-     *    isCorrect = true
-     *    isChecked = false
-     *    => correct
-     */
-    let state: AnswerState = "neutral";
-
-    if (isCorrect) {
-      state = "correct";
-    } else if (isChecked) {
-      state = "incorrect";
-    }
-
-    answers.push({
-      label: letters[answers.length] ?? String(answers.length + 1),
-      text: answerText,
-      state,
-    });
-  });
-
-  return answers;
-}
-
-function parseQuestionHtml(html: string): {
-  questionText: string;
-  answers: ParsedAnswer[];
-  feedback: string;
-} {
-  const qtextMatch = html.match(
-    /<div[^>]*class="[^"]*\bqtext\b[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
-  );
-
-  const questionText = qtextMatch
-    ? stripHtml(qtextMatch[1])
-    : stripHtml(html.substring(0, 400));
-
-  // Đáp án đúng lấy từ .rightanswer.
-  const correctAnswerText = parseCorrectAnswer(html);
-
-  // Các answer row lấy checked + text rồi đối chiếu với .rightanswer.
-  const answers = parseAnswerRows(html, correctAnswerText);
-
-  const feedbackMatch = html.match(
-    /<div[^>]*class="[^"]*\bgeneralfeedback\b[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
-  );
-
-  const feedback = feedbackMatch ? stripHtml(feedbackMatch[1]) : "";
-
-  return {
-    questionText,
-    answers,
-    feedback,
-  };
-}
-
-function getStateInfo(state?: string, mark?: string, maxmark?: number) {
-  const m = parseFloat(mark ?? "");
-  const max = maxmark ?? 0;
-
-  if (max > 0 && Number.isFinite(m)) {
-    if (m >= max)
-      return {
-        label: "Đúng",
-        color: COLORS.success,
-        bg: "#EAF7EF",
-        icon: "checkmark-circle" as const,
-      };
-
-    if (m > 0)
-      return {
-        label: "Đúng một phần",
-        color: COLORS.warning,
-        bg: "#FFF6E4",
-        icon: "alert-circle" as const,
-      };
-
-    return {
-      label: "Sai",
-      color: COLORS.error,
-      bg: "#FFF1F1",
-      icon: "close-circle" as const,
-    };
-  }
-
-  switch (state) {
-    case "gradedright":
-      return {
-        label: "Đúng",
-        color: COLORS.success,
-        bg: "#EAF7EF",
-        icon: "checkmark-circle" as const,
-      };
-
-    case "gradedpartial":
-      return {
-        label: "Đúng một phần",
-        color: COLORS.warning,
-        bg: "#FFF6E4",
-        icon: "alert-circle" as const,
-      };
-
-    case "gradedwrong":
-      return {
-        label: "Sai",
-        color: COLORS.error,
-        bg: "#FFF1F1",
-        icon: "close-circle" as const,
-      };
-
-    default:
-      return {
-        label: "Chưa chấm",
-        color: COLORS.textLight,
-        bg: COLORS.backgroundSoft,
-        icon: "help-circle" as const,
-      };
+function getStateInfo(question: ReviewQuestion) {
+  switch (getReviewGrade(question)) {
+    case "correct": return { label: "Đúng", color: COLORS.success, bg: "#EAF7EF", icon: "checkmark-circle" as const };
+    case "partial": return { label: "Đúng một phần", color: COLORS.warning, bg: "#FFF6E4", icon: "alert-circle" as const };
+    case "incorrect": return { label: "Sai", color: COLORS.error, bg: "#FFF1F1", icon: "close-circle" as const };
+    default: return { label: "Chưa chấm", color: COLORS.textLight, bg: COLORS.backgroundSoft, icon: "help-circle" as const };
   }
 }
-
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function AnswerReviewScreen() {
   useNavigation();
+  const { width } = useWindowDimensions();
+  const contentWidth = Math.max(1, width - 60);
 
   const route = useRoute<ReviewRoute>();
   const { attemptid, quizName } = route.params;
@@ -445,22 +129,9 @@ export default function AnswerReviewScreen() {
 
   const collapseAll = () => setExpandedSlots(new Set());
 
-  const correctCount = questions.filter((q) => {
-    const m = parseFloat(q.mark ?? "");
-    const mx = q.maxmark ?? 0;
-
-    return mx > 0 && Number.isFinite(m) && m >= mx;
-  }).length;
-
-  const wrongCount = questions.filter((q) => {
-    const m = parseFloat(q.mark ?? "");
-    const mx = q.maxmark ?? 0;
-
-    return mx > 0 && Number.isFinite(m) && m < mx;
-  }).length;
-
-  const uncheckCount = questions.filter((q) => !(q.mark && q.maxmark)).length;
-
+  const correctCount = questions.filter(q => getReviewGrade(q) === "correct").length;
+  const wrongCount = questions.filter(q => ["incorrect", "partial"].includes(getReviewGrade(q))).length;
+  const uncheckCount = questions.filter(q => getReviewGrade(q) === "ungraded").length;
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -606,12 +277,10 @@ export default function AnswerReviewScreen() {
 
         {/* ── Question list ── */}
         {questions.map((q, idx) => {
-          const stateInfo = getStateInfo(q.state, q.mark, q.maxmark);
+          const stateInfo = getStateInfo(q);
           const isExpanded = expandedSlots.has(q.slot);
 
-          const { questionText, answers, feedback } = parseQuestionHtml(
-            q.html ?? "",
-          );
+          const { contentHtml, feedbackHtml } = parseReviewHtml(q.html ?? "");
 
           const m = parseFloat(q.mark ?? "");
           const mx = q.maxmark ?? 0;
@@ -641,7 +310,7 @@ export default function AnswerReviewScreen() {
                     <Text style={styles.markText}>
                       {Number.isFinite(m)
                         ? `${m % 1 === 0 ? m : m.toFixed(2)}/${mx}`
-                        : `0/${mx}`}{" "}
+                        : `—/${mx}`}{" "}
                       điểm
                     </Text>
                   )}
@@ -674,98 +343,20 @@ export default function AnswerReviewScreen() {
                 <View style={styles.questionBody}>
                   <View style={styles.divider} />
 
-                  {!!questionText && (
-                    <Text style={styles.questionText}>{questionText}</Text>
-                  )}
-
-                  {answers.length > 0 && (
-                    <View style={styles.answersSection}>
-                      <Text style={styles.answersLabel}>Đáp án</Text>
-
-                      {answers.map((ans) => (
-                        <View
-                          key={ans.label}
-                          style={[
-                            styles.answerRow,
-
-                            ans.state === "correct" && styles.answerCorrect,
-
-                            ans.state === "incorrect" && styles.answerIncorrect,
-                          ]}
-                        >
-                          <View
-                            style={[
-                              styles.answerLabelBadge,
-
-                              ans.state === "correct" && {
-                                backgroundColor: COLORS.success,
-                              },
-
-                              ans.state === "incorrect" && {
-                                backgroundColor: COLORS.error,
-                              },
-                            ]}
-                          >
-                            <Text style={styles.answerLabelText}>
-                              {ans.label}
-                            </Text>
-                          </View>
-
-                          <Text
-                            style={[
-                              styles.answerText,
-
-                              ans.state === "correct" && {
-                                color: COLORS.success,
-                                fontWeight: "600",
-                              },
-
-                              ans.state === "incorrect" && {
-                                color: COLORS.error,
-                              },
-                            ]}
-                          >
-                            {ans.text}
-                          </Text>
-
-                          {ans.state === "correct" && (
-                            <Ionicons
-                              name="checkmark-circle"
-                              size={16}
-                              color={COLORS.success}
-                            />
-                          )}
-
-                          {ans.state === "incorrect" && (
-                            <Ionicons
-                              name="close-circle"
-                              size={16}
-                              color={COLORS.error}
-                            />
-                          )}
-                        </View>
-                      ))}
-                    </View>
-                  )}
-
-                  {/* Fallback: show raw stripped html */}
-                  {answers.length === 0 && !!q.html && (
+                  <RenderHTML
+                    contentWidth={contentWidth}
+                    source={{ html: contentHtml || "<p>Nội dung câu hỏi không được cung cấp.</p>" }}
+                    baseStyle={{ fontSize: 15, lineHeight: 23, color: COLORS.text }}
+                    classesStyles={{ correct: { color: COLORS.success }, incorrect: { color: COLORS.error }, partiallycorrect: { color: COLORS.warning } }}
+                  />
+                  {!!feedbackHtml && (
                     <View style={styles.rawContent}>
-                      <Text style={styles.questionText}>
-                        {stripHtml(q.html).substring(0, 800)}
-                      </Text>
-                    </View>
-                  )}
-
-                  {!!feedback && (
-                    <View style={styles.feedbackBox}>
-                      <Ionicons
-                        name="information-circle-outline"
-                        size={15}
-                        color={COLORS.info}
+                      <Text style={styles.answersLabel}>Nhận xét và đáp án</Text>
+                      <RenderHTML
+                        contentWidth={Math.max(1, contentWidth - 24)}
+                        source={{ html: feedbackHtml }}
+                        baseStyle={{ fontSize: 14, lineHeight: 22, color: COLORS.text }}
                       />
-
-                      <Text style={styles.feedbackText}>{feedback}</Text>
                     </View>
                   )}
                 </View>

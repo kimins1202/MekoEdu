@@ -1,201 +1,69 @@
-import { HTMLElement, parse } from "node-html-parser";
+import { parse } from "node-html-parser";
+import { parseQuestion } from "./questionParser";
 
-export type ReviewAnswerState = "correct" | "incorrect" | "neutral";
+const escape = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-export interface ReviewAnswer {
-  text: string;
-  state: ReviewAnswerState;
-  selected: boolean;
-  value?: string;
-}
-
-export interface ParsedReviewQuestion {
-  questionText: string;
-  status: string;
-  state?: string;
-  mark?: string;
-  maxMark?: number;
-  correctAnswer?: string;
-  answers: ReviewAnswer[];
-}
-
-function cleanText(value?: string | null): string {
-  if (!value) return "";
-
-  return value
-    .replace(/&nbsp;/g, " ")
-    .replace(/\u00a0/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function normalizeText(value?: string | null): string {
-  return cleanText(value)
-    .replace(/^[a-zA-Z][.)]\s*/, "")
-    .replace(/^\d+[.)]\s*/, "")
-    .toLowerCase()
-    .trim();
-}
-
-function getQuestionText(root: HTMLElement): string {
-  const qtext = root.querySelector(".qtext");
-
-  if (!qtext) return "";
-
-  return cleanText(qtext.text);
-}
-
-function getCorrectAnswer(root: HTMLElement): string {
-  const rightAnswer = root.querySelector(".rightanswer");
-
-  if (!rightAnswer) return "";
-
-  let text = cleanText(rightAnswer.text);
-
-  text = text.replace(/^The correct answer is:\s*/i, "");
-
-  text = text.replace(/^Đáp án đúng là:\s*/i, "");
-
-  return cleanText(text);
-}
-
-function getAnswerText(row: HTMLElement, input: HTMLElement): string {
-  const inputId = input.getAttribute("id") ?? "";
-
-  if (inputId) {
-    const label = row.querySelector(`label[for="${inputId}"]`);
-
-    if (label) {
-      return cleanText(label.text);
-    }
-  }
-
-  const answerNumber = row.querySelector(".answernumber");
-
-  const clone = parse(row.innerHTML);
-
-  clone.querySelectorAll("input").forEach((element) => element.remove());
-
-  clone
-    .querySelectorAll(".answernumber")
-    .forEach((element) => element.remove());
-
-  clone
-    .querySelectorAll('[title="Incorrect"]')
-    .forEach((element) => element.remove());
-
-  let text = cleanText(clone.text);
-
-  if (answerNumber) {
-    const prefix = cleanText(answerNumber.text);
-
-    if (prefix && text.startsWith(prefix)) {
-      text = text.slice(prefix.length).trim();
-    }
-  }
-
-  return cleanText(text);
-}
-
-function parseAnswerRows(
-  root: HTMLElement,
-  correctAnswer: string,
-): ReviewAnswer[] {
-  const rows = root.querySelectorAll(".answer > .r0, .answer > .r1");
-
-  const normalizedCorrect = normalizeText(correctAnswer);
-
-  return rows
-    .map((row): ReviewAnswer | null => {
-      const input = row.querySelector(
-        'input[type="radio"], input[type="checkbox"]',
-      );
-
-      if (!input) {
-        return null;
-      }
-
-      const selected = input.hasAttribute("checked");
-
-      const value = input.getAttribute("value") ?? undefined;
-
-      const text = getAnswerText(row, input);
-
-      const normalizedText = normalizeText(text);
-
-      const isCorrect =
-        normalizedCorrect !== "" && normalizedText === normalizedCorrect;
-
-      let state: ReviewAnswerState = "neutral";
-
-      if (isCorrect) {
-        state = "correct";
-      } else if (selected) {
-        state = "incorrect";
-      }
-
-      return {
-        text,
-        state,
-        selected,
-        value,
-      };
-    })
-    .filter(
-      (answer): answer is ReviewAnswer =>
-        answer !== null && Boolean(answer.text),
-    );
-}
-
-export function parseReviewQuestion(html: string): ParsedReviewQuestion {
+// Preserve Moodle's review content without rendering interactive form controls.
+export function parseReviewHtml(html: string) {
   const root = parse(html);
+  const stateClasses = (root.querySelector(".que")?.getAttribute("class") ?? "").split(/\s+/);
+  const state = stateClasses.includes("partiallycorrect") ? "gradedpartial"
+    : stateClasses.includes("incorrect") ? "gradedwrong"
+    : stateClasses.includes("correct") ? "gradedright" : undefined;
+  const parsed = parseQuestion(html);
+  const content = parse((root.querySelector(".formulation") ?? root.querySelector(".qtext"))?.innerHTML ?? "");
 
-  const questionText = getQuestionText(root);
+  content.querySelectorAll("script, style, .accesshide, .sr-only, .visually-hidden, .questionflag, .im-feedback").forEach(node => node.remove());
+  content.querySelectorAll("select").forEach(select => {
+    const selected = select.querySelector("option[selected]") ?? select.querySelector("option");
+    const value = selected?.getAttribute("value");
+    select.replaceWith(`<strong>[${escape(value && value !== "0" ? selected?.text.trim() ?? "" : "Chưa trả lời")}]</strong>`);
+  });
+  content.querySelectorAll("textarea").forEach(node => {
+    node.replaceWith(`<div><strong>Câu trả lời của bạn:</strong><p>${escape(node.text.trim() || "Chưa trả lời").replace(/\n/g, "<br>")}</p></div>`);
+  });
+  content.querySelectorAll("input").forEach(input => {
+    const type = (input.getAttribute("type") ?? "text").toLowerCase();
+    if (type === "hidden") { input.remove(); return; }
+    if (type === "radio" || type === "checkbox") {
+      input.replaceWith(input.hasAttribute("checked") ? "<strong>☑ Đã chọn: </strong>" : "☐ ");
+    } else if (["text", "number", "email"].includes(type)) {
+      input.replaceWith(`<strong>[${escape(input.getAttribute("value") || "Chưa trả lời")}]</strong>`);
+    } else input.remove();
+  });
+  content.querySelectorAll("button").forEach(node => node.remove());
 
-  const correctAnswer = getCorrectAnswer(root);
+  // Drag responses are stored in hidden fields and need explicit text labels.
+  const dragResponses = (parsed.dropFields ?? []).map(field => {
+    const input = root.querySelectorAll("input").find(node => node.getAttribute("name") === field.fieldName);
+    const value = input?.getAttribute("value") ?? "";
+    const item = parsed.dragItems?.find(item => String(item.choice) === value);
+    let response = item?.text || (value && value !== "0" ? value : "Chưa trả lời");
+    if (parsed.type === "ddmarker" && value) {
+      response = value === "0" ? "Chưa trả lời" : `Tọa độ: ${value}`;
+    }
+    return `<p><strong>Vị trí ${field.place}:</strong> ${escape(response)}</p>`;
+  }).join("");
 
-  const stateElement = root.querySelector(".state");
+  const feedback = [".specificfeedback", ".generalfeedback", ".rightanswer", ".manualcomment"]
+    .map(selector => root.querySelector(selector)?.innerHTML ?? "").filter(Boolean).join("<br>");
+  const cleanFeedback = parse(feedback);
+  cleanFeedback.querySelectorAll("script, style, .accesshide, .sr-only, .visually-hidden").forEach(node => node.remove());
+  return { contentHtml: content.innerHTML + dragResponses, feedbackHtml: cleanFeedback.innerHTML, state };
+}
 
-  const status = cleanText(stateElement?.text) || "";
-
-  const gradeElement = root.querySelector(".grade");
-
-  const gradeText = cleanText(gradeElement?.text);
-
-  let mark: string | undefined;
-  let maxMark: number | undefined;
-
-  const gradeMatch = gradeText.match(
-    /Mark\s+([-\d.,]+)\s+out\s+of\s+([-\d.,]+)/i,
-  );
-
-  if (gradeMatch) {
-    mark = gradeMatch[1].replace(",", ".");
-
-    maxMark = Number(gradeMatch[2].replace(",", "."));
+export function getReviewGrade(question: {
+  html: string; state?: string; stateclass?: string; mark?: string | number | null; maxmark?: number;
+}): "correct" | "partial" | "incorrect" | "ungraded" {
+  const state = question.state || question.stateclass || parseReviewHtml(question.html).state;
+  if (["needsgrading", "notyetgraded", "gaveup", "todo", "complete", "invalid"].includes(state ?? "")) {
+    return state === "gaveup" ? "incorrect" : "ungraded";
   }
-
-  const questionElement = root.querySelector(".que");
-
-  const state = questionElement?.classNames
-    ?.split(/\s+/)
-    .find((className) => className.startsWith("graded"));
-
-  const answers = parseAnswerRows(root, correctAnswer);
-
-  return {
-    questionText,
-
-    status,
-
-    state,
-
-    mark,
-
-    maxMark,
-
-    correctAnswer: correctAnswer || undefined,
-
-    answers,
-  };
+  if (["gradedright", "mangrright", "correct"].includes(state ?? "")) return "correct";
+  if (["gradedpartial", "mangrpartial", "partiallycorrect"].includes(state ?? "")) return "partial";
+  if (["gradedwrong", "mangrwrong", "incorrect", "notanswered"].includes(state ?? "")) return "incorrect";
+  const mark = question.mark == null || question.mark === "" ? NaN : Number(question.mark);
+  const max = Number(question.maxmark);
+  if (Number.isFinite(mark) && max > 0) return mark >= max ? "correct" : mark > 0 ? "partial" : "incorrect";
+  return "ungraded";
 }

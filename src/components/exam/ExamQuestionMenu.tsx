@@ -1,3 +1,4 @@
+import { isQuestionAnswered } from "@/utils/questionAnswerStatus";
 import { Ionicons } from "@expo/vector-icons";
 import {
   Modal,
@@ -14,7 +15,7 @@ interface QuestionOverviewItem {
   slot: number;
   page: number;
   questionNumber: string;
-  answerName: string | null;
+  answerNames: string[];
   flagged: boolean;
 }
 
@@ -96,7 +97,7 @@ export default function ExamQuestionMenu({
           >
             {questionOverview.map((item, index) => {
               const answered =
-                !!item.answerName && !!selectedAnswers[item.answerName];
+                isQuestionAnswered(item.answerNames, selectedAnswers);
 
               const flagged = Boolean(
                 flaggedQuestions[item.slot] ?? item.flagged,

@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getUserAttempts, processQuizAttempt, saveQuizAttempt } from "@/api/quizApi";
 import { ExamContext, listOfflineExams, readOfflineExam, updateOfflineExam } from "./examStorageService";
+import { buildExamSyncPayload } from "@/utils/examSyncPayload";
 
 const running = new Map<string, Promise<void>>();
 export const isOfflineError = (error: any) =>
@@ -16,31 +17,6 @@ export function syncExam(context: ExamContext, retryFailed = false): Promise<voi
       const snapshot = await readOfflineExam(context);
       if (!snapshot || snapshot.submitted || snapshot.status === "Synced" || (snapshot.status === "Failed" && !retryFailed)) return;
       if (Number(await AsyncStorage.getItem("userid")) !== context.userid || !(await AsyncStorage.getItem("wstoken"))) return;
-      const data: { name: string; value: string }[] = [];
-
-      // 1. Đáp án người dùng đã chọn
-      Object.entries(snapshot.answers).forEach(([name, value]) => {
-        data.push({
-          name,
-          value: String(value),
-        });
-      });
-
-      // 2. sequencecheck của từng câu hỏi
-      Object.values(snapshot.pages).forEach((page) => {
-        page.questions.forEach((question: any) => {
-          const slot = Number(question.slot);
-          const sequencecheck = Number(question.sequencecheck);
-
-          if (Number.isFinite(slot) && Number.isFinite(sequencecheck)) {
-            data.push({
-              name: `q${context.attemptid}:${slot}_:sequencecheck`,
-              value: String(sequencecheck),
-            });
-          }
-        });
-      });
-
       try {
         if (snapshot.submitRequested) {
           // Resolve a lost submission response before attempting submission again.
@@ -50,11 +26,11 @@ export function syncExam(context: ExamContext, retryFailed = false): Promise<voi
           if (attempt.state === "abandoned") throw new Error("Lượt thi đã bị đóng. Đáp án vẫn được giữ trên thiết bị.");
           if (attempt.state !== "finished") {
             if (Number(await AsyncStorage.getItem("userid")) !== context.userid) return;
-            const result = await processQuizAttempt(context.attemptid, data, 1);
+            const result = await processQuizAttempt(context.attemptid, buildExamSyncPayload(snapshot), 1);
             if (result?.state !== "finished") throw new Error("Moodle chưa xác nhận nộp bài thành công.");
           }
         } else {
-          const result = await saveQuizAttempt(context.attemptid, data);
+          const result = await saveQuizAttempt(context.attemptid, buildExamSyncPayload(snapshot));
           if (result?.status === false) throw new Error("Moodle không xác nhận lưu câu trả lời.");
         }
         await updateOfflineExam(context, (current) => current.revision !== snapshot.revision ? current : {

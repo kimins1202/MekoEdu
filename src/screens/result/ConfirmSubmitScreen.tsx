@@ -231,10 +231,6 @@ export default function ConfirmSubmitScreen() {
 
   const flaggedCount = questions.filter((question) => question.flagged).length;
 
-  const savedCount = questions.filter(
-    (question) => questionSaveStatus(question) === "saved",
-  ).length;
-
   const savingCount = questions.filter(
     (question) => questionSaveStatus(question) === "saving",
   ).length;
@@ -565,119 +561,6 @@ export default function ConfirmSubmitScreen() {
               <Text style={styles.statLabel}>Đánh dấu</Text>
             </View>
           </View>
-
-          {/* ============================================================
-              SAVE STATUS
-          ============================================================= */}
-
-          <AppCard style={styles.card}>
-            <View style={styles.cardHeader}>
-              <View style={styles.cardHeaderLeft}>
-                <Ionicons
-                  name="cloud-done-outline"
-                  size={20}
-                  color={COLORS.primary}
-                />
-
-                <Text style={styles.cardTitle}>Trạng thái lưu bài</Text>
-              </View>
-
-              <View
-                style={[
-                  styles.syncBadge,
-                  {
-                    backgroundColor: allSaved ? "#EAF6EF" : "#FCEDED",
-                  },
-                ]}
-              >
-                <Ionicons
-                  name={allSaved ? "checkmark" : "alert"}
-                  size={11}
-                  color={allSaved ? COLORS.success : COLORS.error}
-                />
-
-                <Text
-                  style={[
-                    styles.syncBadgeText,
-                    {
-                      color: allSaved ? COLORS.success : COLORS.error,
-                    },
-                  ]}
-                >
-                  {allSaved ? "Đồng bộ xong" : "Chưa đồng bộ"}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.saveStatsRow}>
-              <View style={styles.saveStat}>
-                <Ionicons
-                  name="cloud-done-outline"
-                  size={18}
-                  color={COLORS.success}
-                />
-
-                <Text
-                  style={[
-                    styles.saveStatValue,
-                    {
-                      color: COLORS.success,
-                    },
-                  ]}
-                >
-                  {savedCount}
-                </Text>
-
-                <Text style={styles.saveStatLabel}>Đã lưu</Text>
-              </View>
-
-              <View style={styles.saveStatDivider} />
-
-              <View style={styles.saveStat}>
-                <Ionicons
-                  name="sync-outline"
-                  size={18}
-                  color={COLORS.warning}
-                />
-
-                <Text
-                  style={[
-                    styles.saveStatValue,
-                    {
-                      color: COLORS.warning,
-                    },
-                  ]}
-                >
-                  {savingCount}
-                </Text>
-
-                <Text style={styles.saveStatLabel}>Đang lưu</Text>
-              </View>
-
-              <View style={styles.saveStatDivider} />
-
-              <View style={styles.saveStat}>
-                <Ionicons
-                  name="alert-circle-outline"
-                  size={18}
-                  color={COLORS.error}
-                />
-
-                <Text
-                  style={[
-                    styles.saveStatValue,
-                    {
-                      color: COLORS.error,
-                    },
-                  ]}
-                >
-                  {notSavedCount}
-                </Text>
-
-                <Text style={styles.saveStatLabel}>Chưa lưu</Text>
-              </View>
-            </View>
-          </AppCard>
 
           {/* ============================================================
               WARNING / SUCCESS
@@ -1111,51 +994,6 @@ const styles = StyleSheet.create({
 
   // --------------------------------------------------------------------------
   // Sync status
-  // --------------------------------------------------------------------------
-
-  syncBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
-  },
-
-  syncBadgeText: {
-    fontSize: 11,
-    fontWeight: "600",
-  },
-
-  saveStatsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  saveStat: {
-    flex: 1,
-    alignItems: "center",
-    gap: 4,
-  },
-
-  saveStatValue: {
-    fontSize: 20,
-    fontWeight: "700",
-  },
-
-  saveStatLabel: {
-    fontSize: 10,
-    color: COLORS.textLight,
-  },
-
-  saveStatDivider: {
-    width: 1,
-    height: 36,
-    backgroundColor: COLORS.border,
-  },
-
-  // --------------------------------------------------------------------------
-  // Warning
   // --------------------------------------------------------------------------
 
   warningBanner: {

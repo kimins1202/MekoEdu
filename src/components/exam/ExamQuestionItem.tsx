@@ -53,7 +53,6 @@ export default function ExamQuestionItem({
     if (answerDisabled) return;
 
     onAnswerChange({
-      ...selectedAnswers,
       [field]: value,
     });
   };

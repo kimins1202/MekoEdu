@@ -24,6 +24,7 @@ import { NestableScrollContainer } from "react-native-draggable-flatlist";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import Loading from "@/components/common/Loading";
+import ExamLoading from "@/components/exam/ExamLoading";
 import ExamNavigation from "@/components/exam/ExamNavigation";
 import ExamQuestionItem from "@/components/exam/ExamQuestionItem";
 import ExamQuestionMenu from "@/components/exam/ExamQuestionMenu";
@@ -54,6 +55,7 @@ import {
 } from "../../api/quizApi";
 
 import { parseQuestion } from "@/parsers/questionParser";
+import { getQuestionAnswerNames, isQuestionAnswered } from "@/utils/questionAnswerStatus";
 import type { ParsedQuestion } from "@/types/question";
 
 /* -------------------------------------------------------------------------- */
@@ -87,7 +89,7 @@ type QuestionOverviewItem = {
   slot: number;
   page: number;
   questionNumber: string;
-  answerName: string | null;
+  answerNames: string[];
   flagged: boolean;
 };
 
@@ -111,12 +113,6 @@ const getQuestionSlot = (question: QuizQuestion) => {
   }
 
   return 0;
-};
-
-const getQuestionAnswerName = (html: string): string | null => {
-  const match = html.match(/<input\b[^>]*name=["']([^"']+)["']/i);
-
-  return match?.[1] ?? null;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -225,12 +221,9 @@ export default function ExamScreen() {
 
   /* CALCULATIONS                                                           */
 
-  const answeredCount = Math.min(
-    totalQuestions || Object.keys(selectedAnswers).length,
-    Object.values(selectedAnswers).filter(
-      (value) => value !== undefined && value !== null && value !== "",
-    ).length,
-  );
+  const answeredCount = questionOverview.filter((item) =>
+    isQuestionAnswered(item.answerNames, selectedAnswers),
+  ).length;
 
   const progressPercent =
     totalQuestions > 0
@@ -288,7 +281,7 @@ export default function ExamScreen() {
           page,
           questionNumber:
             question.questionnumber || String(question.number ?? slot),
-          answerName: getQuestionAnswerName(question.html),
+          answerNames: getQuestionAnswerNames(parseQuestion(question.html)),
           flagged:
             existingFlag !== undefined
               ? existingFlag
@@ -341,7 +334,7 @@ export default function ExamScreen() {
             page: pageIndex,
             questionNumber:
               question.questionnumber || String(question.number ?? slot),
-            answerName: getQuestionAnswerName(question.html),
+            answerNames: getQuestionAnswerNames(parseQuestion(question.html)),
             flagged:
               existingFlag !== undefined
                 ? existingFlag
@@ -393,7 +386,7 @@ export default function ExamScreen() {
             page,
             questionNumber:
               question.questionnumber || String(question.number ?? slot),
-            answerName: getQuestionAnswerName(question.html),
+            answerNames: getQuestionAnswerNames(parseQuestion(question.html)),
             flagged:
               existingFlag !== undefined
                 ? existingFlag
@@ -435,7 +428,7 @@ export default function ExamScreen() {
           page,
           questionNumber:
             question.questionnumber || String(question.number ?? slot),
-          answerName: getQuestionAnswerName(question.html),
+          answerNames: getQuestionAnswerNames(parseQuestion(question.html)),
           flagged:
             existingFlag !== undefined
               ? existingFlag
@@ -970,7 +963,7 @@ export default function ExamScreen() {
       return;
     }
 
-    const answers = answer as Record<string, string>;
+    const answers = { ...answerRef.current, ...(answer as Record<string, string>) };
 
     if (
       saving ||
@@ -1307,7 +1300,7 @@ export default function ExamScreen() {
       id: item.slot,
       number: Number(item.questionNumber) || item.slot,
       status:
-        item.answerName && selectedAnswers[item.answerName]
+        isQuestionAnswered(item.answerNames, answerRef.current)
           ? "answered"
           : "unanswered",
       flagged: Boolean(flaggedQuestions[item.slot] ?? item.flagged),
@@ -1505,11 +1498,7 @@ export default function ExamScreen() {
   /* LOADING                                                                */
 
   if (loading && questions.length === 0) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Loading message="Đang tải bài thi..." />
-      </View>
-    );
+    return <ExamLoading quizName={quizName} />;
   }
 
   /* EMPTY                                                                  */
@@ -1852,13 +1841,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
-  },
-
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: COLORS.backgroundSoft,
-    justifyContent: "center",
-    alignItems: "center",
   },
 
   loadingMore: {

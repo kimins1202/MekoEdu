@@ -8,10 +8,10 @@ import {
 
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
-  FlatList,
+  SectionList,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -21,6 +21,8 @@ import {
 import AppHeader from "@/components/common/AppHeader";
 import Loading from "@/components/common/Loading";
 import COLORS from "@/constants/colors";
+import { getCourseContents } from "@/api/courseApi";
+import type { CourseSection } from "@/types/course";
 
 import { getQuizQuestionCount, getQuizzesByCourses } from "../../api/quizApi";
 
@@ -39,6 +41,8 @@ type Exam = {
   name: string;
   questioncount?: number | null;
   timelimit?: number;
+  section?: number;
+  coursemodule?: number;
 };
 
 // =========================
@@ -52,7 +56,62 @@ export default function ExamListScreen() {
   const { courseid } = route.params;
 
   const [exams, setExams] = useState<Exam[]>([]);
+  const [courseSections, setCourseSections] = useState<CourseSection[]>([]);
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+
+  const sections = useMemo(() => {
+    const remaining = new Map(exams.map((exam) => [Number(exam.id), exam]));
+    const groups: { key: string; title: string; data: Exam[]; count: number }[] = [];
+
+    for (const section of courseSections) {
+      const data: Exam[] = [];
+      for (const module of section.modules ?? []) {
+        if (module.modname !== "quiz") continue;
+        const exam = remaining.get(Number(module.instance));
+        if (exam) {
+          data.push(exam);
+          remaining.delete(Number(exam.id));
+        }
+      }
+      // Quiz metadata can still identify the section when modules are omitted.
+      for (const exam of remaining.values()) {
+        if (exam.section != null && Number(exam.section) === Number(section.section)) {
+          data.push(exam);
+          remaining.delete(Number(exam.id));
+        }
+      }
+      if (data.length) {
+        groups.push({
+          key: `section-${section.id}`,
+          title: section.name?.trim() || (section.section === 0 ? "Phần chung" : `Phần ${section.section}`),
+          data,
+          count: data.length,
+        });
+      }
+    }
+
+    for (const exam of remaining.values()) {
+      const key = exam.section == null ? "other" : `fallback-${exam.section}`;
+      let group = groups.find((item) => item.key === key);
+      if (!group) {
+        group = {
+          key,
+          title: exam.section == null ? "Bài thi khác" : Number(exam.section) === 0 ? "Phần chung" : `Phần ${exam.section}`,
+          data: [],
+          count: 0,
+        };
+        groups.push(group);
+      }
+      group.data.push(exam);
+      group.count++;
+    }
+
+    return groups.map((group) => ({
+      ...group,
+      data: collapsedSections.has(group.key) ? [] : group.data,
+    }));
+  }, [exams, courseSections, collapsedSections]);
 
   // LOAD EXAMS FROM API
 
@@ -61,13 +120,19 @@ export default function ExamListScreen() {
       setLoading(true);
 
       // Lấy danh sách quiz của course
-      const quizData = await getQuizzesByCourses([courseid]);
+      const [quizData, contents] = await Promise.all([
+        getQuizzesByCourses([courseid]),
+        getCourseContents(courseid).catch((error) => {
+          console.error("Lỗi lấy section khóa học:", error);
+          return [] as CourseSection[];
+        }),
+      ]);
 
       const quizzes = quizData?.quizzes ?? [];
 
       // Lấy số câu hỏi của từng quiz
       const quizzesWithQuestionCount = await Promise.all(
-        quizzes.map(async (quiz: any) => {
+        quizzes.map(async (quiz: Exam) => {
           try {
             const questioncount = await getQuizQuestionCount(Number(quiz.id));
 
@@ -87,10 +152,13 @@ export default function ExamListScreen() {
       );
 
       setExams(quizzesWithQuestionCount);
+      setCourseSections(contents);
+      setCollapsedSections(new Set());
     } catch (error: any) {
       console.error("Lỗi load exams:", error?.response?.data || error?.message);
 
       setExams([]);
+      setCourseSections([]);
     } finally {
       setLoading(false);
     }
@@ -159,11 +227,37 @@ export default function ExamListScreen() {
           </TouchableOpacity>
         </View>
       ) : (
-        <FlatList
-          data={exams}
+        <SectionList
+          sections={sections}
           keyExtractor={(item) => String(item.id)}
+          stickySectionHeadersEnabled={false}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.list}
+          renderSectionHeader={({ section }) => (
+            <TouchableOpacity
+              style={styles.sectionHeader}
+              activeOpacity={0.75}
+              accessibilityRole="button"
+              accessibilityLabel={section.title}
+              accessibilityState={{ expanded: !collapsedSections.has(section.key) }}
+              onPress={() => setCollapsedSections((current) => {
+                const next = new Set(current);
+                if (next.has(section.key)) next.delete(section.key);
+                else next.add(section.key);
+                return next;
+              })}
+            >
+              <Ionicons
+                name={collapsedSections.has(section.key) ? "chevron-forward" : "chevron-down"}
+                size={20}
+                color={COLORS.primary}
+              />
+              <View style={styles.sectionContent}>
+                <Text style={styles.sectionTitle}>{section.title}</Text>
+                <Text style={styles.sectionCount}>{section.count} bài kiểm tra</Text>
+              </View>
+            </TouchableOpacity>
+          )}
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.examCard}
@@ -285,6 +379,31 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
 
     elevation: 2,
+  },
+
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 14,
+    marginBottom: 4,
+  },
+
+  sectionContent: {
+    flex: 1,
+  },
+
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: COLORS.text,
+    lineHeight: 24,
+  },
+
+  sectionCount: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginTop: 3,
   },
 
   // ICON

@@ -30,6 +30,7 @@ function setup(data = new Map([['userid', '1'], ['wstoken', 'test']])) {
   const store = load('src/services/examStorageService.ts', { '@react-native-async-storage/async-storage': storage });
   const sync = load('src/services/syncService.ts', {
     '@react-native-async-storage/async-storage': storage, '@/api/quizApi': api, './examStorageService': store,
+    '@/utils/examSyncPayload': load('src/utils/examSyncPayload.ts', { 'node-html-parser': require('node-html-parser') }),
   });
   return { data, api, store, sync, failDisk: () => { diskError = true; } };
 }
@@ -46,6 +47,39 @@ test('offline answers persist Pending across restart then become Synced after ac
   await reopened.sync.syncPendingExams();
   assert.equal(sent[0].value, 'A');
   assert.equal((await reopened.store.readOfflineExam(context)).status, 'Synced');
+});
+
+test('uses question usage ID for both autosave and final submission, not attempt ID', async () => {
+  const h = setup();
+  await h.store.updateOfflineExam(context, exam => ({ ...exam, pages: { 0: {
+    questions: [{ slot: 1, sequencecheck: 2, html: '<input type="hidden" name="q987:1_:sequencecheck" value="2"><input name="q987:1_answer" value="">' }], nextpage: -1,
+  } } }));
+  const checkPayload = data => {
+    const values = Object.fromEntries(data.map(item => [item.name, item.value]));
+    assert.equal(values['q987:1_answer'], '3');
+    assert.equal(values['q987:1_:sequencecheck'], '2');
+    assert.equal(values['q3:1_:sequencecheck'], undefined);
+    assert.equal(values.slots, '1');
+  };
+  let saves = 0;
+  h.api.saveQuizAttempt = async (_, data) => { checkPayload(data); saves++; return { status: true }; };
+  await h.store.queueExamAnswers(context, { 'q987:1_answer': '3' });
+  await h.sync.syncExam(context);
+  assert.equal(saves, 1);
+  h.api.processQuizAttempt = async (_, data) => { checkPayload(data); return { state: 'finished' }; };
+  await h.store.queueExamAnswers(context, { 'q987:1_answer': '3' }, true);
+  await h.sync.syncExam(context);
+  assert.equal((await h.store.readOfflineExam(context)).submitted, true);
+});
+
+test('missing question metadata never silently acknowledges unsent answers', async () => {
+  const h = setup();
+  await h.store.queueExamAnswers(context, { 'q987:1_answer': 'yes' });
+  h.api.saveQuizAttempt = async () => assert.fail('must not send incomplete payload');
+  await h.sync.syncExam(context);
+  const exam = await h.store.readOfflineExam(context);
+  assert.equal(exam.status, 'Failed');
+  assert.equal(exam.answers['q987:1_answer'], 'yes');
 });
 
 test('old in-flight acknowledgement cannot mark newer edits Synced; latest answers are sent next', async () => {
