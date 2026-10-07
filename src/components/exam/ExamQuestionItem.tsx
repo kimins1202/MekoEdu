@@ -1,4 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
+import AudioPlayer from "./questions/AudioPlayer";
+import { getMoodleFileUrl } from "../../utils/moodleFile";
 import {
   LayoutChangeEvent,
   StyleSheet,
@@ -91,19 +93,42 @@ export default function ExamQuestionItem({
         {!!questionText && (
           <Text style={styles.questionText}>{questionText}</Text>
         )}
+
+        {/* Audio của Description / Listening */}
+        {question.type === "description" && question.audioUrl && (
+          <View style={styles.descriptionAudio}>
+            <AudioPlayer uri={getMoodleFileUrl(question.audioUrl, token)} />
+          </View>
+        )}
+
+        {/* Description chỉ hiển thị nội dung + audio, không có phần trả lời */}
+        {question.type !== "description" && (
+          <AppCard style={styles.answerBox}>
+            <Text style={styles.answerTitle}>Trả lời</Text>
+
+            <QuestionRenderer
+              question={question}
+              answers={selectedAnswers}
+              setAnswer={handleAnswerChange}
+              token={token}
+            />
+          </AppCard>
+        )}
       </AppCard>
 
-      {/* Answer */}
-      <AppCard style={styles.answerBox}>
-        <Text style={styles.answerTitle}>Trả lời</Text>
+      {/* Answer - Description không có phần trả lời */}
+      {question.type !== "description" && (
+        <AppCard style={styles.answerBox}>
+          <Text style={styles.answerTitle}>Trả lời</Text>
 
-        <QuestionRenderer
-          question={question}
-          answers={selectedAnswers}
-          setAnswer={handleAnswerChange}
-          token={token}
-        />
-      </AppCard>
+          <QuestionRenderer
+            question={question}
+            answers={selectedAnswers}
+            setAnswer={handleAnswerChange}
+            token={token}
+          />
+        </AppCard>
+      )}
     </View>
   );
 }
@@ -194,5 +219,9 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     textTransform: "uppercase",
     letterSpacing: 0.5,
+  },
+
+  descriptionAudio: {
+    marginTop: 16,
   },
 });

@@ -553,6 +553,53 @@ function parseCloze(root: HTMLElement): ClozePart[] {
   return parts;
 }
 
+function parseDescriptionText(root: HTMLElement): string {
+  const qtext = root.querySelector(".qtext");
+
+  if (!qtext) return "";
+
+  let html = qtext.innerHTML;
+
+  // Các thẻ xuống dòng
+  html = html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<\/div>/gi, "\n")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "• ");
+
+  const cloned = parse(html);
+
+  // Xóa accessibility text
+  cloned
+    .querySelectorAll(".accesshide, .sr-only, .visually-hidden")
+    .forEach((element) => element.remove());
+
+  // Xóa audio/media khỏi phần text
+  cloned
+    .querySelectorAll("audio, video, .mediaplugin")
+    .forEach((element) => element.remove());
+
+  let text = cloned.text;
+
+  return (
+    text
+      .replace(/&nbsp;/gi, " ")
+      .replace(/\u00a0/g, " ")
+
+      // Chỉ gom space/tab, KHÔNG gom \n
+      .replace(/[ \t]+/g, " ")
+
+      // Xóa space đầu/cuối mỗi dòng
+      .replace(/ *\n */g, "\n")
+
+      // Không cho quá nhiều dòng trống
+      .replace(/\n{3,}/g, "\n\n")
+
+      .trim()
+  );
+}
+
 export function parseQuestion(html: string): ParsedQuestion {
   const root = parse(html);
   const type = detectType(root, html);
@@ -560,9 +607,10 @@ export function parseQuestion(html: string): ParsedQuestion {
 
   const result: ParsedQuestion = {
     type,
+
     text:
-      type === "ddwtos"
-        ? parseDragDropQuestionText(root)
+      type === "description"
+        ? parseDescriptionText(root)
         : parseQuestionText(root),
 
     html,
