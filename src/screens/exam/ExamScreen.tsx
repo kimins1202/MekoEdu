@@ -185,6 +185,8 @@ export default function ExamScreen() {
 
   const pageCacheRef = useRef<Record<number, CachedPage>>({});
 
+  const playedAudioRef = useRef<Set<string>>(new Set());
+
   const flaggedRef = useRef<Record<number, boolean>>({});
 
   const submissionLock = useRef(false);
@@ -623,6 +625,7 @@ export default function ExamScreen() {
 
       pageCacheRef.current = {};
       flaggedRef.current = {};
+      playedAudioRef.current = new Set();
 
       const userId = await AsyncStorage.getItem("userid");
 
@@ -1631,6 +1634,7 @@ export default function ExamScreen() {
               questionText={parsedQuestion.text}
               question={parsedQuestion}
               token={token}
+              playedAudioRef={playedAudioRef}
               isFlagged={isFlagged}
               selectedAnswers={selectedAnswers}
               disabled={submitting || examFinished || answersLocked}

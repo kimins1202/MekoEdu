@@ -28,7 +28,15 @@ function parseQuestionText(root: HTMLElement): string {
   if (!qtext) return "";
 
   // Clone để không ảnh hưởng HTML gốc
-  const cloned = parse(qtext.innerHTML);
+  let qtextHtml = qtext.innerHTML;
+
+  // Giữ các xuống dòng Moodle
+  qtextHtml = qtextHtml
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<\/div>/gi, "\n");
+
+  const cloned = parse(qtextHtml);
 
   // Embedded Answers / Cloze
   cloned.querySelectorAll("input, select, textarea").forEach((element) => {
@@ -73,11 +81,22 @@ function parseQuestionText(root: HTMLElement): string {
       element.replaceWith(" ___ ");
     });
 
-  return cleanText(cloned.text)
-    .replace(/Blank\s+\d+\s+Question\s+\d+/gi, "")
-    .replace(/\s+([.,;:!?])/g, "$1")
-    .replace(/\s+/g, " ")
-    .trim();
+  return (
+    cloned.text
+      .replace(/&nbsp;/gi, " ")
+      .replace(/\u00a0/g, " ")
+
+      // Chỉ gom space/tab, không xóa newline
+      .replace(/[ \t]+/g, " ")
+
+      // Xóa khoảng trắng quanh newline
+      .replace(/ *\n */g, "\n")
+
+      // Tối đa 1 dòng trống
+      .replace(/\n{3,}/g, "\n\n")
+
+      .trim()
+  );
 }
 /**
  * Moodle sinh ID dạng q103:2_choice0_label. Dấu ':' có ý nghĩa đặc biệt
@@ -162,9 +181,6 @@ function getLabelForInput(root: HTMLElement, input: HTMLElement): string {
 }
 
 function stripChoicePrefix(label: string): string {
-  // Calculated multichoice của Moodle đôi khi trả option dưới dạng
-  // <pre><code>11.50</code></pre>. Khi text bị escape, node-html-parser có thể
-  // trả literal "<code>11.50</code>". Chuẩn hóa để mobile chỉ hiện giá trị.
   const normalized = label
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")
@@ -173,10 +189,17 @@ function stripChoicePrefix(label: string): string {
     .replace(/\s+/g, " ")
     .trim();
 
-  return normalized
-    .replace(/^[a-zA-Z][.)]\s*/, "")
-    .replace(/^\d+[.)]\s*/, "")
-    .trim();
+  return (
+    normalized
+      // a. Answer / A) Answer
+      .replace(/^[a-zA-Z][.)]\s+/, "")
+
+      // 1. Answer / 2) Answer
+      // Bắt buộc phải có khoảng trắng nên KHÔNG match 3.30
+      .replace(/^\d+[.)]\s+/, "")
+
+      .trim()
+  );
 }
 
 function parseRadioChoices(root: HTMLElement): {

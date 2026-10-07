@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import AudioPlayer from "./questions/AudioPlayer";
+import AutoAudioPlayer from "./questions/AutoAudioPlayer";
 import { getMoodleFileUrl } from "../../utils/moodleFile";
 import {
   LayoutChangeEvent,
@@ -27,6 +27,8 @@ interface ExamQuestionItemProps {
 
   token?: string;
 
+  playedAudioRef: React.MutableRefObject<Set<string>>;
+
   onFlagToggle: () => void;
   onAnswerChange: (answer: unknown) => void;
   onLayout?: (event: LayoutChangeEvent) => void;
@@ -42,6 +44,7 @@ export default function ExamQuestionItem({
   flagDisabled = disabled,
   answerDisabled = disabled,
   token,
+  playedAudioRef,
   onFlagToggle,
   onAnswerChange,
   onLayout,
@@ -58,7 +61,6 @@ export default function ExamQuestionItem({
   return (
     <View style={styles.questionContainer} onLayout={onLayout}>
       <AppCard style={styles.questionBox}>
-        {/* Question header */}
         <View style={styles.questionHeader}>
           <View style={styles.questionHeaderLeft}>
             <View style={styles.questionNumber}>
@@ -70,53 +72,41 @@ export default function ExamQuestionItem({
             <Text style={styles.questionLabel}>Câu hỏi</Text>
           </View>
 
-          {/* Flag */}
-          <TouchableOpacity
-            style={[styles.flagButton, isFlagged && styles.flagButtonActive]}
-            onPress={onFlagToggle}
-            disabled={flagDisabled}
-            activeOpacity={0.75}
-          >
-            <Ionicons
-              name={isFlagged ? "flag" : "flag-outline"}
-              size={19}
-              color={isFlagged ? COLORS.warning : COLORS.textLight}
-            />
+          {question.type !== "description" && (
+            <TouchableOpacity
+              style={[styles.flagButton, isFlagged && styles.flagButtonActive]}
+              onPress={onFlagToggle}
+              disabled={flagDisabled}
+              activeOpacity={0.75}
+            >
+              <Ionicons
+                name={isFlagged ? "flag" : "flag-outline"}
+                size={19}
+                color={isFlagged ? COLORS.warning : COLORS.textLight}
+              />
 
-            <Text style={[styles.flagText, isFlagged && styles.flagTextActive]}>
-              {isFlagged ? "Đã đánh dấu" : "Đánh dấu"}
-            </Text>
-          </TouchableOpacity>
+              <Text
+                style={[styles.flagText, isFlagged && styles.flagTextActive]}
+              >
+                {isFlagged ? "Đã đánh dấu" : "Đánh dấu"}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
-        {/* Question text */}
         {!!questionText && (
           <Text style={styles.questionText}>{questionText}</Text>
         )}
 
-        {/* Audio của Description / Listening */}
         {question.type === "description" && question.audioUrl && (
-          <View style={styles.descriptionAudio}>
-            <AudioPlayer uri={getMoodleFileUrl(question.audioUrl, token)} />
-          </View>
-        )}
-
-        {/* Description chỉ hiển thị nội dung + audio, không có phần trả lời */}
-        {question.type !== "description" && (
-          <AppCard style={styles.answerBox}>
-            <Text style={styles.answerTitle}>Trả lời</Text>
-
-            <QuestionRenderer
-              question={question}
-              answers={selectedAnswers}
-              setAnswer={handleAnswerChange}
-              token={token}
-            />
-          </AppCard>
+          <AutoAudioPlayer
+            uri={getMoodleFileUrl(question.audioUrl, token)}
+            audioKey={question.audioUrl}
+            playedAudioRef={playedAudioRef}
+          />
         )}
       </AppCard>
 
-      {/* Answer - Description không có phần trả lời */}
       {question.type !== "description" && (
         <AppCard style={styles.answerBox}>
           <Text style={styles.answerTitle}>Trả lời</Text>
