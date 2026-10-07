@@ -1,4 +1,6 @@
 import RenderHTML from "react-native-render-html";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { readOfflineExam } from "@/services/examStorageService";
 import { getReviewGrade, parseReviewHtml } from "@/parsers/reviewParser";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -55,11 +57,12 @@ export default function AnswerReviewScreen() {
   const contentWidth = Math.max(1, width - 60);
 
   const route = useRoute<ReviewRoute>();
-  const { attemptid, quizName } = route.params;
+  const { attemptid, quizid, quizName } = route.params;
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [questions, setQuestions] = useState<ReviewQuestion[]>([]);
+  const [savedAnswers, setSavedAnswers] = useState<Record<string, string>>({});
   const [totalMark, setTotalMark] = useState<number | null>(null);
   const [maxMark, setMaxMark] = useState<number | null>(null);
   const [expandedSlots, setExpandedSlots] = useState<Set<number>>(new Set());
@@ -76,6 +79,10 @@ export default function AnswerReviewScreen() {
       }
 
       setQuestions(res.questions);
+      setExpandedSlots(new Set(res.questions.map((question: ReviewQuestion) => question.slot)));
+      const userid = Number(await AsyncStorage.getItem("userid"));
+      const local = userid ? await readOfflineExam({ userid, quizid, attemptid }).catch(() => null) : null;
+      setSavedAnswers(local?.answers ?? {});
 
       let total = 0;
       let max = 0;
@@ -280,7 +287,11 @@ export default function AnswerReviewScreen() {
           const stateInfo = getStateInfo(q);
           const isExpanded = expandedSlots.has(q.slot);
 
-          const { contentHtml, feedbackHtml } = parseReviewHtml(q.html ?? "");
+          const { questionHtml, selectedAnswerHtml, correctAnswerHtml, feedbackHtml, answerGroups } = parseReviewHtml(q.html ?? "", savedAnswers);
+          const localResponse = Object.entries(savedAnswers)
+            .filter(([name, value]) => new RegExp(`^q\\d+:${q.slot}_(?![:\\-])`).test(name)
+              && !name.endsWith("answerformat") && value.trim() && !/_choice\d+$/.test(name))
+            .map(([, value]) => value).join("; ");
 
           const m = parseFloat(q.mark ?? "");
           const mx = q.maxmark ?? 0;
@@ -345,13 +356,47 @@ export default function AnswerReviewScreen() {
 
                   <RenderHTML
                     contentWidth={contentWidth}
-                    source={{ html: contentHtml || "<p>Nội dung câu hỏi không được cung cấp.</p>" }}
+                    source={{ html: questionHtml || "<p>Nội dung câu hỏi không được cung cấp.</p>" }}
                     baseStyle={{ fontSize: 15, lineHeight: 23, color: COLORS.text }}
                     classesStyles={{ correct: { color: COLORS.success }, incorrect: { color: COLORS.error }, partiallycorrect: { color: COLORS.warning } }}
                   />
+                  {answerGroups.map((group, groupIndex) => (
+                    <View key={groupIndex} style={styles.answersSection}>
+                      {!!group.label && <Text style={styles.answersLabel}>{group.label}</Text>}
+                      {group.choices.map((choice, choiceIndex) => (
+                        <View key={choice.key} style={[styles.answerRow,
+                          choice.state === "correct" && styles.answerCorrect,
+                          choice.state === "incorrect" && styles.answerIncorrect]}>
+                          <View style={[styles.answerLabelBadge, { backgroundColor: choice.state === "correct" ? COLORS.success : choice.state === "incorrect" ? COLORS.error : COLORS.textSecondary }]}>
+                            <Text style={styles.answerLabelText}>{String.fromCharCode(65 + choiceIndex)}</Text>
+                          </View>
+                          <Text style={styles.answerText}>{choice.text}{choice.selected ? "  ✓ Đã chọn" : ""}</Text>
+                          {choice.state !== "neutral" && <Ionicons name={choice.state === "correct" ? "checkmark-circle" : "close-circle"} size={20} color={choice.state === "correct" ? COLORS.success : COLORS.error} />}
+                        </View>
+                      ))}
+                    </View>
+                  ))}
+                  {answerGroups.length === 0 && <View style={[styles.rawContent,
+                    getReviewGrade(q) === "incorrect" && styles.answerIncorrect,
+                    getReviewGrade(q) === "correct" && styles.answerCorrect]}>
+                    <Text style={styles.answersLabel}>Đáp án của bạn</Text>
+                    {!selectedAnswerHtml && localResponse ? <Text style={styles.answerText}>{localResponse}</Text> : <RenderHTML
+                      contentWidth={Math.max(1, contentWidth - 24)}
+                      source={{ html: selectedAnswerHtml || "<p>Không có đáp án được cung cấp trong dữ liệu xem lại.</p>" }}
+                      baseStyle={{ fontSize: 14, lineHeight: 22, color: COLORS.text }}
+                    />}
+                  </View>}
+                  <View style={[styles.rawContent, { backgroundColor: "#EAF7EF", marginTop: 12 }]}>
+                    <Text style={[styles.answersLabel, { color: COLORS.success }]}>Đáp án đúng</Text>
+                    <RenderHTML
+                      contentWidth={Math.max(1, contentWidth - 24)}
+                      source={{ html: correctAnswerHtml || "<p>Moodle chưa cung cấp đáp án đúng cho câu hỏi này.</p>" }}
+                      baseStyle={{ fontSize: 14, lineHeight: 22, color: COLORS.text }}
+                    />
+                  </View>
                   {!!feedbackHtml && (
                     <View style={styles.rawContent}>
-                      <Text style={styles.answersLabel}>Nhận xét và đáp án</Text>
+                      <Text style={styles.answersLabel}>Nhận xét</Text>
                       <RenderHTML
                         contentWidth={Math.max(1, contentWidth - 24)}
                         source={{ html: feedbackHtml }}

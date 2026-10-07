@@ -13,13 +13,55 @@ function load(path) {
 const { parseReviewHtml, getReviewGrade } = load('src/parsers/reviewParser.ts');
 const wrap = (type, content, feedback = '') => `<div class="que ${type} incorrect"><div class="info">Question 1 Not answered</div><div class="formulation">${content}</div><div class="outcome">${feedback}</div><script>// unwanted</script></div>`;
 
+test('all correct checkbox answers turn green including an unselected correct answer', () => {
+  const html = wrap('multichoice', '<div class="qtext">Multiple answers</div><div class="answer">' +
+    ['2', '3', '1', '12'].map((text, index) => `<div class="r${index % 2}"><input type="checkbox" name="q8:1_choice${index}" id="choice${index}" value="1" ${index < 2 ? 'checked' : ''}><label for="choice${index}">${text}</label></div>`).join('') + '</div>',
+    '<div class="rightanswer">The correct answers are: 1, 2</div>');
+  const choices = parseReviewHtml(html).answerGroups[0].choices;
+  assert.equal(choices[0].state, 'correct');
+  assert.equal(choices[1].state, 'incorrect');
+  assert.equal(choices[2].state, 'correct');
+  assert.equal(choices[2].selected, false);
+  assert.equal(choices[3].state, 'neutral');
+});
+
+test('all radio options are shown with selected wrong red and exact correct green', () => {
+  const result = parseReviewHtml(wrap('multichoice', '<div class="qtext">Choose</div><div class="answer"><div class="r0 incorrect"><input type="radio" name="q8:1_answer" id="one" value="0" checked><label for="one">a. 1</label></div><div class="r1"><input type="radio" name="q8:1_answer" id="two" value="1"><label for="two">b. 3</label></div><div class="r0"><input type="radio" name="q8:1_answer" id="three" value="2"><label for="three">c. 30</label></div></div>', '<div class="rightanswer">The correct answer is: 3</div>'));
+  const choices = result.answerGroups[0].choices;
+  assert.equal(choices.length, 3);
+  assert.equal(choices[0].selected, true);
+  assert.equal(choices[0].state, 'incorrect');
+  assert.equal(choices[1].state, 'correct');
+  assert.equal(choices[2].state, 'neutral');
+});
+
+test('gapselect exposes all options and marks the expected word green', () => {
+  const result = parseReviewHtml(wrap('gapselect', '<div class="qtext">HTML <select name="q8:1_p1"><option value="0">Choose</option><option value="1" selected>wrong</option><option value="2">markup</option></select></div>', '<div class="rightanswer">The correct answer is: HTML [markup]</div>'));
+  const choices = result.answerGroups[0].choices;
+  assert.equal(choices.length, 2);
+  assert.equal(choices[0].state, 'incorrect');
+  assert.equal(choices[0].selected, true);
+  assert.equal(choices[1].state, 'correct');
+});
+
 test('gap select review shows only the selected answer and preserves the whole nested question', () => {
   const result = parseReviewHtml(wrap('gapselect', '<div class="qtext"><p>HTML là <span class="accesshide">Blank 1 Question 1</span><select name="q1:1_p1"><option value="0">Choose</option><option value="1" selected>đánh dấu</option><option value="2">aaa</option></select>.</p><p>Second paragraph</p></div>', '<div class="specificfeedback">Incorrect</div><div class="rightanswer"><p>The correct answer is: <b>đánh dấu</b></p></div>'));
   assert.match(result.contentHtml, /đánh dấu/);
   assert.match(result.contentHtml, /Second paragraph/);
   assert.doesNotMatch(result.contentHtml, /aaa|Blank 1|Question 1|script|select/);
-  assert.match(result.feedbackHtml, /The correct answer/);
+  assert.match(result.correctAnswerHtml, /The correct answer/);
+  assert.doesNotMatch(result.feedbackHtml, /The correct answer/);
+  assert.match(result.selectedAnswerHtml, /đánh dấu/);
+  assert.doesNotMatch(result.questionHtml, /đánh dấu|aaa/);
   assert.equal(result.state, 'gradedwrong');
+});
+
+test('response outside formulation is displayed separately from question and correct answer', () => {
+  const result = parseReviewHtml('<div class="que shortanswer correct"><div class="formulation"><div class="qtext">moshi moshi?</div></div><div class="answer"><input name="q55:2_answer" value="yes" readonly></div><div class="rightanswer">The correct answer is: yes</div></div>');
+  assert.match(result.questionHtml, /moshi moshi/);
+  assert.match(result.selectedAnswerHtml, /yes/);
+  assert.match(result.correctAnswerHtml, /yes/);
+  assert.doesNotMatch(result.questionHtml, /The correct answer/);
 });
 
 test('radio, checkbox and truefalse reviews preserve the selected options without guessing correct answers', () => {
