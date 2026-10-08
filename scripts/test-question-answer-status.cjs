@@ -7,7 +7,22 @@ const exported = {};
 vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/utils/questionAnswerStatus.ts', 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS },
 }).outputText, { exports: exported });
-const { getQuestionAnswerNames, isQuestionAnswered } = exported;
+const { getQuestionAnswerNames, isAnswerableQuestion, isQuestionAnswered } = exported;
+
+test('reading passages do not inflate question totals or unanswered counts', () => {
+  const questions = [
+    ...Array.from({ length: 4 }, () => ({ type: 'description', fieldName: 'metadata' })),
+    ...Array.from({ length: 40 }, (_, index) => ({ type: 'shortanswer', fieldName: `answer${index}` })),
+  ];
+  const answerable = questions.filter(isAnswerableQuestion);
+  const answers = { answer0: 'a', answer1: 'b', answer2: 'c', answer3: 'd', metadata: '1' };
+  const answered = answerable.filter(question => isQuestionAnswered(getQuestionAnswerNames(question), answers)).length;
+  assert.equal(answerable.length, 40);
+  assert.equal(answered, 4);
+  assert.equal(answerable.length - answered, 36);
+  assert.equal((answered / answerable.length) * 100, 10);
+  assert.equal(getQuestionAnswerNames(questions[0]).length, 0);
+});
 
 test('select missing words counts the question once even with multiple responses', () => {
   const fields = getQuestionAnswerNames({ selectFields: [{ fieldName: 'q1:1_p1' }, { fieldName: 'q1:1_p2' }] });

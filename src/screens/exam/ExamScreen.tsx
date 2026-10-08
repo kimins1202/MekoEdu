@@ -55,7 +55,7 @@ import {
 } from "../../api/quizApi";
 
 import { parseQuestion } from "@/parsers/questionParser";
-import { getQuestionAnswerNames, isQuestionAnswered } from "@/utils/questionAnswerStatus";
+import { getQuestionAnswerNames, isAnswerableQuestion, isQuestionAnswered } from "@/utils/questionAnswerStatus";
 import type { ParsedQuestion } from "@/types/question";
 
 /* -------------------------------------------------------------------------- */
@@ -94,6 +94,10 @@ type QuestionOverviewItem = {
 };
 
 type ExamAnswers = Record<string, string>;
+
+function isCountedQuizQuestion(question: QuizQuestion): boolean {
+  return question.type !== "description" && isAnswerableQuestion(parseQuestion(question.html));
+}
 
 /* -------------------------------------------------------------------------- */
 /* HELPERS                                                                    */
@@ -270,7 +274,7 @@ export default function ExamScreen() {
       pageQuestions.forEach((question) => {
         const slot = getQuestionSlot(question);
 
-        if (!slot) {
+        if (!slot || !isCountedQuizQuestion(question)) {
           return;
         }
 
@@ -300,7 +304,7 @@ export default function ExamScreen() {
       (page?.questions ?? []).forEach((question: QuizQuestion) => {
         const slot = getQuestionSlot(question);
 
-        if (slot > 0) {
+        if (slot > 0 && isCountedQuizQuestion(question)) {
           slots.add(slot);
         }
       });
@@ -319,7 +323,7 @@ export default function ExamScreen() {
         (page?.questions ?? []).forEach((question: QuizQuestion) => {
           const slot = getQuestionSlot(question);
 
-          if (!slot) {
+          if (!slot || !isCountedQuizQuestion(question)) {
             return;
           }
 
@@ -369,7 +373,7 @@ export default function ExamScreen() {
         cachedPage.questions.forEach((question) => {
           const slot = getQuestionSlot(question);
 
-          if (!slot) {
+          if (!slot || !isCountedQuizQuestion(question)) {
             return;
           }
 
@@ -411,7 +415,7 @@ export default function ExamScreen() {
       pageQuestions.forEach((question) => {
         const slot = getQuestionSlot(question);
 
-        if (!slot) {
+        if (!slot || !isCountedQuizQuestion(question)) {
           return;
         }
 

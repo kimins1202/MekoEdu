@@ -121,14 +121,12 @@ export default function SettingsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
 
-  const loadSettings = useCallback(async () => {
-    try {
-      const [siteInfoResponse, savedTheme, storedProfile] = await Promise.all([
+  const loadSettings = useCallback(() => {
+    return Promise.all([
         getSiteInfo(),
         AsyncStorage.getItem("themeMode"),
         AsyncStorage.getItem(PROFILE_STORAGE_KEY),
-      ]);
-
+      ]).then(([siteInfoResponse, savedTheme, storedProfile]) => {
       if (siteInfoResponse?.exception) {
         throw new Error(
           siteInfoResponse.message || "Không thể lấy thông tin sinh viên.",
@@ -162,22 +160,22 @@ export default function SettingsScreen() {
       }
 
       setDarkMode(savedTheme === "dark");
-    } catch (error: any) {
+    }).catch((error: any) => {
       Alert.alert("Không thể tải dữ liệu", error?.message || "Đã xảy ra lỗi.");
-    } finally {
+    }).finally(() => {
       setLoading(false);
       setRefreshing(false);
-    }
+    });
   }, []);
 
   useEffect(() => {
-    loadSettings();
+    void loadSettings();
   }, [loadSettings]);
 
   // Refresh settings
   const handleRefresh = () => {
     setRefreshing(true);
-    loadSettings();
+    void loadSettings();
   };
 
   // Change theme
@@ -275,7 +273,7 @@ export default function SettingsScreen() {
             </Text>
 
             <View style={styles.studentBadge}>
-              <View style={styles.studentDot} />{" "}
+              <View style={styles.studentDot} />
               <Text style={styles.studentText}>Sinh viên MekoEdu</Text>
             </View>
           </View>
@@ -365,7 +363,7 @@ export default function SettingsScreen() {
           />
         </View>
 
-        <Text style={styles.version}>MekoEdu v1.0.0</Text>
+        <Text style={styles.version}>MekoEdu v1.4</Text>
       </ScrollView>
     </View>
   );

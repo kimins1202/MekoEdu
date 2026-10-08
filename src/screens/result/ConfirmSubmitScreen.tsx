@@ -240,7 +240,7 @@ export default function ConfirmSubmitScreen() {
   ).length;
 
   const progressPercent =
-    questions.length > 0 ? answeredCount / questions.length : 0;
+    questions.length > 0 ? (answeredCount / questions.length) * 100 : 0;
 
   const allSaved = savingCount === 0 && notSavedCount === 0;
 
@@ -426,7 +426,7 @@ export default function ConfirmSubmitScreen() {
             <AppProgressBar
               progress={progressPercent}
               height={5}
-              color={progressPercent === 1 ? "#7DBA18" : "#FFD740"}
+              color={progressPercent === 100 ? "#7DBA18" : "#FFD740"}
               trackColor="rgba(255,255,255,0.22)"
               showPercent={false}
             />

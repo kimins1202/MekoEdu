@@ -1,6 +1,11 @@
 import type { ParsedQuestion } from "@/types/question";
 
+export function isAnswerableQuestion(question: Pick<ParsedQuestion, "type">): boolean {
+  return question.type !== "description";
+}
+
 export function getQuestionAnswerNames(question: ParsedQuestion): string[] {
+  if (!isAnswerableQuestion(question)) return [];
   const names = [
     question.fieldName,
     question.orderingFieldName,

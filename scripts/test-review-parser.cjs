@@ -13,6 +13,24 @@ function load(path) {
 const { parseReviewHtml, getReviewGrade } = load('src/parsers/reviewParser.ts');
 const wrap = (type, content, feedback = '') => `<div class="que ${type} incorrect"><div class="info">Question 1 Not answered</div><div class="formulation">${content}</div><div class="outcome">${feedback}</div><script>// unwanted</script></div>`;
 
+test('review preserves bold, italic and underline in question and answer labels', () => {
+  const result = parseReviewHtml(wrap('multichoice', '<div class="qtext"><b>Bold</b><i>Italic</i><u>Underline</u></div><div class="answer"><input type="radio" name="q8:1_answer" id="formatted" value="0"><label for="formatted"><strong>Bold</strong><em>Italic</em><u>Underline</u></label></div>'));
+  assert.match(result.questionHtml, /<b>Bold<\/b>/);
+  assert.match(result.questionHtml, /<i>Italic<\/i>/);
+  assert.match(result.questionHtml, /<u>Underline<\/u>/);
+  const label = result.answerGroups[0].choices[0].html;
+  assert.match(label, /<strong>Bold<\/strong>/);
+  assert.match(label, /<em>Italic<\/em>/);
+  assert.match(label, /<u>Underline<\/u>/);
+});
+
+test('description is identified as content without answer panels', () => {
+  const description = parseReviewHtml(wrap('description', '<div class="qtext"><p>Reading passage</p></div>'));
+  assert.equal(description.isDescription, true);
+  assert.match(description.questionHtml, /Reading passage/);
+  assert.equal(parseReviewHtml(wrap('shortanswer', '<div class="qtext">Question</div>')).isDescription, false);
+});
+
 test('all correct checkbox answers turn green including an unselected correct answer', () => {
   const html = wrap('multichoice', '<div class="qtext">Multiple answers</div><div class="answer">' +
     ['2', '3', '1', '12'].map((text, index) => `<div class="r${index % 2}"><input type="checkbox" name="q8:1_choice${index}" id="choice${index}" value="1" ${index < 2 ? 'checked' : ''}><label for="choice${index}">${text}</label></div>`).join('') + '</div>',

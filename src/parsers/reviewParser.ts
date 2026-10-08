@@ -6,6 +6,7 @@ const escape = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;
 export type ReviewChoice = {
   key: string;
   text: string;
+  html?: string;
   selected: boolean;
   state: "correct" | "incorrect" | "neutral";
 };
@@ -44,7 +45,9 @@ export function parseReviewHtml(html: string, savedAnswers: Record<string, strin
       const correct = classes.includes("correct") || correctTexts.includes(normalize(choice.label))
         || (selected && state === "gradedright");
       const wrong = selected && (classes.includes("incorrect") || (!correct && !!rightText) || state === "gradedwrong");
-      return { key: `${index}`, text: choice.label, selected: !!selected, state: correct ? "correct" : wrong ? "incorrect" : "neutral" };
+      const label = parse(choice.labelHtml ?? escape(choice.label));
+      label.querySelectorAll("script, style, .accesshide, .sr-only, .visually-hidden").forEach(node => node.remove());
+      return { key: `${index}`, text: choice.label, html: label.innerHTML, selected: !!selected, state: correct ? "correct" : wrong ? "incorrect" : "neutral" };
     }) });
   }
   for (const [index, field] of (parsed.selectFields ?? []).entries()) {
@@ -136,6 +139,7 @@ export function parseReviewHtml(html: string, savedAnswers: Record<string, strin
   const correct = parse(root.querySelector(".rightanswer")?.innerHTML ?? "");
   correct.querySelectorAll("script, style, .accesshide, .sr-only, .visually-hidden").forEach(node => node.remove());
   return {
+    isDescription: parsed.type === "description",
     contentHtml: content.innerHTML + dragResponses,
     questionHtml: question.innerHTML || `<p>${escape(parsed.text)}</p>`,
     selectedAnswerHtml: dragResponses || responses.map((response, index) => `<p>${responses.length > 1 ? `${index + 1}. ` : ""}${response}</p>`).join(""),

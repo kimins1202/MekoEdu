@@ -20,6 +20,14 @@ import AppCard from "../../components/common/AppCard";
 import AppHeader from "../../components/common/AppHeader";
 import COLORS from "../../constants/colors";
 
+const reviewTagsStyles = {
+  strong: { fontWeight: "bold" as const },
+  b: { fontWeight: "bold" as const },
+  em: { fontStyle: "italic" as const },
+  i: { fontStyle: "italic" as const },
+  u: { textDecorationLine: "underline" as const },
+};
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ReviewRoute = {
@@ -287,7 +295,7 @@ export default function AnswerReviewScreen() {
           const stateInfo = getStateInfo(q);
           const isExpanded = expandedSlots.has(q.slot);
 
-          const { questionHtml, selectedAnswerHtml, correctAnswerHtml, feedbackHtml, answerGroups } = parseReviewHtml(q.html ?? "", savedAnswers);
+          const { questionHtml, selectedAnswerHtml, correctAnswerHtml, feedbackHtml, answerGroups, isDescription } = parseReviewHtml(q.html ?? "", savedAnswers);
           const localResponse = Object.entries(savedAnswers)
             .filter(([name, value]) => new RegExp(`^q\\d+:${q.slot}_(?![:\\-])`).test(name)
               && !name.endsWith("answerformat") && value.trim() && !/_choice\d+$/.test(name))
@@ -355,11 +363,14 @@ export default function AnswerReviewScreen() {
                   <View style={styles.divider} />
 
                   <RenderHTML
+                    tagsStyles={reviewTagsStyles}
+                    enableCSSInlineProcessing
                     contentWidth={contentWidth}
                     source={{ html: questionHtml || "<p>Nội dung câu hỏi không được cung cấp.</p>" }}
                     baseStyle={{ fontSize: 15, lineHeight: 23, color: COLORS.text }}
                     classesStyles={{ correct: { color: COLORS.success }, incorrect: { color: COLORS.error }, partiallycorrect: { color: COLORS.warning } }}
                   />
+                  {!isDescription && <>
                   {answerGroups.map((group, groupIndex) => (
                     <View key={groupIndex} style={styles.answersSection}>
                       {!!group.label && <Text style={styles.answersLabel}>{group.label}</Text>}
@@ -370,7 +381,16 @@ export default function AnswerReviewScreen() {
                           <View style={[styles.answerLabelBadge, { backgroundColor: choice.state === "correct" ? COLORS.success : choice.state === "incorrect" ? COLORS.error : COLORS.textSecondary }]}>
                             <Text style={styles.answerLabelText}>{String.fromCharCode(65 + choiceIndex)}</Text>
                           </View>
-                          <Text style={styles.answerText}>{choice.text}{choice.selected ? "  ✓ Đã chọn" : ""}</Text>
+                          <View style={{ flex: 1 }}>
+                            {choice.html ? <RenderHTML
+                    tagsStyles={reviewTagsStyles}
+                    enableCSSInlineProcessing
+                    contentWidth={Math.max(1, contentWidth - 100)}
+                              source={{ html: choice.html }}
+                              baseStyle={{ fontSize: 14, color: COLORS.text }}
+                            /> : <Text style={styles.answerText}>{choice.text}</Text>}
+                            {choice.selected && <Text style={styles.answerText}>✓ Đã chọn</Text>}
+                          </View>
                           {choice.state !== "neutral" && <Ionicons name={choice.state === "correct" ? "checkmark-circle" : "close-circle"} size={20} color={choice.state === "correct" ? COLORS.success : COLORS.error} />}
                         </View>
                       ))}
@@ -381,7 +401,9 @@ export default function AnswerReviewScreen() {
                     getReviewGrade(q) === "correct" && styles.answerCorrect]}>
                     <Text style={styles.answersLabel}>Đáp án của bạn</Text>
                     {!selectedAnswerHtml && localResponse ? <Text style={styles.answerText}>{localResponse}</Text> : <RenderHTML
-                      contentWidth={Math.max(1, contentWidth - 24)}
+                    tagsStyles={reviewTagsStyles}
+                    enableCSSInlineProcessing
+                    contentWidth={Math.max(1, contentWidth - 24)}
                       source={{ html: selectedAnswerHtml || "<p>Không có đáp án được cung cấp trong dữ liệu xem lại.</p>" }}
                       baseStyle={{ fontSize: 14, lineHeight: 22, color: COLORS.text }}
                     />}
@@ -389,7 +411,9 @@ export default function AnswerReviewScreen() {
                   <View style={[styles.rawContent, { backgroundColor: "#EAF7EF", marginTop: 12 }]}>
                     <Text style={[styles.answersLabel, { color: COLORS.success }]}>Đáp án đúng</Text>
                     <RenderHTML
-                      contentWidth={Math.max(1, contentWidth - 24)}
+                    tagsStyles={reviewTagsStyles}
+                    enableCSSInlineProcessing
+                    contentWidth={Math.max(1, contentWidth - 24)}
                       source={{ html: correctAnswerHtml || "<p>Moodle chưa cung cấp đáp án đúng cho câu hỏi này.</p>" }}
                       baseStyle={{ fontSize: 14, lineHeight: 22, color: COLORS.text }}
                     />
@@ -398,12 +422,15 @@ export default function AnswerReviewScreen() {
                     <View style={styles.rawContent}>
                       <Text style={styles.answersLabel}>Nhận xét</Text>
                       <RenderHTML
-                        contentWidth={Math.max(1, contentWidth - 24)}
+                    tagsStyles={reviewTagsStyles}
+                    enableCSSInlineProcessing
+                    contentWidth={Math.max(1, contentWidth - 24)}
                         source={{ html: feedbackHtml }}
                         baseStyle={{ fontSize: 14, lineHeight: 22, color: COLORS.text }}
                       />
                     </View>
                   )}
+                  </>}
                 </View>
               )}
             </AppCard>
