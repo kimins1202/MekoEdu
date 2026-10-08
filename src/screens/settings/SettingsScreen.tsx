@@ -2,19 +2,42 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   DeviceEventEmitter,
+  Image,
+  RefreshControl,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 
+import { getSiteInfo } from "../../api/authApi";
 import AppHeader from "../../components/common/AppHeader";
+import Loading from "../../components/common/Loading";
 import COLORS from "../../constants/colors";
 import { AppStackParamList } from "../../types/navigation";
+
+interface SiteInfo {
+  userid?: number;
+  username?: string;
+  fullname?: string;
+  siteurl?: string;
+  email?: string;
+}
+
+interface LocalProfile {
+  fullname: string;
+  birthday: string;
+  avatarId: string;
+  avatarUri: string | null;
+  address: string;
+  phone: string;
+}
 
 interface SettingItemProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -23,6 +46,31 @@ interface SettingItemProps {
   danger?: boolean;
   onPress?: () => void;
 }
+
+type AvatarOption = {
+  id: string;
+  icon: keyof typeof Ionicons.glyphMap;
+};
+
+const PROFILE_STORAGE_KEY = "@mekoedu_profile";
+
+const DEFAULT_PROFILE: LocalProfile = {
+  fullname: "",
+  birthday: "",
+  avatarId: "person",
+  avatarUri: null,
+  address: "",
+  phone: "",
+};
+
+const AVATAR_OPTIONS: AvatarOption[] = [
+  { id: "person", icon: "person" },
+  { id: "happy", icon: "happy" },
+  { id: "school", icon: "school" },
+  { id: "book", icon: "book" },
+  { id: "leaf", icon: "leaf" },
+  { id: "star", icon: "star" },
+];
 
 function SettingItem({
   icon,
@@ -64,7 +112,80 @@ export default function SettingsScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<AppStackParamList>>();
 
-  // Đăng xuất tài khoản
+  const [user, setUser] = useState<SiteInfo | null>(null);
+
+  const [localProfile, setLocalProfile] =
+    useState<LocalProfile>(DEFAULT_PROFILE);
+
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
+
+  const loadSettings = useCallback(() => {
+    return Promise.all([
+        getSiteInfo(),
+        AsyncStorage.getItem("themeMode"),
+        AsyncStorage.getItem(PROFILE_STORAGE_KEY),
+      ]).then(([siteInfoResponse, savedTheme, storedProfile]) => {
+      if (siteInfoResponse?.exception) {
+        throw new Error(
+          siteInfoResponse.message || "Không thể lấy thông tin sinh viên.",
+        );
+      }
+
+      setUser({
+        userid: Number(siteInfoResponse?.userid),
+        username: siteInfoResponse?.username || "",
+        fullname: siteInfoResponse?.fullname || "",
+        siteurl: siteInfoResponse?.siteurl || "",
+        email: siteInfoResponse?.email || "",
+      });
+
+      if (storedProfile) {
+        try {
+          const parsed = JSON.parse(storedProfile);
+
+          setLocalProfile({
+            ...DEFAULT_PROFILE,
+            ...parsed,
+          });
+        } catch {
+          setLocalProfile(DEFAULT_PROFILE);
+        }
+      } else {
+        setLocalProfile({
+          ...DEFAULT_PROFILE,
+          fullname: siteInfoResponse?.fullname || "",
+        });
+      }
+
+      setDarkMode(savedTheme === "dark");
+    }).catch((error: any) => {
+      Alert.alert("Không thể tải dữ liệu", error?.message || "Đã xảy ra lỗi.");
+    }).finally(() => {
+      setLoading(false);
+      setRefreshing(false);
+    });
+  }, []);
+
+  useEffect(() => {
+    void loadSettings();
+  }, [loadSettings]);
+
+  // Refresh settings
+  const handleRefresh = () => {
+    setRefreshing(true);
+    void loadSettings();
+  };
+
+  // Change theme
+  const handleThemeChange = async (value: boolean) => {
+    setDarkMode(value);
+
+    await AsyncStorage.setItem("themeMode", value ? "dark" : "light");
+  };
+
+  // Logout
   const handleLogout = () => {
     Alert.alert(
       "Đăng xuất",
@@ -79,14 +200,10 @@ export default function SettingsScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              // Xóa thông tin phiên đăng nhập
               await AsyncStorage.multiRemove(["wstoken", "userid"]);
 
-              // Báo cho RootNavigator biết trạng thái đăng nhập đã thay đổi
               DeviceEventEmitter.emit("authChange");
-            } catch (error) {
-              console.error("LOGOUT - Lỗi:", error);
-
+            } catch {
               Alert.alert("Lỗi", "Không thể đăng xuất. Vui lòng thử lại.");
             }
           },
@@ -95,40 +212,82 @@ export default function SettingsScreen() {
     );
   };
 
+  const selectedAvatar =
+    AVATAR_OPTIONS.find((avatar) => avatar.id === localProfile.avatarId) ||
+    AVATAR_OPTIONS[0];
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <AppHeader title="Cài đặt" />
+
+        <Loading message="Đang tải thông tin..." />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <AppHeader title="Cài đặt" />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={COLORS.primary}
+          />
+        }
         contentContainerStyle={styles.content}
       >
-        {/* Profile */}
         <TouchableOpacity
           style={styles.profileCard}
-          activeOpacity={0.7}
+          activeOpacity={0.8}
           onPress={() => navigation.navigate("Profile")}
         >
           <View style={styles.avatar}>
-            <Ionicons name="person" size={30} color={COLORS.primaryDark} />
+            {localProfile.avatarUri ? (
+              <Image
+                source={{
+                  uri: localProfile.avatarUri,
+                }}
+                style={styles.avatarImage}
+              />
+            ) : (
+              <Ionicons
+                name={selectedAvatar.icon}
+                size={28}
+                color={COLORS.white}
+              />
+            )}
           </View>
 
           <View style={styles.profileInfo}>
-            <Text style={styles.name}>Nguyễn Kim Yến</Text>
-            <Text style={styles.email}>Sinh viên MekoEdu</Text>
+            <Text style={styles.name} numberOfLines={1}>
+              {localProfile.fullname || user?.fullname || "Chưa cập nhật"}
+            </Text>
+
+            <Text style={styles.username} numberOfLines={1}>
+              @{user?.username || "Chưa cập nhật"}
+            </Text>
+
+            <View style={styles.studentBadge}>
+              <View style={styles.studentDot} />
+              <Text style={styles.studentText}>Sinh viên MekoEdu</Text>
+            </View>
           </View>
 
           <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
         </TouchableOpacity>
 
-        {/* Account */}
         <Text style={styles.sectionTitle}>Tài khoản</Text>
 
         <View style={styles.settingsGroup}>
           <SettingItem
             icon="person-outline"
             title="Thông tin cá nhân"
-            subtitle="Xem và chỉnh sửa thông tin"
+            subtitle="Xem thông tin tài khoản"
             onPress={() => navigation.navigate("Profile")}
           />
 
@@ -140,7 +299,6 @@ export default function SettingsScreen() {
           />
         </View>
 
-        {/* App */}
         <Text style={styles.sectionTitle}>Ứng dụng</Text>
 
         <View style={styles.settingsGroup}>
@@ -151,11 +309,35 @@ export default function SettingsScreen() {
             onPress={() => navigation.navigate("SettingsNotification")}
           />
 
-          <SettingItem
-            icon="moon-outline"
-            title="Giao diện"
-            subtitle="Sáng / Tối"
-          />
+          <View style={styles.settingItem}>
+            <View style={styles.settingIcon}>
+              <Ionicons
+                name={darkMode ? "moon-outline" : "sunny-outline"}
+                size={21}
+                color={COLORS.primaryDark}
+              />
+            </View>
+
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingTitle}>Giao diện</Text>
+
+              <Text style={styles.settingSubtitle}>
+                {darkMode ? "Giao diện tối" : "Giao diện sáng"}
+              </Text>
+            </View>
+
+            <View style={styles.switchContainer}>
+              <Switch
+                value={darkMode}
+                onValueChange={handleThemeChange}
+                trackColor={{
+                  false: COLORS.border,
+                  true: COLORS.primary,
+                }}
+                thumbColor={COLORS.white}
+              />
+            </View>
+          </View>
 
           <SettingItem
             icon="information-circle-outline"
@@ -172,7 +354,6 @@ export default function SettingsScreen() {
           />
         </View>
 
-        {/* Logout */}
         <View style={styles.settingsGroup}>
           <SettingItem
             icon="log-out-outline"
@@ -182,7 +363,7 @@ export default function SettingsScreen() {
           />
         </View>
 
-        <Text style={styles.version}>MekoEdu v1.0.0</Text>
+        <Text style={styles.version}>MekoEdu v1.4</Text>
       </ScrollView>
     </View>
   );
@@ -201,51 +382,88 @@ const styles = StyleSheet.create({
 
   profileCard: {
     backgroundColor: COLORS.white,
-    borderRadius: 18,
+    borderRadius: 20,
     padding: 16,
     flexDirection: "row",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: COLORS.border,
     marginBottom: 25,
   },
 
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: COLORS.backgroundSoft,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: COLORS.primary,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 13,
+    overflow: "hidden",
+  },
+
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 29,
   },
 
   profileInfo: {
     flex: 1,
+    marginLeft: 13,
+    marginRight: 8,
   },
 
   name: {
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: "800",
     color: COLORS.text,
   },
 
-  email: {
-    fontSize: 12,
+  username: {
+    marginTop: 3,
+    fontSize: 11,
     color: COLORS.textSecondary,
-    marginTop: 4,
+  },
+
+  studentBadge: {
+    alignSelf: "flex-start",
+    marginTop: 7,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 9,
+    backgroundColor: COLORS.backgroundSoft,
+  },
+
+  studentDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.success,
+    marginRight: 5,
+  },
+
+  studentText: {
+    fontSize: 9,
+    fontWeight: "700",
+    color: COLORS.success,
   },
 
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
+    fontSize: 15,
+    fontWeight: "800",
     color: COLORS.text,
     marginBottom: 10,
   },
 
   settingsGroup: {
     backgroundColor: COLORS.white,
-    borderRadius: 16,
+    borderRadius: 17,
     overflow: "hidden",
     marginBottom: 22,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
 
   settingItem: {
@@ -260,26 +478,26 @@ const styles = StyleSheet.create({
   settingIcon: {
     width: 42,
     height: 42,
-    borderRadius: 12,
+    borderRadius: 13,
     backgroundColor: COLORS.backgroundSoft,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
   },
 
-  dangerIcon: {
-    backgroundColor: "#FFF0F0",
-    borderWidth: 1,
-    borderColor: "#FFD6D6",
-  },
-
   settingInfo: {
     flex: 1,
   },
 
+  switchContainer: {
+    width: 52,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
   settingTitle: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "700",
     color: COLORS.text,
   },
 
@@ -293,6 +511,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF8F8",
   },
 
+  dangerIcon: {
+    backgroundColor: "#FFF0F0",
+    borderWidth: 1,
+    borderColor: "#FFD6D6",
+  },
+
   dangerText: {
     color: COLORS.error,
   },
@@ -301,6 +525,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: 11,
     color: COLORS.textLight,
-    marginTop: 5,
+    marginTop: 2,
   },
 });

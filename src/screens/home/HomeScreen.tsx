@@ -40,6 +40,7 @@ interface Course {
   shortname?: string;
   progress?: number;
   lastaccess?: number;
+  quizCount?: number;
 }
 
 interface SiteInfo {
@@ -70,6 +71,7 @@ interface QuizAttempt {
 
 interface RecentAttempt extends QuizAttempt {
   quizName: string;
+  courseId?: number;
 }
 
 type HomeNavigationProp = CompositeNavigationProp<
@@ -88,9 +90,7 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // =====================================================
   // LOAD HOME DATA
-  // =====================================================
 
   const loadHomeData = useCallback(async () => {
     try {
@@ -138,6 +138,7 @@ export default function HomeScreen() {
       // Không có khóa học
       if (courseData.length === 0) {
         setQuizCount(0);
+        setCourses([]);
         setRecentAttempts([]);
         return;
       }
@@ -148,6 +149,7 @@ export default function HomeScreen() {
 
       if (courseIds.length === 0) {
         setQuizCount(0);
+        setCourses(sortedCourses.map((course) => ({ ...course, quizCount: 0 })));
         setRecentAttempts([]);
         return;
       }
@@ -157,6 +159,7 @@ export default function HomeScreen() {
 
       if (quizzesResponse?.exception) {
         setQuizCount(0);
+        setCourses(sortedCourses.map((course) => ({ ...course, quizCount: 0 })));
         setRecentAttempts([]);
         return;
       }
@@ -166,6 +169,14 @@ export default function HomeScreen() {
         : [];
 
       setQuizCount(quizzes.length);
+      setCourses(
+        sortedCourses.map((course) => ({
+          ...course,
+          quizCount: quizzes.filter(
+            (quiz) => Number(quiz.course) === Number(course.id),
+          ).length,
+        })),
+      );
 
       if (quizzes.length === 0) {
         setRecentAttempts([]);
@@ -190,6 +201,7 @@ export default function HomeScreen() {
               ...attempt,
               quiz: Number(quiz.id),
               quizName: quiz.name || "Bài kiểm tra",
+              courseId: Number(quiz.course),
             }));
           } catch {
             return [];
@@ -224,12 +236,14 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
-    loadHomeData();
+    const timer = setTimeout(() => {
+      void loadHomeData();
+    }, 0);
+
+    return () => clearTimeout(timer);
   }, [loadHomeData]);
 
-  // =====================================================
   // HELPERS
-  // =====================================================
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -304,9 +318,7 @@ export default function HomeScreen() {
     }
   };
 
-  // =====================================================
   // NAVIGATION
-  // =====================================================
 
   const goToCourses = () => {
     navigation.navigate("Courses");
@@ -327,19 +339,24 @@ export default function HomeScreen() {
   };
 
   const goToAttemptQuiz = (attempt: RecentAttempt) => {
-    if (!attempt.quiz) {
-      return;
-    }
+    if (!attempt.quiz) return;
 
-    navigation.navigate("Exam", {
-      quizid: Number(attempt.quiz),
-      quizName: attempt.quizName,
-    });
+    if (attempt.state === "finished") {
+      navigation.navigate("AnswerReview", {
+        attemptid: attempt.id,
+        quizid: Number(attempt.quiz),
+        quizName: attempt.quizName,
+      });
+    } else {
+      navigation.navigate("Exam", {
+        quizid: Number(attempt.quiz),
+        quizName: attempt.quizName,
+        courseid: attempt.courseId ?? 0,
+      });
+    }
   };
 
-  // =====================================================
   // LOADING
-  // =====================================================
 
   if (loading) {
     return <Loading message="Đang tải trang chủ..." />;
@@ -349,13 +366,7 @@ export default function HomeScreen() {
 
   const firstCourse = recentCourses[0];
 
-  const firstCourseProgress = firstCourse
-    ? getCourseProgress(firstCourse)
-    : null;
-
-  // =====================================================
   // RENDER
-  // =====================================================
 
   return (
     <View style={styles.container}>
@@ -376,9 +387,9 @@ export default function HomeScreen() {
           />
         }
       >
-        {/* =================================================
+        {/* 
             USER WELCOME
-        ================================================= */}
+         */}
 
         <View style={styles.userCard}>
           <View style={styles.userAvatar}>
@@ -420,9 +431,9 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* =================================================
+        {/* 
             STATISTICS
-        ================================================= */}
+         */}
 
         <View style={styles.statsRow}>
           <StatisticCard
@@ -444,20 +455,11 @@ export default function HomeScreen() {
               }
             }}
           />
-
-          <StatisticCard
-            icon="trending-up-outline"
-            value={
-              firstCourseProgress !== null ? `${firstCourseProgress}%` : "--"
-            }
-            label="Thống kê"
-            onPress={() => navigation.navigate("Statistics")}
-          />
         </View>
 
-        {/* =================================================
+        {/* 
             RECENT COURSES
-        ================================================= */}
+         */}
 
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleRow}>
@@ -476,9 +478,12 @@ export default function HomeScreen() {
             {recentCourses.map((course) => (
               <View key={course.id} style={styles.courseWrapper}>
                 <CourseItem
-                  courseName={course.fullname}
-                  shortname={course.shortname}
-                  onPress={() => goToExamList(course.id)}
+                  {...({
+                    courseName: course.fullname,
+                    shortname: course.shortname,
+                    quizCount: course.quizCount ?? 0,
+                    onPress: () => goToExamList(course.id),
+                  } as any)}
                 />
 
                 {(() => {
@@ -524,9 +529,9 @@ export default function HomeScreen() {
           />
         )}
 
-        {/* =================================================
+        {/* 
             RECENT HISTORY
-        ================================================= */}
+         */}
 
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleRow}>
@@ -607,9 +612,9 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* =================================================
+        {/* 
             QUICK ACTIONS
-        ================================================= */}
+         */}
 
         <View style={styles.quickHeader}>
           <View style={styles.sectionTitleRow}>
@@ -624,18 +629,6 @@ export default function HomeScreen() {
             icon="book-outline"
             title="Khóa học"
             onPress={goToCourses}
-          />
-
-          <QuickAction
-            icon="clipboard-outline"
-            title="Bài kiểm tra"
-            onPress={() => {
-              if (firstCourse) {
-                goToExamList(firstCourse.id);
-              } else {
-                goToCourses();
-              }
-            }}
           />
 
           <QuickAction
@@ -655,9 +648,7 @@ export default function HomeScreen() {
   );
 }
 
-// =====================================================
 // QUICK ACTION
-// =====================================================
 
 interface QuickActionProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -683,9 +674,7 @@ function QuickAction({ icon, title, onPress }: QuickActionProps) {
   );
 }
 
-// =====================================================
 // STYLES
-// =====================================================
 
 const styles = StyleSheet.create({
   container: {

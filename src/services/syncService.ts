@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getUserAttempts, processQuizAttempt, saveQuizAttempt } from "@/api/quizApi";
 import { ExamContext, listOfflineExams, readOfflineExam, updateOfflineExam } from "./examStorageService";
+import { buildExamSyncPayload } from "@/utils/examSyncPayload";
 
 const running = new Map<string, Promise<void>>();
 export const isOfflineError = (error: any) =>
@@ -16,7 +17,6 @@ export function syncExam(context: ExamContext, retryFailed = false): Promise<voi
       const snapshot = await readOfflineExam(context);
       if (!snapshot || snapshot.submitted || snapshot.status === "Synced" || (snapshot.status === "Failed" && !retryFailed)) return;
       if (Number(await AsyncStorage.getItem("userid")) !== context.userid || !(await AsyncStorage.getItem("wstoken"))) return;
-      const data = Object.entries(snapshot.answers).map(([name, value]) => ({ name, value }));
       try {
         if (snapshot.submitRequested) {
           // Resolve a lost submission response before attempting submission again.
@@ -26,11 +26,11 @@ export function syncExam(context: ExamContext, retryFailed = false): Promise<voi
           if (attempt.state === "abandoned") throw new Error("Lượt thi đã bị đóng. Đáp án vẫn được giữ trên thiết bị.");
           if (attempt.state !== "finished") {
             if (Number(await AsyncStorage.getItem("userid")) !== context.userid) return;
-            const result = await processQuizAttempt(context.attemptid, data, 1);
+            const result = await processQuizAttempt(context.attemptid, buildExamSyncPayload(snapshot), 1);
             if (result?.state !== "finished") throw new Error("Moodle chưa xác nhận nộp bài thành công.");
           }
         } else {
-          const result = await saveQuizAttempt(context.attemptid, data);
+          const result = await saveQuizAttempt(context.attemptid, buildExamSyncPayload(snapshot));
           if (result?.status === false) throw new Error("Moodle không xác nhận lưu câu trả lời.");
         }
         await updateOfflineExam(context, (current) => current.revision !== snapshot.revision ? current : {

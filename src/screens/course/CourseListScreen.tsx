@@ -1,10 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
 
-import { getCourseCompletionStatus, getUserCourses } from "../../api/courseApi";
+import { getUserCourses } from "../../api/courseApi";
 import AppHeader from "../../components/common/AppHeader";
 import EmptyState from "../../components/common/EmptyState";
 import Loading from "../../components/common/Loading";
@@ -14,6 +14,7 @@ import CourseFilter, {
   CourseFilterType,
 } from "../../components/course/CourseFilter";
 import COLORS from "../../constants/colors";
+import { getCourseExamProgress } from "../../services/courseProgressService";
 import type { AppStackParamList } from "../../types/navigation";
 
 type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
@@ -22,8 +23,14 @@ type Course = {
   id: number;
   fullname: string;
   shortname: string;
+
   progress: number;
+
   completed: boolean;
+
+  totalExams: number;
+
+  completedExams: number;
 };
 
 export default function CourseListScreen() {
@@ -35,31 +42,7 @@ export default function CourseListScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    loadCourses();
-  }, []);
-
-  const calculateProgress = (completion: any) => {
-    const criteria =
-      completion?.completionstatus?.completions ??
-      completion?.completions ??
-      [];
-
-    if (!Array.isArray(criteria) || criteria.length === 0) {
-      return 0;
-    }
-
-    const completedCount = criteria.filter(
-      (item: any) =>
-        item?.complete === true ||
-        item?.complete === 1 ||
-        item?.complete === "1",
-    ).length;
-
-    return Math.round((completedCount / criteria.length) * 100);
-  };
-
-  const loadCourses = async () => {
+  const loadCourses = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
@@ -85,25 +68,25 @@ export default function CourseListScreen() {
 
       const coursesWithProgress = await Promise.all(
         courseData.map(async (course: any) => {
-          let progress = 0;
-
-          try {
-            const completion = await getCourseCompletionStatus(
-              Number(course.id),
-              userid,
-            );
-
-            progress = calculateProgress(completion);
-          } catch {
-            progress = 0;
-          }
+          const progressData = await getCourseExamProgress(
+            Number(course.id),
+            userid,
+          );
 
           return {
             id: Number(course.id),
+
             fullname: course.fullname || "Khóa học",
+
             shortname: course.shortname || "",
-            progress,
-            completed: progress >= 100,
+
+            progress: progressData.progress,
+
+            completed: progressData.completed,
+
+            totalExams: progressData.totalExams,
+
+            completedExams: progressData.completedExams,
           };
         }),
       );
@@ -114,7 +97,17 @@ export default function CourseListScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      const timeoutId = setTimeout(() => {
+        void loadCourses();
+      }, 0);
+
+      return () => clearTimeout(timeoutId);
+    }, [loadCourses]),
+  );
 
   const filteredCourses = useMemo(() => {
     const keyword = searchText.trim().toLowerCase();
@@ -183,20 +176,6 @@ export default function CourseListScreen() {
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
           <View>
-            <View style={styles.introCard}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>KH</Text>
-              </View>
-
-              <View style={styles.introContent}>
-                <Text style={styles.introTitle}>Khóa học của bạn</Text>
-
-                <Text style={styles.introSubtitle}>
-                  Theo dõi tiến độ học tập của bạn
-                </Text>
-              </View>
-            </View>
-
             <SearchBar
               value={searchText}
               onChangeText={setSearchText}
@@ -228,6 +207,8 @@ export default function CourseListScreen() {
             shortname={item.shortname}
             progress={item.progress}
             completed={item.completed}
+            completedExams={item.completedExams}
+            totalExams={item.totalExams}
             onPress={() =>
               navigation.navigate("ExamList", {
                 courseid: item.id,

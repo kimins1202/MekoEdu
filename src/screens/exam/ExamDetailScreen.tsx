@@ -1,9 +1,12 @@
-// src/screens/ExamDetailScreen.tsx
-
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useIsFocused, useNavigation, useRoute } from "@react-navigation/native";
-import { useEffect, useState } from "react";
+import {
+  useFocusEffect,
+  useNavigation,
+  useRoute,
+} from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useCallback, useMemo, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -12,33 +15,52 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
+import AppButton from "@/components/common/AppButton";
+import AppCard from "@/components/common/AppCard";
 import AppHeader from "@/components/common/AppHeader";
 import Loading from "@/components/common/Loading";
 import COLORS from "@/constants/colors";
-import { listOfflineExams } from "@/services/examStorageService";
-import { isOfflineError } from "@/services/syncService";
-import { findResumeTarget, ResumeTarget } from "@/utils/resumeExam";
 
 import { getQuizAccessInformation, getUserAttempts } from "../../api/quizApi";
 
+import { AppStackParamList } from "../../types/navigation";
+
+// TYPES
+
+type RouteParams = {
+  courseid: number;
+  quizid: number;
+  quizName: string;
+  questionCount?: number;
+  timelimit?: number;
+};
+
+type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
+
+type Attempt = {
+  id: number;
+  quiz?: number;
+  userid?: number;
+  attempt?: number;
+  state?: string;
+  timestart?: number;
+  timefinish?: number;
+  timemodified?: number;
+  sumgrades?: number;
+};
+
+// SCREEN
+
 export default function ExamDetailScreen() {
-  const navigation = useNavigation<any>();
+  const navigation = useNavigation<NavigationProp>();
   const route = useRoute<any>();
 
-  // =========================================
-  // THÔNG TIN BÀI THI
-  // =========================================
-
-  const { quizid, quizName, questionCount, timelimit } = route.params;
-
-  // =========================================
-  // STATE
-  // =========================================
+  const { courseid, quizid, quizName, questionCount, timelimit } =
+    route.params as RouteParams;
 
   const [loading, setLoading] = useState(true);
-  const [resumeTarget, setResumeTarget] = useState<ResumeTarget | null>(null);
-  const isFocused = useIsFocused();
 
   // API 6
   const [canAttempt, setCanAttempt] = useState(false);
@@ -47,145 +69,197 @@ export default function ExamDetailScreen() {
   );
 
   // API 7
-  const [attempts, setAttempts] = useState<any[]>([]);
+  const [attempts, setAttempts] = useState<Attempt[]>([]);
 
-  // =========================================
   // LOAD DATA
-  // =========================================
 
-  useEffect(() => {
-    if (isFocused) void loadExamData();
-  }, [isFocused, quizid]);
-
-  const loadExamData = async () => {
+  const loadQuizData = useCallback(async () => {
     try {
       setLoading(true);
-      setResumeTarget(null);
-      setCanAttempt(false);
-      setPreventAccessReasons([]);
-      setAttempts([]);
-
-      // =====================================
-      // LẤY USER ID
-      // =====================================
 
       const userId = await AsyncStorage.getItem("userid");
 
       if (!userId) {
-        Alert.alert("Lỗi", "Không tìm thấy User ID. Vui lòng đăng nhập lại.");
-        return;
+        throw new Error("Không tìm thấy User ID. Vui lòng đăng nhập lại.");
       }
 
-      // =====================================
       // API 6
-      // mod_quiz_get_quiz_access_information
-      // =====================================
+      // KIỂM TRA QUYỀN TRUY CẬP
 
-      const accessResponse = await getQuizAccessInformation(quizid);
+      const accessResponse = await getQuizAccessInformation(Number(quizid));
 
       setCanAttempt(accessResponse?.canattempt ?? false);
 
       setPreventAccessReasons(accessResponse?.preventaccessreasons ?? []);
 
-      // =====================================
       // API 7
-      // mod_quiz_get_user_attempts
-      // =====================================
+      // LẤY LỊCH SỬ LÀM BÀI
 
       const attemptsResponse = await getUserAttempts(
-        quizid,
+        Number(quizid),
         Number(userId),
         "all",
       );
 
-      setAttempts(attemptsResponse?.attempts ?? []);
-      const cached = await listOfflineExams(Number(userId));
-      setResumeTarget(findResumeTarget(Number(userId), Number(quizid), attemptsResponse?.attempts ?? [], cached));
-    } catch (error) {
-      if (isOfflineError(error)) {
-        try {
-          const userid = Number(await AsyncStorage.getItem("userid"));
-          const target = findResumeTarget(userid, Number(quizid), null, await listOfflineExams(userid));
-          if (target) {
-            setResumeTarget(target);
-            return;
-          }
-        } catch { /* Fall through to the visible load error. */ }
+      if (attemptsResponse?.exception) {
+        throw new Error(
+          attemptsResponse.message || "Không thể lấy lịch sử làm bài.",
+        );
       }
+
+      const loadedAttempts = Array.isArray(attemptsResponse?.attempts)
+        ? attemptsResponse.attempts
+        : [];
+
+      setAttempts(loadedAttempts);
+    } catch (error: any) {
       console.error("EXAM DETAIL ERROR:", error);
 
-      Alert.alert("Lỗi", "Không thể tải thông tin bài thi.");
+      Alert.alert("Lỗi", error?.message || "Không thể tải thông tin bài thi.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [quizid]);
 
-  // =========================================
-  // ATTEMPT STATUS
-  // =========================================
+  useFocusEffect(
+    useCallback(() => {
+      const timeoutId = setTimeout(() => {
+        void loadQuizData();
+      }, 0);
 
-  const getAttemptStatus = (state: string) => {
-    switch (state) {
-      case "finished":
-        return "Đã hoàn thành";
+      return () => clearTimeout(timeoutId);
+    }, [loadQuizData]),
+  );
 
-      case "inprogress":
-        return "Đang làm";
+  // 3 LẦN GẦN NHẤT
 
-      case "overdue":
-        return "Quá hạn";
+  const recentAttempts = useMemo(() => {
+    return [...attempts]
+      .sort((a, b) => {
+        const timeA = a.timemodified || a.timefinish || a.timestart || 0;
 
-      case "abandoned":
-        return "Đã bỏ";
+        const timeB = b.timemodified || b.timefinish || b.timestart || 0;
 
-      default:
-        return state || "Không xác định";
-    }
-  };
+        return timeB - timeA;
+      })
+      .slice(0, 3);
+  }, [attempts]);
 
-  // =========================================
-  // FORMAT DATE
-  // =========================================
+  const inProgressAttempt = useMemo(
+    () =>
+      attempts
+        .filter(
+          (attempt) =>
+            String(attempt.state).toLowerCase() === "inprogress" &&
+            Number.isInteger(Number(attempt.id)) &&
+            Number(attempt.id) > 0,
+        )
+        .sort(
+          (a, b) =>
+            (b.timemodified || b.timestart || 0) -
+            (a.timemodified || a.timestart || 0),
+        )[0],
+    [attempts],
+  );
 
-  const formatDate = (timestamp: number) => {
-    if (!timestamp || timestamp === 0) {
+  // FORMAT TIME
+
+  const formatDate = (timestamp?: number) => {
+    if (!timestamp) {
       return "Chưa xác định";
     }
 
-    return new Date(timestamp * 1000).toLocaleString("vi-VN");
+    return new Date(timestamp * 1000).toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
   };
 
-  // =========================================
-  // FORMAT TIME LIMIT
-  // =========================================
+  const formatTime = (timestamp?: number) => {
+    if (!timestamp) {
+      return "";
+    }
 
-  const formatTimeLimit = (seconds: number) => {
-    if (!seconds || seconds <= 0) {
+    return new Date(timestamp * 1000).toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  // ATTEMPT STATUS
+
+  const getAttemptStatus = (state?: string) => {
+    switch (state) {
+      case "finished":
+        return {
+          label: "Đã hoàn thành",
+          color: COLORS.success,
+          background: "#EEF8F2",
+          icon: "checkmark-circle-outline" as const,
+        };
+
+      case "inprogress":
+        return {
+          label: "Đang làm",
+          color: COLORS.warning,
+          background: "#FFF8E8",
+          icon: "time-outline" as const,
+        };
+
+      case "overdue":
+        return {
+          label: "Quá hạn",
+          color: COLORS.error,
+          background: "#FFF1F1",
+          icon: "alert-circle-outline" as const,
+        };
+
+      case "abandoned":
+        return {
+          label: "Đã bỏ",
+          color: COLORS.textSecondary,
+          background: COLORS.backgroundSoft,
+          icon: "close-circle-outline" as const,
+        };
+
+      default:
+        return {
+          label: "Không xác định",
+          color: COLORS.textSecondary,
+          background: COLORS.backgroundSoft,
+          icon: "information-circle-outline" as const,
+        };
+    }
+  };
+
+  // FORMAT TIMELIMIT
+
+  const formattedTimeLimit = useMemo(() => {
+    if (!timelimit || timelimit <= 0) {
       return "Không giới hạn";
     }
 
-    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor(timelimit / 60);
 
-    const minutes = Math.floor((seconds % 3600) / 60);
-
-    if (hours > 0 && minutes > 0) {
-      return `${hours} giờ ${minutes} phút`;
+    if (minutes < 60) {
+      return `${minutes} phút`;
     }
 
-    if (hours > 0) {
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+
+    if (remainingMinutes === 0) {
       return `${hours} giờ`;
     }
 
-    return `${minutes} phút`;
-  };
+    return `${hours} giờ ${remainingMinutes} phút`;
+  }, [timelimit]);
 
-  // =========================================
-  // BẮT ĐẦU LÀM BÀI
-  // GIỮ NGUYÊN LUỒNG CŨ
-  // =========================================
+  // START QUIZ
 
   const handleStartQuiz = () => {
-    if (!canAttempt && !resumeTarget) {
+    if (!canAttempt && !inProgressAttempt) {
       Alert.alert(
         "Không thể làm bài",
         preventAccessReasons.length > 0
@@ -196,50 +270,41 @@ export default function ExamDetailScreen() {
       return;
     }
 
-    Alert.alert(
-      "Giám sát màn hình khi thi",
-      "Ứng dụng ghi nhận số lần rời màn hình và lưu nhật ký trên thiết bị. Chụp/quay màn hình sẽ bị chặn trên điện thoại được hỗ trợ. Bạn cần nộp bài trước khi quay lại màn hình khác.",
-      [
-        { text: "Hủy", style: "cancel" },
-        { text: resumeTarget ? "Tiếp tục" : "Bắt đầu", onPress: () => navigation.navigate("Exam", { quizid, quizName, attemptid: resumeTarget?.attemptid }) },
-      ],
-    );
+    navigation.navigate("Exam", {
+      courseid: Number(courseid),
+      quizid: Number(quizid),
+      quizName,
+      questionCount,
+      ...(inProgressAttempt ? { attemptid: Number(inProgressAttempt.id) } : {}),
+    });
   };
 
-  // =========================================
   // LOADING
-  // =========================================
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={styles.container}>
+        <AppHeader title="Chi tiết bài thi" showBack />
+
         <Loading message="Đang tải thông tin bài thi..." />
       </View>
     );
   }
 
-  // =========================================
   // UI
-  // =========================================
 
   return (
     <View style={styles.container}>
-      <AppHeader
-        title="Chi tiết bài thi"
-        subtitle="Thông tin và lịch sử làm bài"
-        showBack
-      />
+      <AppHeader title="Chi tiết bài thi" showBack />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={styles.content}
       >
-        {/* =====================================
-            QUIZ HEADER CARD
-        ===================================== */}
+        {/* SUMMARY CARD */}
 
-        <View style={styles.quizCard}>
-          <View style={styles.quizIcon}>
+        <AppCard style={styles.summaryCard}>
+          <View style={styles.summaryIcon}>
             <Ionicons
               name="document-text-outline"
               size={30}
@@ -247,339 +312,303 @@ export default function ExamDetailScreen() {
             />
           </View>
 
-          <View style={styles.quizInfo}>
-            <Text style={styles.quizName} numberOfLines={3}>
+          <View style={styles.summaryInfo}>
+            <Text style={styles.summaryTitle} numberOfLines={2}>
               {quizName}
             </Text>
 
-            <View style={styles.quizIdRow}>
-              <Ionicons
-                name="pricetag-outline"
-                size={13}
-                color={COLORS.textLight}
-              />
+            <View style={styles.summaryMeta}>
+              <View style={styles.summaryMetaItem}>
+                <Ionicons
+                  name="help-circle-outline"
+                  size={15}
+                  color={COLORS.textSecondary}
+                />
 
-              <Text style={styles.quizId}>Quiz ID: {quizid}</Text>
+                <Text style={styles.summaryMetaText}>
+                  {questionCount != null
+                    ? `${questionCount} câu hỏi`
+                    : "Chưa xác định số câu"}
+                </Text>
+              </View>
+
+              <View style={styles.summaryMetaItem}>
+                <Ionicons
+                  name="time-outline"
+                  size={15}
+                  color={COLORS.textSecondary}
+                />
+
+                <Text style={styles.summaryMetaText}>{formattedTimeLimit}</Text>
+              </View>
             </View>
           </View>
+        </AppCard>
+
+        {/* THÔNG TIN BÀI THI */}
+
+        <View style={styles.infoHeader}>
+          <Text style={styles.sectionTitle}>Thông tin bài thi</Text>
         </View>
 
-        {/* =====================================
-            THÔNG TIN BÀI THI
-        ===================================== */}
+        <AppCard style={styles.infoCard}>
+          <InfoRow
+            icon="document-text-outline"
+            label="Số câu hỏi"
+            value={
+              questionCount != null ? `${questionCount} câu` : "Chưa xác định"
+            }
+          />
 
-        <Text style={styles.sectionTitle}>Thông tin bài thi</Text>
+          <InfoRow
+            icon="time-outline"
+            label="Thời gian làm bài"
+            value={formattedTimeLimit}
+          />
 
-        <View style={styles.infoCard}>
-          {/* Thời gian */}
+          <InfoRow
+            icon="repeat-outline"
+            label="Số lần đã làm"
+            value={attempts.length > 0 ? `${attempts.length} lần` : "Chưa làm"}
+          />
 
-          <View style={styles.infoItem}>
-            <View style={styles.infoIcon}>
-              <Ionicons name="time-outline" size={21} color={COLORS.primary} />
-            </View>
+          <InfoRow
+            icon="shield-checkmark-outline"
+            label="Quyền truy cập"
+            value={canAttempt ? "Được phép làm bài" : "Không được phép"}
+            valueColor={canAttempt ? COLORS.success : COLORS.error}
+            last
+          />
+        </AppCard>
 
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Thời gian làm bài</Text>
-
-              <Text style={styles.infoValue}>{formatTimeLimit(timelimit)}</Text>
-            </View>
-          </View>
-
-          <View style={styles.divider} />
-
-          {/* Số câu */}
-
-          <View style={styles.infoItem}>
-            <View style={styles.infoIcon}>
-              <Ionicons
-                name="help-circle-outline"
-                size={21}
-                color={COLORS.primary}
-              />
-            </View>
-
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Số câu hỏi</Text>
-
-              <Text style={styles.infoValue}>
-                {questionCount !== undefined
-                  ? `${questionCount} câu`
-                  : "Chưa xác định"}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.divider} />
-
-          {/* Số lần làm */}
-
-          <View style={styles.infoItem}>
-            <View style={styles.infoIcon}>
-              <Ionicons
-                name="repeat-outline"
-                size={21}
-                color={COLORS.primary}
-              />
-            </View>
-
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Số lần đã làm</Text>
-
-              <Text style={styles.infoValue}>
-                {attempts.length > 0 ? `${attempts.length} lần` : "Chưa làm"}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* =====================================
-            QUYỀN TRUY CẬP
-        ===================================== */}
-
-        <Text style={styles.sectionTitle}>Quyền truy cập</Text>
-
-        <View
-          style={[
-            styles.accessCard,
-            canAttempt ? styles.accessCardSuccess : styles.accessCardError,
-          ]}
-        >
-          <View
-            style={[
-              styles.accessIcon,
-              canAttempt ? styles.accessIconSuccess : styles.accessIconError,
-            ]}
-          >
-            <Ionicons
-              name={canAttempt ? "checkmark-circle" : "close-circle"}
-              size={27}
-              color={canAttempt ? COLORS.primary : COLORS.error}
-            />
-          </View>
-
-          <View style={styles.accessContent}>
-            <Text
-              style={[
-                styles.accessTitle,
-                {
-                  color: canAttempt ? COLORS.primary : COLORS.error,
-                },
-              ]}
-            >
-              {canAttempt ? "Có thể làm bài" : "Không thể làm bài"}
-            </Text>
-
-            <Text style={styles.accessText}>
-              {canAttempt
-                ? "Bạn được phép truy cập bài thi này."
-                : "Bạn hiện không được phép truy cập bài thi."}
-            </Text>
-          </View>
-        </View>
-
-        {/* =====================================
-            LÝ DO KHÔNG ĐƯỢC TRUY CẬP
-        ===================================== */}
+        {/* ACCESS WARNING */}
 
         {!canAttempt && preventAccessReasons.length > 0 && (
           <View style={styles.warningCard}>
-            <View style={styles.warningHeader}>
+            <View style={styles.warningIcon}>
               <Ionicons
-                name="information-circle-outline"
-                size={20}
+                name="alert-circle-outline"
+                size={21}
                 color={COLORS.error}
               />
-
-              <Text style={styles.warningTitle}>Lý do không thể truy cập</Text>
             </View>
 
-            {preventAccessReasons.map((reason, index) => (
-              <View key={index} style={styles.reasonRow}>
-                <View style={styles.reasonDot} />
+            <View style={styles.warningContent}>
+              <Text style={styles.warningTitle}>Không thể bắt đầu bài thi</Text>
 
-                <Text style={styles.reasonText}>{reason}</Text>
-              </View>
-            ))}
+              {preventAccessReasons.map((reason, index) => (
+                <Text key={`${reason}-${index}`} style={styles.warningText}>
+                  • {reason}
+                </Text>
+              ))}
+            </View>
           </View>
         )}
 
-        {/* =====================================
-            LỊCH SỬ LÀM BÀI
-        ===================================== */}
+        {/* LỊCH SỬ LÀM BÀI */}
 
         <View style={styles.historyHeader}>
-          <Text style={styles.sectionTitle}>Lịch sử làm bài</Text>
+          <View>
+            <Text style={styles.sectionTitle}>Lịch sử làm bài</Text>
 
-          <View style={styles.countBadge}>
-            <Text style={styles.countText}>{attempts.length}</Text>
+            <Text style={styles.sectionSubtitle}>3 lần làm bài gần nhất</Text>
           </View>
         </View>
 
-        <View style={styles.historyCard}>
-          {attempts.length === 0 ? (
-            <View style={styles.emptyHistory}>
-              <View style={styles.emptyIcon}>
-                <Ionicons
-                  name="document-outline"
-                  size={30}
-                  color={COLORS.primary}
-                />
-              </View>
+        {recentAttempts.length === 0 ? (
+          <AppCard style={styles.emptyHistory}>
+            <View style={styles.emptyHistoryIcon}>
+              <Ionicons
+                name="time-outline"
+                size={26}
+                color={COLORS.textLight}
+              />
+            </View>
 
-              <Text style={styles.emptyTitle}>Chưa có lịch sử làm bài</Text>
+            <View style={styles.emptyHistoryContent}>
+              <Text style={styles.emptyHistoryTitle}>
+                Chưa có lịch sử làm bài
+              </Text>
 
-              <Text style={styles.emptyText}>
+              <Text style={styles.emptyHistoryText}>
                 Bạn chưa thực hiện bài thi này.
               </Text>
             </View>
-          ) : (
-            attempts.map((attempt, index) => (
-              <View
-                key={attempt.id ?? index}
-                style={[
-                  styles.attemptItem,
-                  index === attempts.length - 1 && styles.lastAttempt,
-                ]}
-              >
-                {/* Icon */}
+          </AppCard>
+        ) : (
+          <AppCard style={styles.historyCard}>
+            {recentAttempts.map((attempt, index) => {
+              const status = getAttemptStatus(attempt.state);
+              const isFinished = attempt.state === "finished";
 
-                <View
+              const timestamp =
+                attempt.timemodified || attempt.timefinish || attempt.timestart;
+
+              return (
+                <TouchableOpacity
+                  key={`${attempt.id}-${index}`}
                   style={[
-                    styles.attemptIcon,
-                    attempt.state === "finished"
-                      ? styles.attemptIconSuccess
-                      : attempt.state === "inprogress"
-                        ? styles.attemptIconProgress
-                        : styles.attemptIconDefault,
+                    styles.historyItem,
+                    index === recentAttempts.length - 1 &&
+                      styles.historyItemLast,
                   ]}
+                  activeOpacity={isFinished ? 0.7 : 1}
+                  disabled={!isFinished}
+                  onPress={() => {
+                    if (!isFinished || !attempt.id) return;
+                    navigation.navigate("Result", {
+                      courseid: Number(courseid),
+                      quizid: Number(quizid),
+                      quizName,
+                      attemptid: attempt.id,
+                    });
+                  }}
                 >
-                  <Ionicons
-                    name={
-                      attempt.state === "finished"
-                        ? "checkmark-outline"
-                        : attempt.state === "inprogress"
-                          ? "time-outline"
-                          : "document-outline"
-                    }
-                    size={20}
-                    color={
-                      attempt.state === "finished"
-                        ? COLORS.primary
-                        : attempt.state === "inprogress"
-                          ? COLORS.warning
-                          : COLORS.textSecondary
-                    }
-                  />
-                </View>
+                  {/* ICON */}
 
-                {/* Content */}
-
-                <View style={styles.attemptContent}>
-                  <Text style={styles.attemptTitle}>
-                    Lần {attempt.attempt ?? index + 1}
-                  </Text>
-
-                  <View style={styles.statusRow}>
-                    <Text style={styles.statusLabel}>Trạng thái:</Text>
-
-                    <Text style={styles.statusValue}>
-                      {getAttemptStatus(attempt.state)}
-                    </Text>
+                  <View style={styles.historyIcon}>
+                    <Ionicons
+                      name="document-text-outline"
+                      size={20}
+                      color={COLORS.primary}
+                    />
                   </View>
 
-                  {attempt.sumgrades !== undefined &&
-                    attempt.sumgrades !== null && (
-                      <View style={styles.detailRow}>
-                        <Ionicons
-                          name="star-outline"
-                          size={14}
-                          color={COLORS.textLight}
-                        />
+                  {/* CONTENT */}
 
-                        <Text style={styles.detailText}>
-                          Điểm: {attempt.sumgrades}
+                  <View style={styles.historyContent}>
+                    <Text style={styles.attemptTitle}>
+                      Lần {attempt.attempt ?? index + 1}
+                    </Text>
+
+                    <View style={styles.historyMeta}>
+                      <Ionicons
+                        name="calendar-outline"
+                        size={12}
+                        color={COLORS.textLight}
+                      />
+
+                      <Text style={styles.historyMetaText}>
+                        {formatDate(timestamp)}
+                      </Text>
+
+                      {timestamp && (
+                        <>
+                          <View style={styles.historyDot} />
+
+                          <Ionicons
+                            name="time-outline"
+                            size={12}
+                            color={COLORS.textLight}
+                          />
+
+                          <Text style={styles.historyMetaText}>
+                            {formatTime(timestamp)}
+                          </Text>
+                        </>
+                      )}
+                    </View>
+
+                    {attempt.sumgrades !== undefined &&
+                      attempt.sumgrades !== null && (
+                        <Text style={styles.scoreText}>
+                          Điểm: {Number(attempt.sumgrades).toFixed(1)}
                         </Text>
-                      </View>
+                      )}
+                  </View>
+
+                  {/* STATUS + CHEVRON */}
+
+                  <View style={styles.historyRight}>
+                    <View
+                      style={[
+                        styles.statusBadge,
+                        {
+                          backgroundColor: status.background,
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name={status.icon}
+                        size={13}
+                        color={status.color}
+                      />
+
+                      <Text
+                        style={[
+                          styles.statusText,
+                          {
+                            color: status.color,
+                          },
+                        ]}
+                      >
+                        {status.label}
+                      </Text>
+                    </View>
+
+                    {isFinished && (
+                      <Ionicons
+                        name="chevron-forward"
+                        size={16}
+                        color={COLORS.textLight}
+                        style={styles.chevron}
+                      />
                     )}
-
-                  {attempt.timestart ? (
-                    <View style={styles.detailRow}>
-                      <Ionicons
-                        name="play-outline"
-                        size={14}
-                        color={COLORS.textLight}
-                      />
-
-                      <Text style={styles.detailText}>
-                        Bắt đầu: {formatDate(attempt.timestart)}
-                      </Text>
-                    </View>
-                  ) : null}
-
-                  {attempt.timefinish && attempt.timefinish !== 0 ? (
-                    <View style={styles.detailRow}>
-                      <Ionicons
-                        name="checkmark-outline"
-                        size={14}
-                        color={COLORS.textLight}
-                      />
-
-                      <Text style={styles.detailText}>
-                        Kết thúc: {formatDate(attempt.timefinish)}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-              </View>
-            ))
-          )}
-        </View>
-
-        {/* =====================================
-            START BUTTON
-            KHÔNG DISABLED
-            GIỮ NGUYÊN BUSINESS FLOW
-        ===================================== */}
-
-        <TouchableOpacity
-          style={[
-            styles.startButton,
-            !canAttempt && !resumeTarget && styles.startButtonDisabled,
-          ]}
-          onPress={handleStartQuiz}
-          activeOpacity={0.85}
-        >
-          <View style={styles.startButtonContent}>
-            <Ionicons
-              name="play-circle-outline"
-              size={23}
-              color={COLORS.white}
-            />
-
-            <Text style={styles.startButtonText}>{resumeTarget?.pendingSubmission ? "Tiếp tục đồng bộ bài nộp" : resumeTarget ? "Tiếp tục bài làm" : "Bắt đầu làm bài"}</Text>
-
-            <Ionicons name="arrow-forward" size={20} color={COLORS.white} />
-          </View>
-        </TouchableOpacity>
-
-        {resumeTarget && (
-          <Text style={styles.disabledHint}>
-            {resumeTarget.offline ? "Bản lưu trên thiết bị" : "Bài thi đang làm"} · Trang {resumeTarget.page + 1}. Đáp án và hạn giờ được giữ nguyên.
-          </Text>
-        )}
-        {!canAttempt && !resumeTarget && (
-          <Text style={styles.disabledHint}>
-            Nhấn nút để xem lý do bạn chưa thể làm bài.
-          </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </AppCard>
         )}
       </ScrollView>
+
+      <SafeAreaView edges={["bottom"]} style={styles.startFooter}>
+        <AppButton
+          title={inProgressAttempt ? "Tiếp tục bài thi" : "Bắt đầu làm bài"}
+          onPress={handleStartQuiz}
+          disabled={!canAttempt && !inProgressAttempt}
+          style={styles.startButton}
+        />
+      </SafeAreaView>
     </View>
   );
 }
 
-// =========================================
+// INFO ROW
+
+interface InfoRowProps {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+  valueColor?: string;
+  last?: boolean;
+}
+
+function InfoRow({
+  icon,
+  label,
+  value,
+  valueColor,
+  last = false,
+}: InfoRowProps) {
+  return (
+    <View style={[styles.infoRow, last && styles.infoRowLast]}>
+      <View style={styles.infoIcon}>
+        <Ionicons name={icon} size={18} color={COLORS.primary} />
+      </View>
+
+      <Text style={styles.infoLabel}>{label}</Text>
+
+      <Text
+        style={[styles.infoValue, valueColor ? { color: valueColor } : null]}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+
 // STYLES
-// =========================================
 
 const styles = StyleSheet.create({
   container: {
@@ -587,430 +616,306 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.backgroundSoft,
   },
 
-  scrollContent: {
+  content: {
     padding: 20,
-    paddingBottom: 40,
+    paddingBottom: 24,
   },
 
-  // =======================================
-  // QUIZ CARD
-  // =======================================
+  // SUMMARY
 
-  quizCard: {
+  summaryCard: {
+    borderRadius: 20,
+    padding: 17,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.white,
-    borderRadius: 20,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-
-    shadowColor: COLORS.black,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.04,
-    shadowRadius: 7,
-    elevation: 2,
   },
 
-  quizIcon: {
+  summaryIcon: {
     width: 58,
     height: 58,
     borderRadius: 17,
-    backgroundColor: "#EAF6EE",
+    backgroundColor: COLORS.backgroundSoft,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 14,
+    marginRight: 13,
   },
 
-  quizInfo: {
+  summaryInfo: {
     flex: 1,
   },
 
-  quizName: {
-    fontSize: 18,
-    lineHeight: 25,
+  summaryTitle: {
+    fontSize: 16,
+    lineHeight: 21,
     fontWeight: "700",
     color: COLORS.text,
+    marginBottom: 9,
   },
 
-  quizIdRow: {
+  summaryMeta: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 7,
+    gap: 14,
   },
 
-  quizId: {
+  summaryMetaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  summaryMetaText: {
     marginLeft: 5,
-    fontSize: 12,
-    color: COLORS.textLight,
+    fontSize: 11,
+    color: COLORS.textSecondary,
   },
 
-  // =======================================
   // SECTION
-  // =======================================
 
   sectionTitle: {
-    marginTop: 25,
-    marginBottom: 10,
     fontSize: 17,
     fontWeight: "700",
     color: COLORS.text,
   },
 
-  // =======================================
+  infoHeader: {
+    marginTop: 23,
+  },
+
+  sectionSubtitle: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginTop: 4,
+  },
+
   // INFO CARD
-  // =======================================
 
   infoCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 18,
+    marginTop: 11,
+    padding: 0,
     paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-
-  infoItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 15,
-  },
-
-  infoIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
-    backgroundColor: COLORS.backgroundSoft,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 13,
-  },
-
-  infoContent: {
-    flex: 1,
-  },
-
-  infoLabel: {
-    fontSize: 12,
-    color: COLORS.textLight,
-    marginBottom: 4,
-  },
-
-  infoValue: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: COLORS.text,
-  },
-
-  divider: {
-    height: 1,
-    backgroundColor: COLORS.border,
-  },
-
-  // =======================================
-  // ACCESS
-  // =======================================
-
-  accessCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    borderRadius: 17,
-    borderWidth: 1,
-  },
-
-  accessCardSuccess: {
-    backgroundColor: "#F0F9F3",
-    borderColor: "#CBE8D4",
-  },
-
-  accessCardError: {
-    backgroundColor: "#FFF5F5",
-    borderColor: "#F3D1D1",
-  },
-
-  accessIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 13,
-  },
-
-  accessIconSuccess: {
-    backgroundColor: "#DDF2E4",
-  },
-
-  accessIconError: {
-    backgroundColor: "#FFE2E2",
-  },
-
-  accessContent: {
-    flex: 1,
-  },
-
-  accessTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    marginBottom: 4,
-  },
-
-  accessText: {
-    fontSize: 12,
-    lineHeight: 18,
-    color: COLORS.textSecondary,
-  },
-
-  // =======================================
-  // WARNING
-  // =======================================
-
-  warningCard: {
-    marginTop: 10,
-    padding: 15,
-    borderRadius: 15,
-    backgroundColor: "#FFF5F5",
-    borderWidth: 1,
-    borderColor: "#F3D1D1",
-  },
-
-  warningHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 7,
-  },
-
-  warningTitle: {
-    marginLeft: 7,
-    fontSize: 14,
-    fontWeight: "700",
-    color: COLORS.error,
-  },
-
-  reasonRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    marginTop: 7,
-  },
-
-  reasonDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: COLORS.error,
-    marginTop: 7,
-    marginRight: 9,
-  },
-
-  reasonText: {
-    flex: 1,
-    fontSize: 13,
-    lineHeight: 20,
-    color: COLORS.textSecondary,
-  },
-
-  // =======================================
-  // HISTORY
-  // =======================================
-
-  historyHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  countBadge: {
-    minWidth: 25,
-    height: 25,
-    paddingHorizontal: 7,
-    borderRadius: 13,
-    backgroundColor: COLORS.primary,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 15,
-    marginLeft: 8,
-  },
-
-  countText: {
-    color: COLORS.white,
-    fontSize: 12,
-    fontWeight: "700",
-  },
-
-  historyCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: COLORS.border,
     overflow: "hidden",
   },
 
-  attemptItem: {
+  infoRow: {
+    minHeight: 58,
     flexDirection: "row",
-    padding: 16,
+    alignItems: "center",
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
 
-  lastAttempt: {
+  infoRowLast: {
     borderBottomWidth: 0,
   },
 
-  attemptIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
+  infoIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: COLORS.backgroundSoft,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 11,
+  },
+
+  infoLabel: {
+    flex: 1,
+    fontSize: 13,
+    color: COLORS.textSecondary,
+  },
+
+  infoValue: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.text,
+    textAlign: "right",
+  },
+
+  // WARNING
+
+  warningCard: {
+    marginTop: 12,
+    backgroundColor: "#FFF5F5",
+    borderRadius: 16,
+    padding: 13,
+    flexDirection: "row",
+    borderWidth: 1,
+    borderColor: "#F5D6D6",
+  },
+
+  warningIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    backgroundColor: "#FFEAEA",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
+  },
+
+  warningContent: {
+    flex: 1,
+  },
+
+  warningTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: COLORS.error,
+    marginBottom: 5,
+  },
+
+  warningText: {
+    fontSize: 11,
+    lineHeight: 17,
+    color: COLORS.textSecondary,
+  },
+
+  // HISTORY
+
+  historyHeader: {
+    marginTop: 23,
+    marginBottom: 11,
+  },
+
+  historyCard: {
+    padding: 0,
+    overflow: "hidden",
+  },
+
+  historyItem: {
+    minHeight: 72,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+
+  historyItemLast: {
+    borderBottomWidth: 0,
+  },
+
+  historyIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: COLORS.backgroundSoft,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 11,
+  },
+
+  historyContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  attemptTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: COLORS.text,
+    marginBottom: 5,
+  },
+
+  historyMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  historyMetaText: {
+    fontSize: 10,
+    color: COLORS.textLight,
+    marginLeft: 4,
+  },
+
+  historyDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: COLORS.textLight,
+    marginHorizontal: 6,
+  },
+
+  scoreText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: COLORS.primaryDark,
+    marginTop: 5,
+  },
+
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 5,
+    borderRadius: 8,
+    marginLeft: 6,
+  },
+
+  statusText: {
+    fontSize: 8,
+    fontWeight: "700",
+  },
+
+  historyRight: {
+    alignItems: "flex-end",
+    gap: 6,
+    marginLeft: 6,
+  },
+
+  chevron: {
+    marginTop: 2,
+  },
+
+  // EMPTY HISTORY
+
+  emptyHistory: {
+    padding: 15,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  emptyHistoryIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    backgroundColor: COLORS.backgroundSoft,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
   },
 
-  attemptIconSuccess: {
-    backgroundColor: "#EAF6EE",
-  },
-
-  attemptIconProgress: {
-    backgroundColor: "#FFF7E8",
-  },
-
-  attemptIconDefault: {
-    backgroundColor: COLORS.backgroundSoft,
-  },
-
-  attemptContent: {
+  emptyHistoryContent: {
     flex: 1,
   },
 
-  attemptTitle: {
-    fontSize: 15,
+  emptyHistoryTitle: {
+    fontSize: 13,
     fontWeight: "700",
     color: COLORS.text,
-    marginBottom: 5,
+    marginBottom: 4,
   },
 
-  statusRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 5,
-  },
-
-  statusLabel: {
-    fontSize: 12,
-    color: COLORS.textLight,
-    marginRight: 4,
-  },
-
-  statusValue: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: COLORS.textSecondary,
-  },
-
-  detailRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 4,
-  },
-
-  detailText: {
-    flex: 1,
-    marginLeft: 6,
-    fontSize: 12,
+  emptyHistoryText: {
+    fontSize: 11,
     lineHeight: 17,
     color: COLORS.textSecondary,
   },
 
-  // =======================================
-  // EMPTY
-  // =======================================
-
-  emptyHistory: {
-    alignItems: "center",
-    paddingVertical: 35,
-    paddingHorizontal: 20,
-  },
-
-  emptyIcon: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    backgroundColor: COLORS.backgroundSoft,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-
-  emptyTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: COLORS.text,
-    marginBottom: 5,
-  },
-
-  emptyText: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    textAlign: "center",
-  },
-
-  // =======================================
-  // START BUTTON
-  // =======================================
+  // START
 
   startButton: {
-    height: 56,
-    marginTop: 28,
-    borderRadius: 17,
-    backgroundColor: COLORS.primaryDark,
-    justifyContent: "center",
-    alignItems: "center",
-
-    shadowColor: COLORS.primaryDark,
-    shadowOffset: {
-      width: 0,
-      height: 7,
-    },
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    elevation: 5,
+    marginTop: 0,
   },
 
-  startButtonDisabled: {
-    backgroundColor: "#AEB9B3",
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-
-  startButtonContent: {
-    width: "100%",
+  startFooter: {
     paddingHorizontal: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  startButtonText: {
-    marginHorizontal: 10,
-    fontSize: 16,
-    fontWeight: "700",
-    color: COLORS.white,
-  },
-
-  disabledHint: {
-    marginTop: 9,
-    fontSize: 12,
-    color: COLORS.textLight,
-    textAlign: "center",
-  },
-
-  // =======================================
-  // LOADING
-  // =======================================
-
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: COLORS.backgroundSoft,
+    paddingTop: 10,
+    paddingBottom: 8,
+    backgroundColor: COLORS.white,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
   },
 });

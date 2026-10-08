@@ -1,25 +1,43 @@
-import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
 import COLORS from "../../constants/colors";
 
 interface ExamTimerProps {
   seconds: number | null;
+  compact?: boolean;
 }
 
-export default function ExamTimer({
-  seconds,
-}: ExamTimerProps) {
+export default function ExamTimer({ seconds, compact = false }: ExamTimerProps) {
   const hours = Math.floor((seconds ?? 0) / 3600);
   const minutes = Math.floor(((seconds ?? 0) % 3600) / 60);
   const remainingSeconds = (seconds ?? 0) % 60;
 
-  const formattedTime = seconds === null ? "Không giới hạn" : `${hours > 0 ? `${String(hours).padStart(2, "0")}:` : ""}${String(minutes).padStart(
-    2,
-    "0",
-  )}:${String(remainingSeconds).padStart(2, "0")}`;
+  const formattedTime =
+    seconds === null
+      ? "∞"
+      : `${hours > 0 ? `${String(hours).padStart(2, "0")}:` : ""}${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
 
-  const isWarning = seconds !== null && seconds <= 60;
-  const isDanger = seconds !== null && seconds <= 30;
+  const isWarning = seconds !== null && seconds <= 300;
+  const isDanger = seconds !== null && seconds <= 60;
+
+  const timeColor = isDanger
+    ? COLORS.error
+    : isWarning
+      ? COLORS.warning
+      : COLORS.primary;
+
+  if (compact) {
+    return (
+      <Text
+        style={[
+          styles.compactTime,
+          isWarning && styles.warningText,
+          isDanger && styles.dangerText,
+        ]}
+      >
+        {formattedTime}
+      </Text>
+    );
+  }
 
   return (
     <View
@@ -29,20 +47,13 @@ export default function ExamTimer({
         isDanger && styles.dangerContainer,
       ]}
     >
-      <Ionicons
-        name="time-outline"
-        size={20}
-        color={
-          isDanger ? COLORS.error : isWarning ? COLORS.warning : COLORS.primary
-        }
-      />
-
       <View style={styles.content}>
         <Text style={styles.label}>Thời gian còn lại</Text>
 
         <Text
           style={[
             styles.time,
+            { color: timeColor },
             isWarning && styles.warningText,
             isDanger && styles.dangerText,
           ]}
@@ -99,5 +110,12 @@ const styles = StyleSheet.create({
 
   dangerText: {
     color: COLORS.error,
+  },
+
+  compactTime: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: COLORS.primary,
+    letterSpacing: 0.5,
   },
 });

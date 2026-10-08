@@ -5,12 +5,14 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 interface CourseItemProps {
   courseName: string;
   shortname?: string;
+  quizCount: number;
   onPress: () => void;
 }
 
 export default function CourseItem({
   courseName,
   shortname,
+  quizCount,
   onPress,
 }: CourseItemProps) {
   return (
@@ -37,16 +39,8 @@ export default function CourseItem({
 
         <View style={styles.footer}>
           <View style={styles.statItem}>
-            <Ionicons name="play-circle-outline" size={14} color="#FFF" />
-            <Text style={styles.statText}>18 Bài</Text>
-          </View>
-          <View style={styles.statItem}>
             <Ionicons name="document-text-outline" size={14} color="#FFF" />
-            <Text style={styles.statText}>4 Bài kiểm tra</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Ionicons name="people-outline" size={14} color="#FFF" />
-            <Text style={styles.statText}>68 SV</Text>
+            <Text style={styles.statText}>{quizCount} bài kiểm tra</Text>
           </View>
         </View>
       </LinearGradient>

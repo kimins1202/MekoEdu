@@ -5,7 +5,6 @@ import {
   Animated,
   Dimensions,
   Easing,
-  Image,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -13,6 +12,7 @@ import {
 } from "react-native";
 
 import AppButton from "../../components/common/AppButton";
+import MekoLogo from "../../components/common/MekoLogo";
 import COLORS from "../../constants/colors";
 import { RootStackParamList } from "../../types/navigation";
 
@@ -62,6 +62,7 @@ export default function OnboardingScreen({ navigation }: Props) {
   const contentTranslateY = useRef(new Animated.Value(0)).current;
 
   const handleNext = () => {
+    // Slide cuối → sang Launch
     if (currentIndex >= onboardingData.length - 1) {
       navigation.replace("Launch");
       return;
@@ -113,15 +114,10 @@ export default function OnboardingScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
       {/* ================= HEADER ================= */}
+
       <View style={styles.header}>
         {/* Logo MekoSoft */}
-        <View style={styles.headerLogoContainer}>
-          <Image
-            source={require("../../../assets/images/meko-logo-dark-rmbg.png")}
-            style={styles.headerLogo}
-            resizeMode="contain"
-          />
-        </View>
+        <MekoLogo />
 
         {/* Bỏ qua */}
         <TouchableOpacity
@@ -134,6 +130,7 @@ export default function OnboardingScreen({ navigation }: Props) {
       </View>
 
       {/* ================= CONTENT ================= */}
+
       <Animated.View
         style={[
           styles.animatedContent,
@@ -144,13 +141,16 @@ export default function OnboardingScreen({ navigation }: Props) {
         ]}
       >
         {/* ================= ILLUSTRATION ================= */}
+
         <View style={styles.illustrationContainer}>
           <View style={styles.illustrationBackground}>
             {/* Background decorations */}
+
             <View style={styles.circleTop} />
             <View style={styles.circleBottom} />
 
             {/* Main card */}
+
             <View style={styles.mainCard}>
               <View style={styles.iconCircle}>
                 <Ionicons
@@ -166,6 +166,7 @@ export default function OnboardingScreen({ navigation }: Props) {
             </View>
 
             {/* Top-right badge */}
+
             <View style={styles.topBadge}>
               <Ionicons
                 name={current.smallIcon}
@@ -175,6 +176,7 @@ export default function OnboardingScreen({ navigation }: Props) {
             </View>
 
             {/* Bottom-left badge */}
+
             <View style={styles.accessBadge}>
               <Ionicons
                 name="checkmark-circle"
@@ -188,6 +190,7 @@ export default function OnboardingScreen({ navigation }: Props) {
         </View>
 
         {/* ================= TEXT ================= */}
+
         <View style={styles.content}>
           <Text style={styles.title}>{current.title}</Text>
 
@@ -196,8 +199,10 @@ export default function OnboardingScreen({ navigation }: Props) {
       </Animated.View>
 
       {/* ================= BOTTOM ================= */}
+
       <View style={styles.bottomSection}>
         {/* Pagination */}
+
         <View style={styles.dots}>
           {onboardingData.map((_, index) => {
             const isActive = index === currentIndex;
@@ -211,7 +216,8 @@ export default function OnboardingScreen({ navigation }: Props) {
           })}
         </View>
 
-        {/* App Button */}
+        {/* Button */}
+
         <AppButton
           title={
             currentIndex === onboardingData.length - 1
@@ -226,18 +232,14 @@ export default function OnboardingScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  // =========================
   // CONTAINER
-  // =========================
 
   container: {
     flex: 1,
     backgroundColor: COLORS.white,
   },
 
-  // =========================
   // HEADER
-  // =========================
 
   header: {
     height: 76,
@@ -248,34 +250,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-  },
-
-  // Nền xanh đồng nhất với hệ thống
-  headerLogoContainer: {
-    width: 44,
-    height: 44,
-
-    borderRadius: 13,
-
-    backgroundColor: COLORS.primary,
-
-    alignItems: "center",
-    justifyContent: "center",
-
-    shadowColor: COLORS.primary,
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-
-  // Logo M trắng đã được tách nền
-  headerLogo: {
-    width: 40,
-    height: 40,
   },
 
   skipButton: {
@@ -289,17 +263,13 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
 
-  // =========================
   // ANIMATED CONTENT
-  // =========================
 
   animatedContent: {
     flex: 1,
   },
 
-  // =========================
   // ILLUSTRATION
-  // =========================
 
   illustrationContainer: {
     width: width * 0.82,
@@ -333,9 +303,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
   },
 
-  // =========================
   // DECORATIONS
-  // =========================
 
   circleTop: {
     position: "absolute",
@@ -365,9 +333,7 @@ const styles = StyleSheet.create({
     right: -30,
   },
 
-  // =========================
   // MAIN CARD
-  // =========================
 
   mainCard: {
     width: 140,
@@ -432,9 +398,7 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
 
-  // =========================
   // TOP BADGE
-  // =========================
 
   topBadge: {
     position: "absolute",
@@ -468,9 +432,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
 
-  // =========================
   // ACCESS BADGE
-  // =========================
 
   accessBadge: {
     position: "absolute",
@@ -512,9 +474,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  // =========================
   // CONTENT
-  // =========================
 
   content: {
     width: width * 0.82,
@@ -550,9 +510,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  // =========================
   // BOTTOM
-  // =========================
 
   bottomSection: {
     width: width * 0.82,
@@ -565,9 +523,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  // =========================
   // DOTS
-  // =========================
 
   dots: {
     flexDirection: "row",

@@ -18,6 +18,7 @@ interface AppButtonProps {
   disabled?: boolean;
   style?: ViewStyle;
   children?: React.ReactNode;
+  gradientColors?: readonly [string, string];
 }
 
 export default function AppButton({
@@ -27,6 +28,7 @@ export default function AppButton({
   disabled = false,
   style,
   children,
+  gradientColors,
 }: AppButtonProps) {
   const isDisabled = disabled || loading;
 
@@ -41,7 +43,7 @@ export default function AppButton({
         colors={
           isDisabled
             ? ["#B7C5BD", "#A3B2AA"]
-            : [COLORS.primary, COLORS.primaryDark]
+            : (gradientColors ?? [COLORS.primary, COLORS.primaryDark])
         }
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}

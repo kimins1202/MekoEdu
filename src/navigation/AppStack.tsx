@@ -1,5 +1,5 @@
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import useOfflineExamSync from "@/hooks/useOfflineExamSync";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import MainTabNavigator from "./MainTabNavigator";
 
@@ -8,15 +8,14 @@ import ExamListScreen from "../screens/exam/ExamListScreen";
 import ExamScreen from "../screens/exam/ExamScreen";
 
 import ProfileScreen from "../screens/account/ProfileScreen";
-import CourseDetailScreen from "../screens/course/CourseDetailScreen";
 import NotificationScreen from "../screens/notification/NotificationScreen";
 import AnswerReviewScreen from "../screens/result/AnswerReviewScreen";
+import ConfirmSubmitScreen from "../screens/result/ConfirmSubmitScreen";
 import ResultScreen from "../screens/result/ResultScreen";
 import StatisticsScreen from "../screens/result/StatisticsScreen";
 import SettingsNotificationScreen from "../screens/settings/NotificationScreen";
 import ContactScreen from "../screens/support/ContactScreen";
 import HelpScreen from "../screens/support/HelpScreen";
-
 import { AppStackParamList } from "../types/navigation";
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
@@ -35,12 +34,15 @@ export default function AppStack() {
 
       {/* New Screens */}
       <Stack.Screen name="Profile" component={ProfileScreen} />
-      <Stack.Screen name="CourseDetail" component={CourseDetailScreen} />
       <Stack.Screen name="Notification" component={NotificationScreen} />
-      <Stack.Screen name="SettingsNotification" component={SettingsNotificationScreen} />
+      <Stack.Screen
+        name="SettingsNotification"
+        component={SettingsNotificationScreen}
+      />
       <Stack.Screen name="Contact" component={ContactScreen} />
       <Stack.Screen name="Help" component={HelpScreen} />
       <Stack.Screen name="Result" component={ResultScreen} />
+      <Stack.Screen name="ConfirmSubmit" component={ConfirmSubmitScreen} />
       <Stack.Screen name="AnswerReview" component={AnswerReviewScreen} />
       <Stack.Screen name="Statistics" component={StatisticsScreen} />
     </Stack.Navigator>

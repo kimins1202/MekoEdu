@@ -1,6 +1,5 @@
-import { ScrollView, StyleSheet, Text, TouchableOpacity } from "react-native";
-
-import COLORS from "../../constants/colors";
+import React from "react";
+import AppFilter, { FilterOption } from "../common/AppFilter";
 
 export type CourseFilterType = "all" | "learning" | "completed";
 
@@ -19,102 +18,29 @@ export default function CourseFilter({
   completedCount,
   onChange,
 }: CourseFilterProps) {
-  const filters = [
+  const filters: FilterOption<CourseFilterType>[] = [
     {
-      key: "all" as CourseFilterType,
+      key: "all",
       label: "Tất cả",
       count: totalCount,
     },
     {
-      key: "learning" as CourseFilterType,
+      key: "learning",
       label: "Đang học",
       count: learningCount,
     },
     {
-      key: "completed" as CourseFilterType,
+      key: "completed",
       label: "Hoàn thành",
       count: completedCount,
     },
   ];
 
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.container}
-    >
-      {filters.map((filter) => {
-        const isActive = activeFilter === filter.key;
-
-        return (
-          <TouchableOpacity
-            key={filter.key}
-            style={[styles.button, isActive && styles.activeButton]}
-            onPress={() => onChange(filter.key)}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.label, isActive && styles.activeLabel]}>
-              {filter.label}
-            </Text>
-
-            <Text style={[styles.count, isActive && styles.activeCount]}>
-              {filter.count}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
-    </ScrollView>
+    <AppFilter
+      filters={filters}
+      activeFilter={activeFilter}
+      onChange={onChange}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    paddingVertical: 4,
-    gap: 8,
-  },
-
-  button: {
-    minHeight: 38,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.white,
-  },
-
-  activeButton: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-
-  label: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.textSecondary,
-  },
-
-  activeLabel: {
-    color: COLORS.white,
-  },
-
-  count: {
-    minWidth: 20,
-    height: 20,
-    marginLeft: 7,
-    paddingHorizontal: 5,
-    borderRadius: 10,
-    textAlign: "center",
-    lineHeight: 20,
-    fontSize: 11,
-    fontWeight: "700",
-    color: COLORS.primary,
-    backgroundColor: COLORS.backgroundSoft,
-  },
-
-  activeCount: {
-    color: COLORS.primary,
-    backgroundColor: COLORS.white,
-  },
-});
