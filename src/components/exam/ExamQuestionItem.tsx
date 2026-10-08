@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 
+import MoodleHtml from "./questions/MoodleHtml";
 import COLORS from "../../constants/colors";
 import AppCard from "../common/AppCard";
 import QuestionRenderer from "./questions/QuestionRenderer";
@@ -94,7 +95,13 @@ export default function ExamQuestionItem({
         </View>
 
         {!!questionText && (
-          <Text style={styles.questionText}>{questionText}</Text>
+          <View style={{ marginTop: 14 }}>
+            {question.qtextHtml ? (
+              <MoodleHtml html={question.qtextHtml} />
+            ) : (
+              <Text style={styles.questionText}>{questionText}</Text>
+            )}
+          </View>
         )}
 
         {question.type === "description" && question.audioUrl && (

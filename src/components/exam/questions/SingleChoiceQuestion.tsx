@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import COLORS from "../../../constants/colors";
 import { Choice } from "../../../types/question";
+import MoodleHtml from "./MoodleHtml";
 
 interface Props {
   choices: Choice[];
@@ -27,9 +28,15 @@ export default function SingleChoiceQuestion({
           >
             <View style={[styles.radio, selected && styles.radioSelected]} />
 
-            <Text style={[styles.label, selected && styles.labelSelected]}>
-              {choice.label}
-            </Text>
+            <View style={styles.label}>
+              {choice.labelHtml ? (
+                <MoodleHtml html={choice.labelHtml} />
+              ) : (
+                <Text style={[styles.label, selected && styles.labelSelected]}>
+                  {choice.label}
+                </Text>
+              )}
+            </View>
           </Pressable>
         );
       })}

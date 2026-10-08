@@ -21,6 +21,7 @@ export type QuestionType =
 
 export interface Choice {
   label: string;
+  labelHtml?: string;
   value: string;
   fieldName?: string;
 }

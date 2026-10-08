@@ -224,9 +224,12 @@ function parseRadioChoices(root: HTMLElement): {
     if (!fieldName) fieldName = name;
 
     const label = stripChoicePrefix(getLabelForInput(root, input));
+    const labelElement = findLabelFor(root, input.getAttribute("id") ?? "");
 
+    const labelHtml = labelElement?.innerHTML;
     choices.push({
       label: label || value,
+      labelHtml,
       value,
       fieldName: name,
     });
