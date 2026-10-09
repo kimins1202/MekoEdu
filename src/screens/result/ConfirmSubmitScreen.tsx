@@ -134,6 +134,13 @@ export default function ConfirmSubmitScreen() {
 
         if (active && exam) {
           applySyncStatus(exam);
+          // This screen must drive queued saves too, rather than depend on a
+          // timer in the exam screen and keep showing "saving" indefinitely.
+          if (exam.status === "Pending") {
+            await syncExam({ userid, quizid, attemptid }, true);
+            const refreshed = await readOfflineExam({ userid, quizid, attemptid });
+            if (active && refreshed) applySyncStatus(refreshed);
+          }
         }
       } catch {
         if (active) {

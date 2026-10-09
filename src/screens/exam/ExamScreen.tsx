@@ -44,6 +44,7 @@ import {
 } from "@/services/examStorageService";
 
 import { isOfflineError, syncExam } from "@/services/syncService";
+import { assertSpeakingReady } from "@/services/speakingStorageService";
 import { selectRequestedAttempt } from "@/utils/resumeExam";
 
 import {
@@ -1239,6 +1240,8 @@ export default function ExamScreen() {
 
       contextRef.current = context;
 
+      // Check before freezing answers so the student can return and upload a replacement.
+      await assertSpeakingReady(context.userid, currentAttemptId);
       await queueExamAnswers(context, answerRef.current, true);
 
       setLocalSaveError(false);
@@ -1649,6 +1652,9 @@ export default function ExamScreen() {
               questionText={parsedQuestion.text}
               question={parsedQuestion}
               attemptId={attemptId}
+              userId={examUserId ?? 0}
+              page={currentPage}
+              focused={isFocused}
               token={token}
               playedAudioRef={playedAudioRef}
               isFlagged={isFlagged}

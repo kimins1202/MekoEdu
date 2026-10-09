@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import {
   setAudioModeAsync,
@@ -14,8 +14,21 @@ interface Props {
 }
 
 export default function RecordedAudioPlayer({ uri }: Props) {
-  const player = useAudioPlayer({ uri });
+  const source = useMemo(() => ({ uri }), [uri]);
+  const player = useAudioPlayer(source);
   const status = useAudioPlayerStatus(player);
+  const [error, setError] = useState(false);
+  const mounted = useRef(false);
+  useLayoutEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+  useEffect(() => {
+    setError(false);
+    const timer = setTimeout(() => setError(true), 15000);
+    if (status.isLoaded) clearTimeout(timer);
+    return () => clearTimeout(timer);
+  }, [uri, status.isLoaded]);
 
   const handlePlayPause = async () => {
     try {
@@ -23,17 +36,9 @@ export default function RecordedAudioPlayer({ uri }: Props) {
         allowsRecording: false,
         playsInSilentMode: true,
       });
-
-      console.log("RECORDED AUDIO STATUS:", {
-        uri,
-        isLoaded: status.isLoaded,
-        duration: status.duration,
-        currentTime: status.currentTime,
-        playing: status.playing,
-      });
+      if (!mounted.current) return;
 
       if (!status.isLoaded) {
-        console.log("RECORDED AUDIO NOT LOADED");
         return;
       }
 
@@ -42,11 +47,12 @@ export default function RecordedAudioPlayer({ uri }: Props) {
         return;
       }
 
-      await player.seekTo(0);
+      if (status.didJustFinish || status.currentTime >= status.duration) await player.seekTo(0);
+      if (!mounted.current) return;
       player.volume = 1;
       player.play();
     } catch (error) {
-      console.error("RECORDED AUDIO PLAY ERROR:", error);
+      if (mounted.current) setError(true);
     }
   };
 
@@ -66,7 +72,7 @@ export default function RecordedAudioPlayer({ uri }: Props) {
       </Pressable>
 
       <Text style={styles.info}>
-        Trạng thái: {status.isLoaded ? "Đã tải" : "Đang tải"}
+        Trạng thái: {error ? "Không thể phát bản ghi. Kiểm tra kết nối hoặc mở lại câu hỏi." : status.isLoaded ? "Đã tải" : "Đang tải"}
       </Text>
 
       <Text style={styles.info}>

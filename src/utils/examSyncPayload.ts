@@ -2,11 +2,12 @@ import { parse } from "node-html-parser";
 import type { OfflineExam } from "@/services/examStorageService";
 
 export function buildExamSyncPayload(exam: OfflineExam) {
-  const data = new Map(Object.entries(exam.answers).map(([name, value]) => [name, String(value)]));
+  const data = new Map(Object.entries(exam.answers).filter(([name]) => !/^q\d+:\d+_recording$/.test(name)).map(([name, value]) => [name, String(value)]));
   const slots = new Set<number>();
   const validated = new Set<string>();
   for (const page of Object.values(exam.pages)) {
     for (const question of page.questions) {
+      if (question.type === "recordrtc" || /que recordrtc/.test(question.html ?? "")) continue;
       const root = parse(question.html ?? "");
       const controls = root.querySelectorAll("input, select, textarea");
       const sequence = controls.find(control => /_:sequencecheck$/.test(control.getAttribute("name") ?? ""));
@@ -34,6 +35,7 @@ export function buildExamSyncPayload(exam: OfflineExam) {
     }
   }
   for (const name of Object.keys(exam.answers)) {
+    if (/^q\d+:\d+_recording$/.test(name)) continue;
     const prefix = name.match(/^q\d+:\d+_/)?.[0];
     if (prefix && !validated.has(prefix)) {
       throw new Error("Không tìm thấy thông tin câu hỏi để đồng bộ. Đáp án vẫn được giữ trên thiết bị.");

@@ -21,6 +21,9 @@ interface ExamQuestionItemProps {
   questionText: string;
   question: ParsedQuestion;
   attemptId: number;
+  userId?: number;
+  page?: number;
+  focused?: boolean;
   isFlagged: boolean;
   selectedAnswers: Record<string, string>;
   disabled: boolean;
@@ -41,6 +44,7 @@ export default function ExamQuestionItem({
   questionText,
   question,
   attemptId,
+  userId, page, focused,
   isFlagged,
   selectedAnswers,
   disabled,
@@ -125,6 +129,10 @@ export default function ExamQuestionItem({
             setAnswer={handleAnswerChange}
             token={token}
             attemptId={attemptId}
+            userId={userId}
+            page={page}
+            focused={focused}
+            disabled={answerDisabled}
           />
         </AppCard>
       )}

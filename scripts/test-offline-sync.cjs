@@ -30,6 +30,10 @@ function setup(data = new Map([['userid', '1'], ['wstoken', 'test']])) {
   const store = load('src/services/examStorageService.ts', { '@react-native-async-storage/async-storage': storage });
   const sync = load('src/services/syncService.ts', {
     '@react-native-async-storage/async-storage': storage, '@/api/quizApi': api, './examStorageService': store,
+    './speakingStorageService': load('src/services/speakingStorageService.ts', {
+      '@react-native-async-storage/async-storage': storage, 'expo-file-system': { File: class {} },
+      '../api/quizApi': api, '../parsers/questionParser': {},
+    }),
     '@/utils/examSyncPayload': load('src/utils/examSyncPayload.ts', { 'node-html-parser': require('node-html-parser') }),
   });
   return { data, api, store, sync, failDisk: () => { diskError = true; } };
@@ -169,4 +173,57 @@ test('page caching and rapid edits preserve both metadata and the latest answer 
   assert.equal(exam.deadline, 123456);
   assert.equal(exam.pages[0].questions[0].slot, 1);
   assert.equal(exam.status, 'Pending');
+});
+
+
+test('Speaking draft IDs and stale sequences are excluded while other answers still sync', async () => {
+  const h = setup();
+  await h.store.updateOfflineExam(context, exam => ({ ...exam, pages: { 0: { questions: [
+    { type: 'recordrtc', slot: 1, sequencecheck: 0, html: '<input name="q987:1_recording" value="old"><input name="q987:1_:sequencecheck" value="0">' },
+    { slot: 2, sequencecheck: 4, html: '<input name="q987:2_answer"><input name="q987:2_:sequencecheck" value="4">' }
+  ], nextpage: -1 } } }));
+  let sent;
+  h.api.saveQuizAttempt = async (_, data) => { sent = Object.fromEntries(data.map(x => [x.name, x.value])); return { status: true }; };
+  await h.store.queueExamAnswers(context, { 'q987:1_recording': 'old', 'q987:2_answer': 'yes' });
+  await h.sync.syncExam(context);
+  assert.equal(sent['q987:1_recording'], undefined);
+  assert.equal(sent['q987:1_:sequencecheck'], undefined);
+  assert.equal(sent['q987:2_answer'], 'yes');
+  assert.equal(sent.slots, '2');
+});
+
+test('pending replacement blocks submission even when an old Speaking draft is selected', async () => {
+  const h = setup();
+  h.data.set('speaking:v1:1:3:q987%3A1_recording', JSON.stringify({ attemptId: 3, fieldName: 'q987:1_recording', audioUri: 'file://new.m4a', uploaded: false }));
+  h.api.processQuizAttempt = async () => assert.fail('must not submit old response');
+  await h.store.queueExamAnswers(context, { 'q987:1_recording': 'old' }, true);
+  await h.sync.syncExam(context);
+  const exam = await h.store.readOfflineExam(context);
+  assert.equal(exam.submitted, false);
+  assert.equal(exam.status, 'Failed');
+  assert.match(exam.error, /Speaking/);
+});
+
+
+test('uploaded Speaking-only exam becomes Synced without an empty save request, then submits', async () => {
+  const h = setup();
+  h.data.set('speaking:v1:1:3:q987%3A1_recording', JSON.stringify({ attemptId: 3, fieldName: 'q987:1_recording', audioUri: 'file://one.m4a', uploaded: true }));
+  h.api.saveQuizAttempt = async () => assert.fail('must not send empty save_attempt');
+  await h.store.queueExamAnswers(context, { 'q987:1_recording': '123' });
+  await h.sync.syncExam(context);
+  assert.equal((await h.store.readOfflineExam(context)).status, 'Synced');
+  let submitted = false;
+  h.api.processQuizAttempt = async (_, data) => { assert.equal(data.length, 0); submitted = true; return { state: 'finished' }; };
+  await h.store.queueExamAnswers(context, { 'q987:1_recording': '123' }, true);
+  await h.sync.syncExam(context);
+  assert.equal(submitted, true);
+  assert.equal((await h.store.readOfflineExam(context)).submitted, true);
+});
+
+test('unuploaded Speaking-only exam is not acknowledged by an empty generic save', async () => {
+  const h = setup();
+  h.data.set('speaking:v1:1:3:q987%3A1_recording', JSON.stringify({ attemptId: 3, fieldName: 'q987:1_recording', uploaded: false }));
+  await h.store.queueExamAnswers(context, { 'q987:1_recording': '' });
+  await h.sync.syncExam(context);
+  assert.equal((await h.store.readOfflineExam(context)).status, 'Failed');
 });

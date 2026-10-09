@@ -1,3 +1,4 @@
+import { assertSpeakingReady } from "./speakingStorageService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getUserAttempts, processQuizAttempt, saveQuizAttempt } from "@/api/quizApi";
 import { ExamContext, listOfflineExams, readOfflineExam, updateOfflineExam } from "./examStorageService";
@@ -19,6 +20,7 @@ export function syncExam(context: ExamContext, retryFailed = false): Promise<voi
       if (Number(await AsyncStorage.getItem("userid")) !== context.userid || !(await AsyncStorage.getItem("wstoken"))) return;
       try {
         if (snapshot.submitRequested) {
+          await assertSpeakingReady(context.userid, context.attemptid);
           // Resolve a lost submission response before attempting submission again.
           const history = await getUserAttempts(context.quizid, context.userid, "all");
           const attempt = history?.attempts?.find((item: any) => Number(item.id) === context.attemptid);
@@ -30,8 +32,14 @@ export function syncExam(context: ExamContext, retryFailed = false): Promise<voi
             if (result?.state !== "finished") throw new Error("Moodle chưa xác nhận nộp bài thành công.");
           }
         } else {
-          const result = await saveQuizAttempt(context.attemptid, buildExamSyncPayload(snapshot));
-          if (result?.status === false) throw new Error("Moodle không xác nhận lưu câu trả lời.");
+          const payload = buildExamSyncPayload(snapshot);
+          // Speaking has already been saved by its dedicated service. An empty
+          // generic payload must not trigger another save_attempt request.
+          if (payload.length) {
+            const result = await saveQuizAttempt(context.attemptid, payload);
+            if (result?.status === false) throw new Error("Moodle không xác nhận lưu câu trả lời.");
+          }
+          await assertSpeakingReady(context.userid, context.attemptid);
         }
         await updateOfflineExam(context, (current) => current.revision !== snapshot.revision ? current : {
           ...current, status: "Synced", error: undefined, submitted: snapshot.submitRequested,

@@ -28,6 +28,10 @@ interface Props {
   setAnswer: (field: string, value: string) => void;
   token?: string;
   attemptId: number;
+  userId?: number;
+  page?: number;
+  disabled?: boolean;
+  focused?: boolean;
 }
 
 export default function QuestionRenderer({
@@ -36,6 +40,7 @@ export default function QuestionRenderer({
   setAnswer,
   token,
   attemptId,
+  userId = 0, page = 0, disabled = false, focused = true,
 }: Props) {
   switch (question.type) {
     case "description":
@@ -208,6 +213,12 @@ export default function QuestionRenderer({
 
       return (
         <RecordRTCQuestion
+          key={`${userId}:${attemptId}:${fieldName}`}
+          userId={userId}
+          page={page}
+          disabled={disabled}
+          focused={focused}
+          token={token}
           question={question}
           attemptId={attemptId}
           fieldName={fieldName}
