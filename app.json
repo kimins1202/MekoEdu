@@ -33,7 +33,13 @@
           }
         }
       ],
-      "expo-audio",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Cho phép MekoEdu sử dụng microphone để ghi âm bài thi Speaking.",
+          "enableBackgroundRecording": false
+        }
+      ],
       "expo-asset"
     ],
     "experiments": {

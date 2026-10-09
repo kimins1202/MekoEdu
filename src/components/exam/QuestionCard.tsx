@@ -12,6 +12,8 @@ interface QuestionCardProps {
 
   question: ParsedQuestion;
 
+  attemptId: number;
+
   selectedAnswers: Record<string, string>;
 
   onAnswerChange: (answers: Record<string, string>) => void;
@@ -31,6 +33,7 @@ export default function QuestionCard({
   onFlagPress,
   isFlagged = false,
   token,
+  attemptId,
 }: QuestionCardProps) {
   const handleAnswerChange = (field: string, value: string) => {
     onAnswerChange({
@@ -120,6 +123,7 @@ export default function QuestionCard({
         answers={selectedAnswers}
         setAnswer={handleAnswerChange}
         token={token}
+        attemptId={attemptId}
       />
     </AppCard>
   );

@@ -1,5 +1,6 @@
 export type QuestionType =
   | "description"
+  | "recordrtc"
   | "truefalse"
   | "gapselect"
   | "shortanswer"
@@ -86,4 +87,10 @@ export interface ParsedQuestion {
   answerFormatField?: string;
 
   answerFormatValue?: string;
+
+  recordingMaxDuration?: number;
+
+  sequencecheck?: number;
+  
+  recordingMediaType?: "audio" | "video" | "screen";
 }

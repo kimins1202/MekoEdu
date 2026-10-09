@@ -20,6 +20,7 @@ interface ExamQuestionItemProps {
   questionNumberText: string;
   questionText: string;
   question: ParsedQuestion;
+  attemptId: number;
   isFlagged: boolean;
   selectedAnswers: Record<string, string>;
   disabled: boolean;
@@ -39,6 +40,7 @@ export default function ExamQuestionItem({
   questionNumberText,
   questionText,
   question,
+  attemptId,
   isFlagged,
   selectedAnswers,
   disabled,
@@ -122,6 +124,7 @@ export default function ExamQuestionItem({
             answers={selectedAnswers}
             setAnswer={handleAnswerChange}
             token={token}
+            attemptId={attemptId}
           />
         </AppCard>
       )}

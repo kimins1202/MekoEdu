@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from "react-native";
-
+import React, { useEffect } from "react";
 import { ParsedQuestion } from "../../../types/question";
 
 import AudioPlayer from "./AudioPlayer";
@@ -16,6 +16,7 @@ import OrderingQuestion from "./OrderingQuestion";
 import SelectMissingWordsQuestion from "./SelectMissingWordsQuestion";
 import ShortAnswerQuestion from "./ShortAnswerQuestion";
 import SingleChoiceQuestion from "./SingleChoiceQuestion";
+import RecordRTCQuestion from "./RecordRTCQuestion";
 
 import { getMoodleFileUrl } from "../../../utils/moodleFile";
 
@@ -26,6 +27,7 @@ interface Props {
   answers: Record<string, string>;
   setAnswer: (field: string, value: string) => void;
   token?: string;
+  attemptId: number;
 }
 
 export default function QuestionRenderer({
@@ -33,6 +35,7 @@ export default function QuestionRenderer({
   answers,
   setAnswer,
   token,
+  attemptId,
 }: Props) {
   switch (question.type) {
     case "description":
@@ -179,6 +182,40 @@ export default function QuestionRenderer({
           setAnswer={setAnswer}
         />
       );
+
+    case "recordrtc": {
+      const fieldName = question.fieldName;
+
+      const sequencecheck = question.sequencecheck;
+
+      if (
+        !fieldName ||
+        !/^q\d+:\d+_recording$/.test(fieldName) ||
+        !Number.isInteger(sequencecheck) ||
+        sequencecheck === undefined
+      ) {
+        return (
+          <View style={styles.error}>
+            <Text style={styles.errorTitle}>
+              Không thể tải thông tin câu Speaking
+            </Text>
+            <Text style={styles.fallbackText}>
+              Thiếu fieldName hoặc sequencecheck từ Moodle.
+            </Text>
+          </View>
+        );
+      }
+
+      return (
+        <RecordRTCQuestion
+          question={question}
+          attemptId={attemptId}
+          fieldName={fieldName}
+          sequencecheck={sequencecheck}
+          setAnswer={setAnswer}
+        />
+      );
+    }
 
     default:
       return (

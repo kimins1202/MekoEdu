@@ -1611,6 +1611,10 @@ export default function ExamScreen() {
         showsVerticalScrollIndicator={false}
       >
         {questions.map((questionItem, questionIndex) => {
+          if (attemptId === null) {
+            return null;
+          }
+
           const slot = getQuestionSlot(questionItem);
 
           const isFlagged = Boolean(
@@ -1629,6 +1633,7 @@ export default function ExamScreen() {
               }
               questionText={parsedQuestion.text}
               question={parsedQuestion}
+              attemptId={attemptId}
               token={token}
               playedAudioRef={playedAudioRef}
               isFlagged={isFlagged}

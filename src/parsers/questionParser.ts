@@ -127,6 +127,7 @@ function detectType(root: HTMLElement, html: string): QuestionType {
   if (html.includes("que gapselect")) return "gapselect";
   if (html.includes("que shortanswer")) return "shortanswer";
   if (html.includes("que essay")) return "essay";
+  if (html.includes("que recordrtc")) return "recordrtc";
   if (html.includes("que randomsamatch")) return "randomsamatch";
   if (html.includes("que match")) return "match";
   if (html.includes("que ddwtos")) return "ddwtos";
@@ -631,6 +632,18 @@ export function parseQuestion(html: string): ParsedQuestion {
   const type = detectType(root, html);
   const qtext = root.querySelector(".qtext");
 
+  let qtextHtml = qtext?.innerHTML ?? undefined;
+
+  if (type === "recordrtc" && qtextHtml) {
+    const cloned = parse(qtextHtml);
+
+    cloned
+      .querySelectorAll(".qtype_recordrtc-audio-widget")
+      .forEach((element) => element.remove());
+
+    qtextHtml = cloned.innerHTML;
+  }
+
   const result: ParsedQuestion = {
     type,
 
@@ -640,7 +653,7 @@ export function parseQuestion(html: string): ParsedQuestion {
         : parseQuestionText(root),
 
     html,
-    qtextHtml: qtext?.innerHTML ?? undefined,
+    qtextHtml,
     audioUrl: parseAudioUrl(root),
   };
 
@@ -714,6 +727,29 @@ export function parseQuestion(html: string): ParsedQuestion {
       result.backgroundImage = parsed.image;
       result.dragItems = parsed.items;
       result.dropFields = parsed.fields;
+      break;
+    }
+
+    case "recordrtc": {
+      const widget = root.querySelector(".qtype_recordrtc-audio-widget");
+
+      result.recordingMediaType =
+        (widget?.getAttribute("data-media-type") as
+          | "audio"
+          | "video"
+          | "screen") ?? "audio";
+
+      result.recordingMaxDuration = Number(
+        widget?.getAttribute("data-max-recording-duration") ?? 180,
+      );
+
+      // Lấy trường Moodle dùng để tham chiếu bản ghi âm.
+      const input = root.querySelector(
+        'input[type="hidden"][name$="_recording"]',
+      );
+
+      result.fieldName = input?.getAttribute("name") ?? undefined;
+
       break;
     }
   }
