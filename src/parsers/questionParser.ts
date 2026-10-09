@@ -739,16 +739,42 @@ export function parseQuestion(html: string): ParsedQuestion {
           | "video"
           | "screen") ?? "audio";
 
-      result.recordingMaxDuration = Number(
+      const duration = Number(
         widget?.getAttribute("data-max-recording-duration") ?? 180,
       );
 
-      // Lấy trường Moodle dùng để tham chiếu bản ghi âm.
-      const input = root.querySelector(
-        'input[type="hidden"][name$="_recording"]',
-      );
+      result.recordingMaxDuration =
+        Number.isFinite(duration) && duration > 0 ? duration : 180;
 
-      result.fieldName = input?.getAttribute("name") ?? undefined;
+      // Tìm trường lưu draft item ID của bản ghi.
+      const recordingInput = root
+        .querySelectorAll("input[name]")
+        .find((input) =>
+          /^q\d+:\d+_recording$/.test(input.getAttribute("name") ?? ""),
+        );
+
+      result.fieldName = recordingInput?.getAttribute("name") ?? undefined;
+
+      // Tìm sequencecheck trong HTML Moodle.
+      const sequenceInput = root
+        .querySelectorAll("input[name]")
+        .find((input) =>
+          /^q\d+:\d+_:sequencecheck$/.test(input.getAttribute("name") ?? ""),
+        );
+
+      const rawSequence = sequenceInput?.getAttribute("value");
+
+      if (
+        rawSequence !== undefined &&
+        rawSequence !== null &&
+        rawSequence.trim() !== ""
+      ) {
+        const sequence = Number(rawSequence);
+
+        if (Number.isInteger(sequence) && sequence >= 0) {
+          result.sequencecheck = sequence;
+        }
+      }
 
       break;
     }

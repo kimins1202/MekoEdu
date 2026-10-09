@@ -10,7 +10,7 @@ import {
   useAudioRecorderState,
 } from "expo-audio";
 
-import { File, Directory, Paths } from "expo-file-system";
+import { File } from "expo-file-system";
 
 import COLORS from "../../../constants/colors";
 import type { ParsedQuestion } from "../../../types/question";
@@ -55,82 +55,57 @@ export default function RecordRTCQuestion({
 
   const elapsedSeconds = Math.floor((recorderState.durationMillis ?? 0) / 1000);
 
-  const stopRecording = async () => {
-    if (stoppingRef.current || !recorder.isRecording) return;
+  
+const stopRecording = async () => {
+  if (stoppingRef.current || !recorder.isRecording) return;
 
-    stoppingRef.current = true;
-    setBusy(true);
+  stoppingRef.current = true;
+  setBusy(true);
 
-    try {
-      console.log("========== RECORDING DEBUG ==========");
-      console.log("RECORDING BEFORE STOP:", {
-        durationMillis: recorderState.durationMillis,
-        isRecording: recorderState.isRecording,
-        recorderUri: recorder.uri,
-      });
+  try {
+    console.log("========== RECORDING DEBUG ==========");
 
-      await recorder.stop();
+    await recorder.stop();
 
-      const sourceUri = recorder.uri;
+    const sourceUri = recorder.uri;
 
-      console.log("RECORDRTC SOURCE URI:", sourceUri);
-
-      if (!sourceUri) {
-        throw new Error("Không tìm thấy file ghi âm");
-      }
-
-      const source = new File(sourceUri);
-
-      console.log("SOURCE EXISTS:", source.exists);
-      console.log("SOURCE SIZE:", source.size);
-
-      if (!source.exists || source.size <= 0) {
-        throw new Error("File ghi âm không hợp lệ");
-      }
-
-      const folder = new Directory(Paths.document, "speaking-recordings");
-
-      folder.create({
-        idempotent: true,
-        intermediates: true,
-      });
-
-      const destination = new File(folder, `speaking-${Date.now()}.m4a`);
-
-      source.copy(destination);
-
-      const savedFile = new File(destination.uri);
-
-      console.log("SAVED URI:", savedFile.uri);
-      console.log("SAVED EXISTS:", savedFile.exists);
-      console.log("SAVED SIZE:", savedFile.size);
-
-      if (!savedFile.exists || savedFile.size <= 0) {
-        throw new Error("Không thể lưu file ghi âm");
-      }
-
-      await setAudioModeAsync({
-        allowsRecording: false,
-        playsInSilentMode: true,
-      });
-
-      setAudioUri(savedFile.uri);
-
-      console.log("RECORDRTC SAVE SUCCESS:", savedFile.uri);
-
-      Alert.alert("Thành công", "Đã lưu bản ghi âm. Bạn có thể nghe lại.");
-    } catch (error) {
-      console.error("RECORDRTC STOP ERROR:", error);
-
-      Alert.alert(
-        "Lỗi lưu ghi âm",
-        error instanceof Error ? error.message : String(error),
-      );
-    } finally {
-      stoppingRef.current = false;
-      setBusy(false);
+    if (!sourceUri) {
+      throw new Error("Không tìm thấy file ghi âm");
     }
-  };
+
+    const source = new File(sourceUri);
+
+    if (!source.exists || !source.size || source.size <= 0) {
+      throw new Error("File ghi âm không hợp lệ");
+    }
+
+    await setAudioModeAsync({
+      allowsRecording: false,
+      playsInSilentMode: true,
+    });
+
+    // Dùng trực tiếp file do expo-audio tạo ra.
+    setAudioUri(sourceUri);
+    setUploaded(false);
+
+    console.log("RECORDRTC SAVE SUCCESS:", sourceUri);
+
+    Alert.alert(
+      "Thành công",
+      "Đã ghi âm. Bạn có thể nghe lại.",
+    );
+  } catch (error) {
+
+    Alert.alert(
+      "Lỗi lưu ghi âm",
+      error instanceof Error ? error.message : String(error),
+    );
+  } finally {
+    stoppingRef.current = false;
+    setBusy(false);
+  }
+};
+
 
   const startRecording = async () => {
     if (busy || isRecording) return;
@@ -160,9 +135,7 @@ export default function RecordRTCQuestion({
       await recorder.prepareToRecordAsync();
       recorder.record();
 
-      console.log("RECORDRTC STARTED");
     } catch (error) {
-      console.error("RECORDRTC START ERROR:", error);
 
       Alert.alert(
         "Lỗi ghi âm",

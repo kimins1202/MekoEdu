@@ -1625,6 +1625,21 @@ export default function ExamScreen() {
             questionItem.html,
           );
 
+          // Ưu tiên sequencecheck do Moodle API trả về.
+          // Chỉ dùng giá trị trong HTML khi API không cung cấp.
+          if (parsedQuestion.type === "recordrtc") {
+            const apiSequence = Number(questionItem.sequencecheck);
+
+            if (
+              questionItem.sequencecheck !== undefined &&
+              questionItem.sequencecheck !== null &&
+              Number.isInteger(apiSequence) &&
+              apiSequence >= 0
+            ) {
+              parsedQuestion.sequencecheck = apiSequence;
+            }
+          }
+
           return (
             <ExamQuestionItem
               key={`${questionItem.slot}-${questionItem.questionnumber}`}
