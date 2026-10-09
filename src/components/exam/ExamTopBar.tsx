@@ -101,7 +101,7 @@ export default function ExamTopBar({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
   },
 
   /*
@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
 
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
 
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,

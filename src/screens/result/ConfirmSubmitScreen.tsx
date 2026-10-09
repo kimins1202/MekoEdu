@@ -355,7 +355,7 @@ export default function ConfirmSubmitScreen() {
   // ---------------------------------------------------------------------------
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView edges={["bottom"]} style={styles.container}>
       {/* ================================================================
           HEADER
       ================================================================= */}
@@ -801,7 +801,7 @@ export default function ConfirmSubmitScreen() {
           </Text>
         </Animated.View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -918,7 +918,7 @@ const styles = StyleSheet.create({
 
   statCard: {
     flex: 1,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 18,
     paddingVertical: 16,
     paddingHorizontal: 8,
@@ -1164,7 +1164,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1.5,
     borderColor: COLORS.primary,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",

@@ -3,15 +3,15 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   DeviceEventEmitter,
   StyleSheet,
   Text,
-  View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getSiteInfo } from "../../api/authApi";
 import COLORS from "../../constants/colors";
@@ -24,11 +24,18 @@ export default function AppInitScreen() {
 
   const [error, setError] = useState(false);
 
-  useEffect(() => {
-    initializeApp();
+  const handleLogout = useCallback(async () => {
+    try {
+      await AsyncStorage.removeItem("wstoken");
+      await AsyncStorage.removeItem("userid");
+
+      DeviceEventEmitter.emit("authChange");
+    } catch (error) {
+      console.error("APP INIT LOGOUT ERROR:", error);
+    }
   }, []);
 
-  const initializeApp = async () => {
+  const initializeApp = useCallback(async () => {
     try {
       // 1. LẤY TOKEN
 
@@ -52,12 +59,6 @@ export default function AppInitScreen() {
 
       await AsyncStorage.setItem("userid", String(siteInfo.userid));
 
-      // 5. KIỂM TRA LẠI USERID
-
-      const savedUserId = await AsyncStorage.getItem("userid");
-
-      // 6. ĐI VÀO APP STACK
-
       navigation.replace("App");
     } catch (error) {
       console.error("APP INIT ERROR:", error);
@@ -78,25 +79,16 @@ export default function AppInitScreen() {
         },
       );
     }
-  };
+  }, [handleLogout, navigation]);
 
-  // ĐĂNG XUẤT KHI APP INIT THẤT BẠI
-
-  const handleLogout = async () => {
-    try {
-      await AsyncStorage.removeItem("wstoken");
-      await AsyncStorage.removeItem("userid");
-
-      DeviceEventEmitter.emit("authChange");
-    } catch (error) {
-      console.error("APP INIT LOGOUT ERROR:", error);
-    }
-  };
+  useEffect(() => {
+    void Promise.resolve().then(initializeApp);
+  }, [initializeApp]);
 
   // UI
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {!error ? (
         <>
           <ActivityIndicator size="large" color={COLORS.primary} />
@@ -118,7 +110,7 @@ export default function AppInitScreen() {
           <Text style={styles.description}>Vui lòng đăng nhập lại.</Text>
         </>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 // STYLE

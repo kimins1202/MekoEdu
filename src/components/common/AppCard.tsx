@@ -17,7 +17,7 @@ export default function AppCard({ style, children, ...rest }: AppCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 18,
     padding: 18,
     borderWidth: 1,

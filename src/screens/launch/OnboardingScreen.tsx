@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import {
   Animated,
   Dimensions,
@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import AppButton from "../../components/common/AppButton";
 import MekoLogo from "../../components/common/MekoLogo";
@@ -58,8 +59,8 @@ export default function OnboardingScreen({ navigation }: Props) {
 
   const current = onboardingData[currentIndex];
 
-  const contentOpacity = useRef(new Animated.Value(1)).current;
-  const contentTranslateY = useRef(new Animated.Value(0)).current;
+  const [contentOpacity] = useState(() => new Animated.Value(1));
+  const [contentTranslateY] = useState(() => new Animated.Value(0));
 
   const handleNext = () => {
     // Slide cuối → sang Launch
@@ -112,7 +113,7 @@ export default function OnboardingScreen({ navigation }: Props) {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* ================= HEADER ================= */}
 
       <View style={styles.header}>
@@ -221,13 +222,13 @@ export default function OnboardingScreen({ navigation }: Props) {
         <AppButton
           title={
             currentIndex === onboardingData.length - 1
-              ? "Bắt đầu học"
+              ? "Bắt đầu thi"
               : "Tiếp tục"
           }
           onPress={handleNext}
         />
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -236,7 +237,7 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
   },
 
   // HEADER
@@ -244,7 +245,7 @@ const styles = StyleSheet.create({
   header: {
     height: 76,
 
-    paddingTop: 36,
+    paddingTop: 12,
     paddingHorizontal: 24,
 
     flexDirection: "row",
@@ -341,7 +342,7 @@ const styles = StyleSheet.create({
 
     borderRadius: 18,
 
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
 
     alignItems: "center",
     justifyContent: "center",
@@ -411,7 +412,7 @@ const styles = StyleSheet.create({
 
     borderRadius: 15,
 
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
 
     alignItems: "center",
     justifyContent: "center",

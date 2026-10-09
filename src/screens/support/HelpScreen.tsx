@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import AppHeader from "../../components/common/AppHeader";
 import COLORS from "../../constants/colors";
@@ -48,7 +49,7 @@ export default function HelpScreen() {
     useNavigation<NativeStackNavigationProp<AppStackParamList>>();
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView edges={["bottom"]} style={styles.container}>
       <AppHeader title="Trợ giúp" />
 
       <ScrollView
@@ -191,7 +192,7 @@ export default function HelpScreen() {
 
         <Text style={styles.footer}>MekoEdu · Trung tâm hỗ trợ</Text>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -210,7 +211,7 @@ const styles = StyleSheet.create({
     padding: 16,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: COLORS.border,
@@ -252,7 +253,7 @@ const styles = StyleSheet.create({
   },
 
   quickCard: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 17,
     borderWidth: 1,
     borderColor: COLORS.border,
@@ -302,7 +303,7 @@ const styles = StyleSheet.create({
   },
 
   faqCard: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 17,
     borderWidth: 1,
     borderColor: COLORS.border,
@@ -343,7 +344,7 @@ const styles = StyleSheet.create({
     padding: 15,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 17,
     borderWidth: 1,
     borderColor: COLORS.border,

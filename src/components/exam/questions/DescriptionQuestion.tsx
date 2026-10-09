@@ -16,7 +16,7 @@ export default function DescriptionQuestion({ question }: Props) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: 14,

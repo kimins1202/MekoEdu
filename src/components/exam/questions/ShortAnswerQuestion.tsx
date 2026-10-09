@@ -34,7 +34,7 @@ export default function ShortAnswerQuestion({
 const styles = StyleSheet.create({
   input: {
     minHeight: 52,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: 14,

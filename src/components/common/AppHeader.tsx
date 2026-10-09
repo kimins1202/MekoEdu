@@ -83,7 +83,7 @@ export default function AppHeader({
 
 const styles = StyleSheet.create({
   safeArea: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
   },
 
   container: {
@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },

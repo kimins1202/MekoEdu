@@ -114,7 +114,7 @@ export default function QuestionNavigator({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: COLORS.border,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     justifyContent: "center",
     alignItems: "center",
     position: "relative",

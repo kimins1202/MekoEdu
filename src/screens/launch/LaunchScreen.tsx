@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import {
   Animated,
   Easing,
@@ -11,9 +11,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import AppButton from "../../components/common/AppButton";
 import MekoLogo from "../../components/common/MekoLogo";
+import { STORAGE_KEYS } from "../../constants/config";
 import COLORS from "../../constants/colors";
 import { RootStackParamList } from "../../types/navigation";
 
@@ -46,17 +48,17 @@ const FEATURES: Feature[] = [
 export default function LaunchScreen() {
   const navigation = useNavigation<NavigationProp>();
 
-  const logoOpacity = useRef(new Animated.Value(0)).current;
-  const logoScale = useRef(new Animated.Value(0.85)).current;
+  const [logoOpacity] = useState(() => new Animated.Value(0));
+  const [logoScale] = useState(() => new Animated.Value(0.85));
 
-  const contentOpacity = useRef(new Animated.Value(0)).current;
-  const contentTranslateY = useRef(new Animated.Value(18)).current;
+  const [contentOpacity] = useState(() => new Animated.Value(0));
+  const [contentTranslateY] = useState(() => new Animated.Value(18));
 
-  const featuresOpacity = useRef(new Animated.Value(0)).current;
-  const featuresTranslateY = useRef(new Animated.Value(18)).current;
+  const [featuresOpacity] = useState(() => new Animated.Value(0));
+  const [featuresTranslateY] = useState(() => new Animated.Value(18));
 
-  const buttonOpacity = useRef(new Animated.Value(0)).current;
-  const buttonTranslateY = useRef(new Animated.Value(15)).current;
+  const [buttonOpacity] = useState(() => new Animated.Value(0));
+  const [buttonTranslateY] = useState(() => new Animated.Value(15));
 
   useEffect(() => {
     Animated.sequence([
@@ -132,6 +134,7 @@ export default function LaunchScreen() {
 
   const handleStart = async () => {
     try {
+      await AsyncStorage.setItem(STORAGE_KEYS.LAUNCH_SEEN, "true");
       const token = await AsyncStorage.getItem("wstoken");
 
       if (token) {
@@ -139,17 +142,24 @@ export default function LaunchScreen() {
       } else {
         navigation.replace("Auth");
       }
-    } catch {
+    } catch (error) {
+      console.error("LAUNCH - Không thể lưu trạng thái giới thiệu:", error);
       navigation.replace("Auth");
     }
   };
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.LAUNCH_SEEN, "true");
+    } catch (error) {
+      console.error("LAUNCH - Không thể lưu trạng thái giới thiệu:", error);
+    }
+
     navigation.replace("Auth");
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* Logo */}
       <Animated.View
         style={[
@@ -218,7 +228,7 @@ export default function LaunchScreen() {
           },
         ]}
       >
-        <AppButton title="Bắt đầu học" onPress={handleStart} />
+        <AppButton title="Bắt đầu thi" onPress={handleStart} />
 
         <TouchableOpacity
           style={styles.loginButton}
@@ -231,7 +241,7 @@ export default function LaunchScreen() {
           </Text>
         </TouchableOpacity>
       </Animated.View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -343,7 +353,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     marginBottom: 8,
   },
 

@@ -14,6 +14,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getAttemptReview } from "../../api/quizApi";
 import AppCard from "../../components/common/AppCard";
@@ -149,15 +150,15 @@ export default function AnswerReviewScreen() {
   const uncheckCount = questions.filter(q => getReviewGrade(q) === "ungraded").length;
   if (loading) {
     return (
-      <View style={styles.centered}>
+      <SafeAreaView style={styles.centered}>
         <ActivityIndicator size="large" color={COLORS.primary} />
         <Text style={styles.loadingText}>Đang tải bài làm...</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView edges={["bottom"]} style={styles.container}>
       <AppHeader title="Xem lại bài làm" showBack />
 
       <ScrollView
@@ -454,7 +455,7 @@ export default function AnswerReviewScreen() {
           </AppCard>
         )}
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -608,7 +609,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
@@ -716,7 +717,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: COLORS.border,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
   },
 
   answerCorrect: {

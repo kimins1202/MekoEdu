@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     minHeight: 58,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: 14,
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
   },
 
   itemActive: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderColor: COLORS.primary,
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 4 },

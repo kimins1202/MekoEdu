@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
   },
 
   questionMenuModal: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingTop: 24,
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
   },
 
   questionGridUnanswered: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderColor: COLORS.border,
   },
 
@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: -4,
     right: -4,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 10,
     overflow: "hidden",
   },

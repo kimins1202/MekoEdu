@@ -102,7 +102,7 @@ export default function CourseCard({
 const styles = StyleSheet.create({
   card: {
     width: "100%",
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: COLORS.border,

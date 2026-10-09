@@ -93,7 +93,7 @@ export default function Loading({
 const styles = StyleSheet.create({
   fullScreenContainer: {
     flex: 1,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     justifyContent: "center",
     alignItems: "center",
     padding: 20,

@@ -18,4 +18,5 @@ export const MOODLE_CONFIG = {
 export const STORAGE_KEYS = {
   TOKEN: "wstoken",
   USER_ID: "userid",
+  LAUNCH_SEEN: "launchSeen",
 };

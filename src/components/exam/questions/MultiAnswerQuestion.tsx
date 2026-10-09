@@ -79,6 +79,6 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     fontSize: 15,
     color: COLORS.text,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
   },
 });

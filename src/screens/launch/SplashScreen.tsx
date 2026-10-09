@@ -1,7 +1,8 @@
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { Animated, Easing, Image, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import COLORS from "../../constants/colors";
 import { RootStackParamList } from "../../types/navigation";
@@ -10,23 +11,23 @@ type Props = NativeStackScreenProps<RootStackParamList, "Splash">;
 
 export default function SplashScreen({ navigation }: Props) {
   // Logo
-  const logoOpacity = useRef(new Animated.Value(0)).current;
-  const logoScale = useRef(new Animated.Value(0.85)).current;
-  const logoTranslateY = useRef(new Animated.Value(10)).current;
+  const [logoOpacity] = useState(() => new Animated.Value(0));
+  const [logoScale] = useState(() => new Animated.Value(0.85));
+  const [logoTranslateY] = useState(() => new Animated.Value(10));
 
   // Loading
-  const loadingOpacity = useRef(new Animated.Value(0)).current;
-  const loadingScale = useRef(new Animated.Value(0.8)).current;
+  const [loadingOpacity] = useState(() => new Animated.Value(0));
+  const [loadingScale] = useState(() => new Animated.Value(0.8));
 
-  const dot1 = useRef(new Animated.Value(0.25)).current;
-  const dot2 = useRef(new Animated.Value(0.25)).current;
-  const dot3 = useRef(new Animated.Value(0.25)).current;
+  const [dot1] = useState(() => new Animated.Value(0.25));
+  const [dot2] = useState(() => new Animated.Value(0.25));
+  const [dot3] = useState(() => new Animated.Value(0.25));
 
-  const progressScale = useRef(new Animated.Value(0)).current;
+  const [progressScale] = useState(() => new Animated.Value(0));
 
   // MekoSoft
-  const brandOpacity = useRef(new Animated.Value(0)).current;
-  const brandTranslateY = useRef(new Animated.Value(10)).current;
+  const [brandOpacity] = useState(() => new Animated.Value(0));
+  const [brandTranslateY] = useState(() => new Animated.Value(10));
 
   useEffect(() => {
     // =====================================
@@ -205,6 +206,10 @@ export default function SplashScreen({ navigation }: Props) {
         colors={[COLORS.primaryDark, COLORS.primary, "#178044"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <SafeAreaView
+        edges={["top", "right", "left"]}
         style={styles.background}
       >
         {/* =========================
@@ -303,7 +308,7 @@ export default function SplashScreen({ navigation }: Props) {
 
         {/* iPhone Home Indicator */}
         <View style={styles.homeIndicator} />
-      </LinearGradient>
+      </SafeAreaView>
     </View>
   );
 }
@@ -339,7 +344,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
 
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
 
     shadowColor: COLORS.black,
     shadowOffset: {

@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
   introCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 18,
     padding: 15,
     marginBottom: 14,

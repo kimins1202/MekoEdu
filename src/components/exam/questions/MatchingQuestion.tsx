@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
 
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
   },
 
   selectButtonSelected: {
@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
   },
 
   modalCard: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 18,
     padding: 16,
     maxHeight: "70%",

@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
   container: {
     padding: 14,
     marginBottom: 16,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: 14,

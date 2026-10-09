@@ -1,14 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useNavigation, useRoute } from "@react-navigation/native";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useEffect, useState } from "react";
 import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+  useFocusEffect,
+  useNavigation,
+  useRoute,
+} from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useCallback, useState } from "react";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
   getAttemptReview,
@@ -39,6 +39,11 @@ type ResultRoute = {
   };
 };
 
+// Luôn hiển thị điểm với 2 chữ số thập phân.
+const formatScore = (value: number): string => {
+  return Number.isFinite(value) ? value.toFixed(2) : "--";
+};
+
 export default function ResultScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<ResultRoute>();
@@ -58,6 +63,8 @@ export default function ResultScreen() {
     try {
       setLoading(true);
       setError("");
+      setFeedback("");
+      setBestGrade(null);
 
       const useridString = await AsyncStorage.getItem("userid");
 
@@ -71,19 +78,17 @@ export default function ResultScreen() {
         throw new Error("User ID không hợp lệ.");
       }
 
-      // Lấy chi tiết bài làm
+      // Lấy chi tiết bài làm.
       const reviewResponse = await getAttemptReview(attemptid);
 
       if (!reviewResponse?.attempt) {
         throw new Error("Chưa tìm thấy kết quả bài thi.");
       }
 
-      // Tính số câu đúng
+      // Tính số câu đúng.
       const questions = Array.isArray(reviewResponse.questions)
         ? reviewResponse.questions
         : [];
-
-      const totalQ = questions.length;
 
       let correctQ = 0;
 
@@ -101,14 +106,14 @@ export default function ResultScreen() {
         }
       });
 
-      setTotalQuestions(totalQ);
+      setTotalQuestions(questions.length);
       setCorrectAnswers(correctQ);
 
-      // Lấy điểm bài thi
+      // Lấy điểm bài thi từ Moodle.
       let finalScore =
         reviewResponse.grade !== null && reviewResponse.grade !== undefined
           ? Number(reviewResponse.grade)
-          : Number(reviewResponse.attempt?.sumgrades || 0);
+          : Number(reviewResponse.attempt?.sumgrades ?? 0);
 
       let maxScore: number | null = null;
 
@@ -126,27 +131,31 @@ export default function ResultScreen() {
         );
 
         if (foundQuiz) {
-          maxScore = Number(foundQuiz.grade);
+          const parsedMaxScore = Number(foundQuiz.grade);
 
+          maxScore =
+            Number.isFinite(parsedMaxScore) && parsedMaxScore > 0
+              ? parsedMaxScore
+              : null;
+
+          // Chỉ quy đổi sumgrades khi review chưa trả về grade.
           if (
             (reviewResponse.grade === null ||
               reviewResponse.grade === undefined) &&
             Number(foundQuiz.sumgrades) > 0 &&
-            maxScore > 0
+            maxScore !== null
           ) {
             finalScore = (finalScore / Number(foundQuiz.sumgrades)) * maxScore;
           }
         }
       } catch {
-        // Giữ điểm từ review nếu không lấy được thông tin quiz
+        // Giữ điểm từ review nếu không lấy được thông tin quiz.
       }
 
       setScore(Number.isFinite(finalScore) ? finalScore : null);
-      setGradeMax(
-        maxScore !== null && Number.isFinite(maxScore) ? maxScore : null,
-      );
+      setGradeMax(maxScore);
 
-      // Lấy feedback
+      // Lấy nhận xét theo điểm thực tế, không dùng điểm đã làm tròn.
       if (Number.isFinite(finalScore)) {
         try {
           const feedbackResponse = await getQuizFeedbackForGrade(
@@ -164,12 +173,16 @@ export default function ResultScreen() {
         }
       }
 
-      // Lấy điểm cao nhất
+      // Lấy điểm cao nhất.
       try {
         const bestGradeResponse = await getUserBestGrade(quizid, userid);
 
         if (bestGradeResponse?.hasgrade) {
-          setBestGrade(Number(bestGradeResponse.grade));
+          const parsedBestGrade = Number(bestGradeResponse.grade);
+
+          setBestGrade(
+            Number.isFinite(parsedBestGrade) ? parsedBestGrade : null,
+          );
         }
       } catch {
         setBestGrade(null);
@@ -182,39 +195,28 @@ export default function ResultScreen() {
   }, [attemptid, courseid, quizid]);
 
   useEffect(() => {
-    let isMounted = true;
-
-    const runLoad = async () => {
-      if (!isMounted) {
-        return;
-      }
-
-      await loadResult();
-    };
-
-    void runLoad();
-
-    return () => {
-      isMounted = false;
-    };
+    void loadResult();
   }, [loadResult]);
 
+  // Điểm số.
   const getScoreText = () => {
     if (score === null) {
       return "--";
     }
 
-    return Number.isInteger(score) ? String(score) : score.toFixed(2);
+    return formatScore(score);
   };
 
+  // Điểm đạt được / điểm tối đa.
   const getGradeText = () => {
     if (score === null || gradeMax === null || gradeMax <= 0) {
       return "--";
     }
 
-    return `${score}/${gradeMax}`;
+    return `${formatScore(score)} / ${formatScore(gradeMax)}`;
   };
 
+  // Phần trăm tiến độ.
   const getPercent = () => {
     if (score === null || gradeMax === null || gradeMax <= 0) {
       return 0;
@@ -237,24 +239,24 @@ export default function ResultScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <SafeAreaView style={styles.loadingContainer}>
         <Loading message="Đang tải kết quả bài thi..." />
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView edges={["bottom"]} style={styles.container}>
       <AppHeader title="Kết quả bài thi" showBack />
 
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* Result header */}
+        {/* Thông tin bài thi */}
         <View style={styles.resultHeader}>
           <View style={styles.successIcon}>
-            <Ionicons name="checkmark" size={42} color={COLORS.white} />
+            <Ionicons name="checkmark" size={38} color={COLORS.white} />
           </View>
 
           <Text style={styles.title}>Đã hoàn thành bài thi</Text>
@@ -264,7 +266,7 @@ export default function ResultScreen() {
           </Text>
         </View>
 
-        {/* Score */}
+        {/* Thẻ điểm số */}
         <AppCard style={styles.scoreCard}>
           <Text style={styles.scoreLabel}>Điểm của bạn</Text>
 
@@ -287,13 +289,12 @@ export default function ResultScreen() {
               />
 
               <Text style={styles.bestGradeText}>
-                Điểm cao nhất:{" "}
-                {Number.isInteger(bestGrade) ? bestGrade : bestGrade.toFixed(2)}
+                Điểm cao nhất: {formatScore(bestGrade)}
               </Text>
             </View>
           )}
 
-          {feedback ? (
+          {!!feedback && (
             <View style={styles.feedbackContainer}>
               <View style={styles.feedbackHeader}>
                 <Ionicons
@@ -307,10 +308,10 @@ export default function ResultScreen() {
 
               <Text style={styles.feedbackText}>{feedback}</Text>
             </View>
-          ) : null}
+          )}
         </AppCard>
 
-        {/* Correct answers */}
+        {/* Số câu trả lời đúng */}
         {totalQuestions > 0 && (
           <AppCard style={styles.infoCard}>
             <View style={styles.infoRow}>
@@ -333,7 +334,7 @@ export default function ResultScreen() {
           </AppCard>
         )}
 
-        {/* Result status */}
+        {/* Trạng thái kết quả */}
         <AppCard
           style={[
             styles.statusCard,
@@ -358,7 +359,7 @@ export default function ResultScreen() {
           </Text>
         </AppCard>
 
-        {/* Actions */}
+        {/* Các nút thao tác */}
         <View style={styles.actions}>
           <AppButton
             title="Xem lại bài làm"
@@ -373,7 +374,7 @@ export default function ResultScreen() {
           />
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -398,13 +399,13 @@ const styles = StyleSheet.create({
 
   resultHeader: {
     alignItems: "center",
-    marginBottom: 18,
+    marginBottom: 20,
   },
 
   successIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 68,
+    height: 68,
+    borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: COLORS.primary,
@@ -440,15 +441,17 @@ const styles = StyleSheet.create({
 
   score: {
     marginTop: 4,
-    fontSize: 50,
-    lineHeight: 58,
+    fontSize: 46,
+    lineHeight: 56,
     fontWeight: "800",
     color: COLORS.primary,
+    fontVariant: ["tabular-nums"],
   },
 
   scoreMax: {
     marginTop: 2,
     fontSize: 14,
+    fontWeight: "500",
     color: COLORS.textSecondary,
   },
 
@@ -488,9 +491,9 @@ const styles = StyleSheet.create({
     marginTop: 14,
     padding: 14,
     borderRadius: 14,
-    backgroundColor: "#F0F8FF",
+    backgroundColor: COLORS.backgroundSoft,
     borderWidth: 1,
-    borderColor: "#B0E0E6",
+    borderColor: COLORS.border,
   },
 
   feedbackHeader: {
@@ -527,7 +530,7 @@ const styles = StyleSheet.create({
   infoIcon: {
     width: 42,
     height: 42,
-    borderRadius: 21,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: COLORS.backgroundSoft,
@@ -559,13 +562,13 @@ const styles = StyleSheet.create({
   },
 
   successCard: {
-    backgroundColor: "#EAF7EF",
-    borderColor: "#C3E6CC",
+    backgroundColor: COLORS.backgroundSoft,
+    borderColor: COLORS.border,
   },
 
   errorCard: {
-    backgroundColor: "#FFF1F1",
-    borderColor: "#F3C4C4",
+    backgroundColor: COLORS.backgroundSoft,
+    borderColor: COLORS.error,
   },
 
   statusText: {

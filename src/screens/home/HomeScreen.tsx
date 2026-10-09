@@ -16,6 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import AppHeader from "../../components/common/AppHeader";
 import EmptyState from "../../components/common/EmptyState";
@@ -359,7 +360,11 @@ export default function HomeScreen() {
   // LOADING
 
   if (loading) {
-    return <Loading message="Đang tải trang chủ..." />;
+    return (
+      <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
+        <Loading message="Đang tải trang chủ..." />
+      </SafeAreaView>
+    );
   }
 
   const recentCourses = courses.slice(0, 3);
@@ -693,7 +698,7 @@ const styles = StyleSheet.create({
   userCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 20,
     padding: 15,
     marginBottom: 22,
@@ -808,7 +813,7 @@ const styles = StyleSheet.create({
   },
 
   progressContainer: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     paddingHorizontal: 15,
     paddingBottom: 15,
     marginTop: -12,
@@ -856,7 +861,7 @@ const styles = StyleSheet.create({
   historyItem: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: 17,
@@ -914,7 +919,7 @@ const styles = StyleSheet.create({
 
   emptyHistory: {
     minHeight: 110,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: 17,
@@ -952,7 +957,7 @@ const styles = StyleSheet.create({
     minHeight: 58,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: COLORS.border,

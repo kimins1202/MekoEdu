@@ -66,7 +66,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: COLORS.border,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
   },
   activeButton: {
     backgroundColor: COLORS.primary,
@@ -95,6 +95,6 @@ const styles = StyleSheet.create({
   },
   activeCount: {
     color: COLORS.primary,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
   },
 });

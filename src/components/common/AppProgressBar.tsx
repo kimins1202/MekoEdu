@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ViewStyle } from 'react-native';
+import { View, Text, StyleSheet, ViewStyle, ColorValue } from 'react-native';
 import COLORS from '../../constants/colors';
 
 interface AppProgressBarProps {
@@ -7,8 +7,8 @@ interface AppProgressBarProps {
   showPercent?: boolean;
   style?: ViewStyle;
   height?: number;
-  color?: string;
-  trackColor?: string;
+  color?: ColorValue;
+  trackColor?: ColorValue;
 }
 
 export default function AppProgressBar({

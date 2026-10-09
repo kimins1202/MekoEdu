@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import AppHeader from "../../components/common/AppHeader";
 import COLORS from "../../constants/colors";
@@ -56,7 +57,7 @@ export default function ContactScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView edges={["bottom"]} style={styles.container}>
       <AppHeader title="Liên hệ" />
 
       <ScrollView
@@ -220,7 +221,7 @@ export default function ContactScreen() {
 
         <Text style={styles.footer}>MekoEdu · Phát triển bởi MekoSoft</Text>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -246,7 +247,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.border,
     marginBottom: 14,
@@ -268,7 +269,7 @@ const styles = StyleSheet.create({
   },
 
   card: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 17,
     borderWidth: 1,
     borderColor: COLORS.border,
@@ -328,7 +329,7 @@ const styles = StyleSheet.create({
   feedbackCard: {
     padding: 16,
     flexDirection: "row",
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 17,
     borderWidth: 1,
     borderColor: COLORS.border,

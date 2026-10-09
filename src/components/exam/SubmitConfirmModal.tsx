@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
   modal: {
     width: "100%",
     maxWidth: 390,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 22,
     padding: 24,
   },

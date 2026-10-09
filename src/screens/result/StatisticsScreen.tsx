@@ -1,17 +1,18 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AppHeader from '../../components/common/AppHeader';
 import COLORS from '../../constants/colors';
 
 export default function StatisticsScreen() {
   return (
-    <View style={styles.container}>
+    <SafeAreaView edges={["bottom"]} style={styles.container}>
       <AppHeader title="Thống kê" subtitle="Tiến độ học tập của bạn" />
       <View style={styles.content}>
         <Text style={styles.text}>Tính năng đang phát triển</Text>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 

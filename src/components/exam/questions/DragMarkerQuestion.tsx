@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginRight: 8,
     marginBottom: 8,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
   },
 
   selected: {
@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderWidth: 2,
     borderColor: COLORS.primary,
   },

@@ -32,7 +32,7 @@ export default function EssayQuestion({ value, onChange }: Props) {
 const styles = StyleSheet.create({
   editor: {
     minHeight: 180,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: 14,

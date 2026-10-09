@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
 
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
   },
 
   containerSelected: {

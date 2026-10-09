@@ -809,7 +809,7 @@ const styles = StyleSheet.create({
 
   // ── SUMMARY CARD ──────────────────────────────
   summaryCard: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 20,
     paddingVertical: 18,
     paddingHorizontal: 8,
@@ -928,7 +928,7 @@ const styles = StyleSheet.create({
 
   // ── RESULT CARD ──────────────────────────────
   resultCard: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 18,
     padding: 14,
     flexDirection: "row",
@@ -1061,7 +1061,7 @@ const styles = StyleSheet.create({
   // ── PAGINATION ──────────────────────────────
   paginationCard: {
     marginTop: 6,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 16,
     padding: 8,
     flexDirection: "row",
@@ -1138,7 +1138,7 @@ const styles = StyleSheet.create({
 
   // ── EMPTY / ERROR ───────────────────────────
   emptyCard: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 20,
     padding: 32,
     alignItems: "center",
@@ -1148,7 +1148,7 @@ const styles = StyleSheet.create({
   },
 
   errorCard: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 20,
     padding: 32,
     alignItems: "center",

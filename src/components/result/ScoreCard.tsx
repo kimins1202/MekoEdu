@@ -68,7 +68,7 @@ export default function ScoreCard({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 20,
     padding: 24,
     alignItems: "center",

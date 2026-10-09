@@ -4,11 +4,15 @@ import { useEffect, useState } from "react";
 import {
   Alert,
   DeviceEventEmitter,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import AppButton from "@/components/common/AppButton";
 import AppInput from "@/components/common/AppInput";
@@ -122,110 +126,149 @@ export default function LoginScreen() {
 
   // Loading
   if (loading) {
-    return <Loading message="Đang kết nối tới hệ thống Moodle..." />;
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <Loading message="Đang kết nối tới hệ thống Moodle..." />
+      </SafeAreaView>
+    );
   }
 
   return (
-    <View style={styles.container}>
-      {/* Background decoration */}
-      <View style={styles.backgroundCircleTop} />
-      <View style={styles.backgroundCircleBottom} />
+    <View style={styles.screen}>
+      <View pointerEvents="none" style={styles.backgroundCircleTop} />
+      <View pointerEvents="none" style={styles.backgroundCircleBottom} />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <MekoLogo size={78} />
-
-        <View style={styles.brandName}>
-          <Text style={styles.mekoText}>Meko</Text>
-          <Text style={styles.eduText}>Edu</Text>
-        </View>
-      </View>
-
-      {/* Form */}
-      <View style={styles.form}>
-        <AppInput
-          label="Tên đăng nhập"
-          placeholder="Nhập tên đăng nhập"
-          value={username}
-          onChangeText={setUsername}
-          autoCapitalize="none"
-          autoCorrect={false}
-          editable={!loading}
-        />
-
-        {/* Password */}
-        <View style={styles.passwordWrapper}>
-          <AppInput
-            label="Mật khẩu"
-            placeholder="Nhập mật khẩu"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry={!showPassword}
-            autoCapitalize="none"
-            autoCorrect={false}
-            editable={!loading}
-            style={styles.passwordInput}
-          />
-
-          <TouchableOpacity
-            style={styles.eyeButton}
-            onPress={() => setShowPassword((prev) => !prev)}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name={showPassword ? "eye-outline" : "eye-off-outline"}
-              size={21}
-              color={COLORS.textLight}
-            />
-          </TouchableOpacity>
-        </View>
-
-        {/* Remember password */}
-        <TouchableOpacity
-          style={styles.rememberRow}
-          onPress={() => setRememberPassword((prev) => !prev)}
-          activeOpacity={0.7}
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoidingView}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-          <View
-            style={[styles.checkbox, rememberPassword && styles.checkboxActive]}
+          <ScrollView
+            contentContainerStyle={styles.container}
+            keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+            keyboardShouldPersistTaps="handled"
           >
-            {rememberPassword && (
-              <Ionicons name="checkmark" size={15} color={COLORS.white} />
-            )}
-          </View>
+            {/* Header */}
+            <View style={styles.header}>
+              <MekoLogo size={78} />
 
-          <Text style={styles.rememberText}>Ghi nhớ mật khẩu</Text>
-        </TouchableOpacity>
+              <View style={styles.brandName}>
+                <Text style={styles.mekoText}>Meko</Text>
+                <Text style={styles.eduText}>Edu</Text>
+              </View>
+            </View>
 
-        {/* Login */}
-        <AppButton onPress={handleLogin} loading={loading} title="Đăng nhập" />
-      </View>
+            {/* Form */}
+            <View style={styles.form}>
+              <AppInput
+                label="Tên đăng nhập"
+                placeholder="Nhập tên đăng nhập"
+                value={username}
+                onChangeText={setUsername}
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!loading}
+              />
 
-      {/* Footer */}
-      <View style={styles.footer}>
-        <View style={styles.footerLine} />
+              {/* Password */}
+              <View style={styles.passwordWrapper}>
+                <AppInput
+                  label="Mật khẩu"
+                  placeholder="Nhập mật khẩu"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={!loading}
+                  style={styles.passwordInput}
+                />
 
-        <View style={styles.footerContent}>
-          <Ionicons
-            name="shield-checkmark-outline"
-            size={15}
-            color={COLORS.textLight}
-          />
+                <TouchableOpacity
+                  style={styles.eyeButton}
+                  onPress={() => setShowPassword((prev) => !prev)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={showPassword ? "eye-outline" : "eye-off-outline"}
+                    size={21}
+                    color={COLORS.textLight}
+                  />
+                </TouchableOpacity>
+              </View>
 
-          <Text style={styles.footerText}>Đăng nhập bằng tài khoản Moodle</Text>
-        </View>
-      </View>
+              {/* Remember password */}
+              <TouchableOpacity
+                style={styles.rememberRow}
+                onPress={() => setRememberPassword((prev) => !prev)}
+                activeOpacity={0.7}
+              >
+                <View
+                  style={[
+                    styles.checkbox,
+                    rememberPassword && styles.checkboxActive,
+                  ]}
+                >
+                  {rememberPassword && (
+                    <Ionicons name="checkmark" size={15} color={COLORS.white} />
+                  )}
+                </View>
+
+                <Text style={styles.rememberText}>Ghi nhớ mật khẩu</Text>
+              </TouchableOpacity>
+
+              {/* Login */}
+              <AppButton
+                onPress={handleLogin}
+                loading={loading}
+                title="Đăng nhập"
+              />
+            </View>
+
+            {/* Footer */}
+            <View style={styles.footer}>
+              <View style={styles.footerLine} />
+
+              <View style={styles.footerContent}>
+                <Ionicons
+                  name="shield-checkmark-outline"
+                  size={15}
+                  color={COLORS.textLight}
+                />
+
+                <Text style={styles.footerText}>
+                  Đăng nhập bằng tài khoản Moodle
+                </Text>
+              </View>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
+    backgroundColor: COLORS.backgroundSoft,
+  },
+
+  safeArea: {
+    flex: 1,
+    backgroundColor: "transparent",
+  },
+
+  keyboardAvoidingView: {
+    flex: 1,
+  },
+
+  container: {
+    flexGrow: 1,
     justifyContent: "center",
     paddingHorizontal: 24,
-    backgroundColor: COLORS.backgroundSoft,
-    overflow: "hidden",
+    paddingVertical: 24,
+    backgroundColor: "transparent",
   },
 
   // Background
@@ -332,7 +375,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 1.5,
     borderColor: COLORS.border,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 9,

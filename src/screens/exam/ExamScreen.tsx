@@ -1509,7 +1509,10 @@ export default function ExamScreen() {
 
   if (questions.length === 0) {
     return (
-      <View style={styles.emptyContainer}>
+      <SafeAreaView
+        edges={["top", "right", "bottom", "left"]}
+        style={styles.emptyContainer}
+      >
         <View style={styles.emptyIcon}>
           <Ionicons
             name="document-text-outline"
@@ -1531,7 +1534,7 @@ export default function ExamScreen() {
         >
           <Text style={styles.backButtonText}>Quay lại</Text>
         </TouchableOpacity>
-      </View>
+      </SafeAreaView>
     );
   }
 
@@ -1930,7 +1933,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 18,

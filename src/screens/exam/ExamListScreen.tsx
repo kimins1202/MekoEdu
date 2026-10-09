@@ -17,6 +17,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import AppHeader from "@/components/common/AppHeader";
 import Loading from "@/components/common/Loading";
@@ -178,18 +179,18 @@ export default function ExamListScreen() {
 
   if (loading && exams.length === 0) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView edges={["bottom"]} style={styles.container}>
         <AppHeader title="Danh sách bài thi" showBack />
 
         <Loading message="Đang tải danh sách bài thi..." />
-      </View>
+      </SafeAreaView>
     );
   }
 
   // UI
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView edges={["bottom"]} style={styles.container}>
       {/* HEADER */}
 
       <AppHeader
@@ -338,7 +339,7 @@ export default function ExamListScreen() {
           )}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -363,7 +364,7 @@ const styles = StyleSheet.create({
   examCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 18,
     padding: 15,
     marginBottom: 12,
@@ -463,7 +464,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 18,

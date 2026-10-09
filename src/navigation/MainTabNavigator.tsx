@@ -22,14 +22,14 @@ export default function MainTabNavigator() {
         headerShown: false,
 
         tabBarActiveTintColor: COLORS.primaryDark,
-        tabBarInactiveTintColor: COLORS.textLight,
+        tabBarInactiveTintColor: "#94A0AA",
 
         tabBarStyle: {
           height: 60 + insets.bottom,
           paddingTop: 8,
           paddingBottom: insets.bottom + 8,
 
-          backgroundColor: COLORS.white,
+          backgroundColor: COLORS.surface,
 
           borderTopWidth: 1,
           borderTopColor: COLORS.border,

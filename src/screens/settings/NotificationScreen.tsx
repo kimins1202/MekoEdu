@@ -1,16 +1,17 @@
 import { StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import AppHeader from "../../components/common/AppHeader";
 import COLORS from "../../constants/colors";
 
 export default function SettingsNotificationScreen() {
   return (
-    <View style={styles.container}>
+    <SafeAreaView edges={["bottom"]} style={styles.container}>
       <AppHeader title="Cài đặt thông báo" />
       <View style={styles.content}>
         <Text style={styles.text}>Tính năng đang phát triển</Text>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 

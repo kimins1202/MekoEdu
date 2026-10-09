@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getSiteInfo } from "../../api/authApi";
 import AppHeader from "../../components/common/AppHeader";
@@ -327,19 +328,19 @@ export default function ProfileScreen() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView edges={["bottom"]} style={styles.container}>
         <AppHeader
           title="Hồ sơ cá nhân"
           subtitle="Thông tin tài khoản của bạn"
         />
 
         <Loading message="Đang tải thông tin..." />
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView edges={["bottom"]} style={styles.container}>
       <AppHeader title="Hồ sơ cá nhân" />
 
       <ScrollView
@@ -728,7 +729,7 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -768,7 +769,7 @@ const styles = StyleSheet.create({
   },
 
   profileCard: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 22,
     paddingVertical: 26,
     paddingHorizontal: 20,
@@ -874,7 +875,7 @@ const styles = StyleSheet.create({
   },
 
   infoCard: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 20,
     paddingHorizontal: 15,
     borderWidth: 1,
@@ -936,7 +937,7 @@ const styles = StyleSheet.create({
   },
 
   personalCard: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 20,
     paddingHorizontal: 15,
     borderWidth: 1,
@@ -1079,7 +1080,7 @@ const styles = StyleSheet.create({
   systemAvatarModal: {
     width: "100%",
     maxWidth: 380,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 22,
     padding: 20,
   },
@@ -1127,7 +1128,7 @@ const styles = StyleSheet.create({
   },
 
   errorCard: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 20,
     padding: 30,
     alignItems: "center",

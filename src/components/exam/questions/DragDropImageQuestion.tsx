@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginRight: 8,
     marginBottom: 8,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
   },
 
   selected: {
@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 10,
     justifyContent: "center",
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
   },
 
   dropFilled: {

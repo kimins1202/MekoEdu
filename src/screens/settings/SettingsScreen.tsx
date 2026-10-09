@@ -5,6 +5,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
+  Appearance,
   DeviceEventEmitter,
   Image,
   RefreshControl,
@@ -159,7 +160,10 @@ export default function SettingsScreen() {
         });
       }
 
-      setDarkMode(savedTheme === "dark");
+      setDarkMode(
+        savedTheme === "dark" ||
+          (savedTheme !== "light" && Appearance.getColorScheme() === "dark"),
+      );
     }).catch((error: any) => {
       Alert.alert("Không thể tải dữ liệu", error?.message || "Đã xảy ra lỗi.");
     }).finally(() => {
@@ -180,9 +184,18 @@ export default function SettingsScreen() {
 
   // Change theme
   const handleThemeChange = async (value: boolean) => {
-    setDarkMode(value);
+    const nextMode = value ? "dark" : "light";
+    const previousMode = darkMode ? "dark" : "light";
 
-    await AsyncStorage.setItem("themeMode", value ? "dark" : "light");
+    try {
+      await AsyncStorage.setItem("themeMode", nextMode);
+      Appearance.setColorScheme(nextMode);
+      setDarkMode(value);
+    } catch (error) {
+      console.error("Không thể lưu giao diện:", error);
+      Alert.alert("Lỗi", "Không thể lưu cài đặt giao diện.");
+      Appearance.setColorScheme(previousMode);
+    }
   };
 
   // Logout
@@ -381,7 +394,7 @@ const styles = StyleSheet.create({
   },
 
   profileCard: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 20,
     padding: 16,
     flexDirection: "row",
@@ -458,7 +471,7 @@ const styles = StyleSheet.create({
   },
 
   settingsGroup: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderRadius: 17,
     overflow: "hidden",
     marginBottom: 22,
