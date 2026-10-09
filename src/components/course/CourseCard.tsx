@@ -40,7 +40,7 @@ export default function CourseCard({
     >
       <View style={styles.topRow}>
         <View style={styles.iconWrapper}>
-          <Ionicons name="school-outline" size={28} color={COLORS.primary} />
+          <Ionicons name="school-outline" size={28} color={COLORS.primaryText} />
         </View>
 
         <View style={styles.content}>
@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
   category: {
     fontSize: 11,
     fontWeight: "600",
-    color: COLORS.primaryDark,
+    color: COLORS.primaryText,
     marginBottom: 4,
     textTransform: "uppercase",
   },
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 5,
     borderRadius: 10,
-    backgroundColor: "#FFF8E8",
+    backgroundColor: COLORS.warningSurface,
   },
 
   completedBadge: {
@@ -202,11 +202,11 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 11,
     fontWeight: "600",
-    color: COLORS.warning,
+    color: COLORS.warningText,
   },
 
   completedText: {
-    color: COLORS.success,
+    color: COLORS.primaryText,
   },
 
   examProgressText: {

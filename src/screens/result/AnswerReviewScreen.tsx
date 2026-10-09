@@ -1,7 +1,7 @@
 import RenderHTML from "react-native-render-html";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { readOfflineExam } from "@/services/examStorageService";
-import { getReviewGrade, parseReviewHtml } from "@/parsers/reviewParser";
+import { getReviewGrade, isReviewDescription, parseReviewHtml } from "@/parsers/reviewParser";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useEffect, useState } from "react";
@@ -20,6 +20,7 @@ import { getAttemptReview } from "../../api/quizApi";
 import AppCard from "../../components/common/AppCard";
 import AppHeader from "../../components/common/AppHeader";
 import COLORS from "../../constants/colors";
+import { countQuestions } from "../../utils/questionCount";
 
 const reviewTagsStyles = {
   strong: { fontWeight: "bold" as const },
@@ -50,6 +51,8 @@ type ReviewQuestion = {
   maxmark?: number;
 };
 
+type ReviewFilter = "all" | "correct" | "wrong" | "ungraded";
+
 function getStateInfo(question: ReviewQuestion) {
   switch (getReviewGrade(question)) {
     case "correct": return { label: "Đúng", color: COLORS.success, bg: "#EAF7EF", icon: "checkmark-circle" as const };
@@ -75,6 +78,7 @@ export default function AnswerReviewScreen() {
   const [totalMark, setTotalMark] = useState<number | null>(null);
   const [maxMark, setMaxMark] = useState<number | null>(null);
   const [expandedSlots, setExpandedSlots] = useState<Set<number>>(new Set());
+  const [activeFilter, setActiveFilter] = useState<ReviewFilter>("all");
 
   const load = async () => {
     try {
@@ -88,6 +92,7 @@ export default function AnswerReviewScreen() {
       }
 
       setQuestions(res.questions);
+      setActiveFilter("all");
       setExpandedSlots(new Set(res.questions.map((question: ReviewQuestion) => question.slot)));
       const userid = Number(await AsyncStorage.getItem("userid"));
       const local = userid ? await readOfflineExam({ userid, quizid, attemptid }).catch(() => null) : null;
@@ -145,9 +150,22 @@ export default function AnswerReviewScreen() {
 
   const collapseAll = () => setExpandedSlots(new Set());
 
-  const correctCount = questions.filter(q => getReviewGrade(q) === "correct").length;
-  const wrongCount = questions.filter(q => ["incorrect", "partial"].includes(getReviewGrade(q))).length;
-  const uncheckCount = questions.filter(q => getReviewGrade(q) === "ungraded").length;
+  const answerableQuestions = questions.filter(q => !isReviewDescription(q));
+  const correctCount = answerableQuestions.filter(q => getReviewGrade(q) === "correct").length;
+  const wrongCount = answerableQuestions.filter(q => ["incorrect", "partial"].includes(getReviewGrade(q))).length;
+  const uncheckCount = answerableQuestions.filter(q => getReviewGrade(q) === "ungraded").length;
+  const filteredQuestions = questions
+    .map((question, index) => ({ question, index }))
+    .filter(({ question }) => {
+      if (activeFilter === "all") return true;
+      if (isReviewDescription(question)) return false;
+      const grade = getReviewGrade(question);
+      if (activeFilter === "wrong") return grade === "incorrect" || grade === "partial";
+      return grade === activeFilter;
+    });
+  const filteredQuestionCount = countQuestions(filteredQuestions.map(({ question }) => question));
+  const toggleFilter = (filter: ReviewFilter) =>
+    setActiveFilter(current => current === filter ? "all" : filter);
   if (loading) {
     return (
       <SafeAreaView style={styles.centered}>
@@ -182,7 +200,7 @@ export default function AnswerReviewScreen() {
               </Text>
 
               <Text style={styles.summarySubtitle}>
-                {correctCount}/{questions.length} câu đúng
+                {correctCount}/{answerableQuestions.length} câu đúng
               </Text>
             </View>
           </View>
@@ -200,7 +218,14 @@ export default function AnswerReviewScreen() {
 
         {/* ── Stat chips ── */}
         <View style={styles.statRow}>
-          <View style={[styles.statChip, { backgroundColor: "#EAF7EF" }]}>
+          <TouchableOpacity
+            style={[styles.statChip, { backgroundColor: "#EAF7EF" }, activeFilter === "correct" && { borderColor: COLORS.success }]}
+            onPress={() => toggleFilter("correct")}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={`Lọc ${correctCount} câu đúng`}
+            accessibilityState={{ selected: activeFilter === "correct" }}
+          >
             <Ionicons
               name="checkmark-circle"
               size={15}
@@ -210,20 +235,33 @@ export default function AnswerReviewScreen() {
             <Text style={[styles.statChipText, { color: COLORS.success }]}>
               {correctCount} Đúng
             </Text>
-          </View>
+          </TouchableOpacity>
 
-          <View style={[styles.statChip, { backgroundColor: "#FFF1F1" }]}>
+          <TouchableOpacity
+            style={[styles.statChip, { backgroundColor: "#FFF1F1" }, activeFilter === "wrong" && { borderColor: COLORS.error }]}
+            onPress={() => toggleFilter("wrong")}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={`Lọc ${wrongCount} câu sai hoặc đúng một phần`}
+            accessibilityState={{ selected: activeFilter === "wrong" }}
+          >
             <Ionicons name="close-circle" size={15} color={COLORS.error} />
 
             <Text style={[styles.statChipText, { color: COLORS.error }]}>
               {wrongCount} Sai
             </Text>
-          </View>
+          </TouchableOpacity>
 
-          <View
+          <TouchableOpacity
+            onPress={() => toggleFilter("ungraded")}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={`Lọc ${uncheckCount} câu chưa chấm`}
+            accessibilityState={{ selected: activeFilter === "ungraded" }}
             style={[
               styles.statChip,
               { backgroundColor: COLORS.backgroundSoft },
+              activeFilter === "ungraded" && { borderColor: COLORS.textSecondary },
             ]}
           >
             <Ionicons name="help-circle" size={15} color={COLORS.textLight} />
@@ -231,8 +269,19 @@ export default function AnswerReviewScreen() {
             <Text style={[styles.statChipText, { color: COLORS.textLight }]}>
               {uncheckCount} Chưa chấm
             </Text>
-          </View>
+          </TouchableOpacity>
         </View>
+
+        {activeFilter !== "all" && (
+          <TouchableOpacity
+            onPress={() => setActiveFilter("all")}
+            style={styles.resetFilter}
+            accessibilityRole="button"
+          >
+            <Ionicons name="close-circle-outline" size={16} color={COLORS.primaryText} />
+            <Text style={styles.resetFilterText}>Xem tất cả câu hỏi</Text>
+          </TouchableOpacity>
+        )}
 
         {/* ── Error ── */}
         {!!error && (
@@ -250,7 +299,7 @@ export default function AnswerReviewScreen() {
         {/* ── Controls ── */}
         {questions.length > 0 && (
           <View style={styles.controls}>
-            <Text style={styles.sectionTitle}>{questions.length} câu hỏi</Text>
+            <Text style={styles.sectionTitle}>{filteredQuestionCount} câu hỏi</Text>
 
             <View style={styles.controlButtons}>
               <TouchableOpacity
@@ -292,7 +341,7 @@ export default function AnswerReviewScreen() {
         )}
 
         {/* ── Question list ── */}
-        {questions.map((q, idx) => {
+        {filteredQuestions.map(({ question: q, index: idx }) => {
           const stateInfo = getStateInfo(q);
           const isExpanded = expandedSlots.has(q.slot);
 
@@ -301,9 +350,6 @@ export default function AnswerReviewScreen() {
             .filter(([name, value]) => new RegExp(`^q\\d+:${q.slot}_(?![:\\-])`).test(name)
               && !name.endsWith("answerformat") && value.trim() && !/_choice\d+$/.test(name))
             .map(([, value]) => value).join("; ");
-
-          const m = parseFloat(q.mark ?? "");
-          const mx = q.maxmark ?? 0;
 
           return (
             <AppCard key={q.slot} style={styles.questionCard}>
@@ -326,14 +372,6 @@ export default function AnswerReviewScreen() {
                     Câu {q.questionnumber ?? idx + 1}
                   </Text>
 
-                  {mx > 0 && (
-                    <Text style={styles.markText}>
-                      {Number.isFinite(m)
-                        ? `${m % 1 === 0 ? m : m.toFixed(2)}/${mx}`
-                        : `—/${mx}`}{" "}
-                      điểm
-                    </Text>
-                  )}
                 </View>
 
                 <View
@@ -390,7 +428,6 @@ export default function AnswerReviewScreen() {
                               source={{ html: choice.html }}
                               baseStyle={{ fontSize: 14, color: COLORS.text }}
                             /> : <Text style={styles.answerText}>{choice.text}</Text>}
-                            {choice.selected && <Text style={styles.answerText}>✓ Đã chọn</Text>}
                           </View>
                           {choice.state !== "neutral" && <Ionicons name={choice.state === "correct" ? "checkmark-circle" : "close-circle"} size={20} color={choice.state === "correct" ? COLORS.success : COLORS.error} />}
                         </View>
@@ -409,7 +446,7 @@ export default function AnswerReviewScreen() {
                       baseStyle={{ fontSize: 14, lineHeight: 22, color: COLORS.text }}
                     />}
                   </View>}
-                  <View style={[styles.rawContent, { backgroundColor: "#EAF7EF", marginTop: 12 }]}>
+                  <View style={[styles.rawContent, { backgroundColor: "#EAF7EF" }]}>
                     <Text style={[styles.answersLabel, { color: COLORS.success }]}>Đáp án đúng</Text>
                     <RenderHTML
                     tagsStyles={reviewTagsStyles}
@@ -439,7 +476,7 @@ export default function AnswerReviewScreen() {
         })}
 
         {/* Empty state */}
-        {questions.length === 0 && !error && (
+        {filteredQuestions.length === 0 && !error && (
           <AppCard style={styles.emptyCard}>
             <Ionicons
               name="document-text-outline"
@@ -450,7 +487,9 @@ export default function AnswerReviewScreen() {
             <Text style={styles.emptyTitle}>Không có câu hỏi</Text>
 
             <Text style={styles.emptyText}>
-              Bài thi này chưa có dữ liệu xem lại.
+              {questions.length === 0
+                ? "Bài thi này chưa có dữ liệu xem lại."
+                : "Không có câu hỏi phù hợp với bộ lọc đang chọn."}
             </Text>
           </AppCard>
         )}
@@ -560,6 +599,22 @@ const styles = StyleSheet.create({
     gap: 5,
     paddingVertical: 10,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.transparent,
+  },
+
+  resetFilter: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 8,
+  },
+
+  resetFilterText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.primaryText,
   },
 
   statChipText: {
@@ -657,12 +712,6 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
 
-  markText: {
-    marginTop: 2,
-    fontSize: 11,
-    color: COLORS.textSecondary,
-  },
-
   stateBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -697,6 +746,7 @@ const styles = StyleSheet.create({
 
   answersSection: {
     gap: 8,
+    marginTop: 12,
   },
 
   answersLabel: {
@@ -753,6 +803,7 @@ const styles = StyleSheet.create({
   },
 
   rawContent: {
+    marginTop: 12,
     backgroundColor: COLORS.backgroundSoft,
     borderRadius: 12,
     padding: 12,

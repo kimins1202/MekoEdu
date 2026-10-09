@@ -378,7 +378,6 @@ export default function HomeScreen() {
       {/* APP HEADER */}
       <AppHeader
         title="MekoEdu"
-        onNotificationPress={() => navigation.navigate("Notification")}
       />
 
       <ScrollView
@@ -388,7 +387,7 @@ export default function HomeScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor={COLORS.primary}
+            tintColor={COLORS.primaryText}
           />
         }
       >
@@ -432,7 +431,7 @@ export default function HomeScreen() {
             onPress={goToSettings}
             activeOpacity={0.8}
           >
-            <Ionicons name="chevron-forward" size={19} color={COLORS.primary} />
+            <Ionicons name="chevron-forward" size={19} color={COLORS.primaryText} />
           </TouchableOpacity>
         </View>
 
@@ -468,7 +467,7 @@ export default function HomeScreen() {
 
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleRow}>
-            <Ionicons name="school-outline" size={19} color={COLORS.primary} />
+            <Ionicons name="school-outline" size={19} color={COLORS.primaryText} />
 
             <Text style={styles.sectionTitle}>Khóa học gần đây</Text>
           </View>
@@ -540,7 +539,7 @@ export default function HomeScreen() {
 
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleRow}>
-            <Ionicons name="time-outline" size={19} color={COLORS.primary} />
+            <Ionicons name="time-outline" size={19} color={COLORS.primaryText} />
 
             <Text style={styles.sectionTitle}>Lịch sử làm bài</Text>
           </View>
@@ -563,7 +562,7 @@ export default function HomeScreen() {
                   <Ionicons
                     name="document-text-outline"
                     size={21}
-                    color={COLORS.primary}
+                    color={COLORS.primaryText}
                   />
                 </View>
 
@@ -623,7 +622,7 @@ export default function HomeScreen() {
 
         <View style={styles.quickHeader}>
           <View style={styles.sectionTitleRow}>
-            <Ionicons name="apps-outline" size={19} color={COLORS.primary} />
+            <Ionicons name="apps-outline" size={19} color={COLORS.primaryText} />
 
             <Text style={styles.sectionTitle}>Truy cập nhanh</Text>
           </View>
@@ -669,7 +668,7 @@ function QuickAction({ icon, title, onPress }: QuickActionProps) {
       activeOpacity={0.75}
     >
       <View style={styles.quickIcon}>
-        <Ionicons name={icon} size={21} color={COLORS.primary} />
+        <Ionicons name={icon} size={21} color={COLORS.primaryText} />
       </View>
 
       <Text style={styles.quickText}>{title}</Text>
@@ -799,7 +798,7 @@ const styles = StyleSheet.create({
   seeAll: {
     fontSize: 12,
     fontWeight: "700",
-    color: COLORS.primary,
+    color: COLORS.primaryText,
   },
 
   // ================= COURSES =================
@@ -836,7 +835,7 @@ const styles = StyleSheet.create({
   progressValue: {
     fontSize: 11,
     fontWeight: "700",
-    color: COLORS.primary,
+    color: COLORS.primaryText,
   },
 
   progressBackground: {
@@ -914,7 +913,7 @@ const styles = StyleSheet.create({
   historyStatus: {
     fontSize: 10,
     fontWeight: "600",
-    color: COLORS.primary,
+    color: COLORS.primaryText,
   },
 
   emptyHistory: {

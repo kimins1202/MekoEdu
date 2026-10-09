@@ -10,14 +10,12 @@ interface AppHeaderProps {
   title: string;
   subtitle?: string;
   showBack?: boolean;
-  onNotificationPress?: () => void;
 }
 
 export default function AppHeader({
   title,
   subtitle,
   showBack = false,
-  onNotificationPress,
 }: AppHeaderProps) {
   const navigation = useNavigation();
 
@@ -62,20 +60,6 @@ export default function AppHeader({
           </View>
         </View>
 
-        {/* Thông báo */}
-        <TouchableOpacity
-          style={styles.notificationButton}
-          onPress={onNotificationPress}
-          activeOpacity={0.7}
-        >
-          <Ionicons
-            name="notifications-outline"
-            size={22}
-            color={COLORS.text}
-          />
-
-          <View style={styles.notificationDot} />
-        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -129,7 +113,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 23,
     fontWeight: "800",
-    color: COLORS.primary,
+    color: COLORS.primaryText,
   },
 
   eduText: {
@@ -153,24 +137,4 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
 
-  notificationButton: {
-    position: "relative",
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: COLORS.backgroundSoft,
-    marginLeft: 10,
-  },
-
-  notificationDot: {
-    position: "absolute",
-    top: 8,
-    right: 8,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: COLORS.primaryLight,
-  },
 });

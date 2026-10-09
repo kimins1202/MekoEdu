@@ -90,11 +90,11 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontSize: 11,
     fontWeight: "700",
-    color: COLORS.primary,
+    color: COLORS.primaryText,
     backgroundColor: COLORS.backgroundSoft,
   },
   activeCount: {
-    color: COLORS.primary,
+    color: COLORS.primaryText,
     backgroundColor: COLORS.surface,
   },
 });

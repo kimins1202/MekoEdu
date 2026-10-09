@@ -46,7 +46,6 @@ export default function ExamTopBar({
         subtitle={`${answeredCount}/${totalQuestions} câu · Trang ${
           currentPage + 1
         }`}
-        showBack
       />
 
       {/* ================= PROGRESS BAR ================= */}

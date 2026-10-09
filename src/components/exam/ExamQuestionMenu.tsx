@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 import COLORS from "../../constants/colors";
 
@@ -47,116 +48,121 @@ export default function ExamQuestionMenu({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
-        <View style={styles.questionMenuModal}>
-          {/* HEADER */}
-          <View style={styles.menuHeader}>
-            <View>
-              <Text style={styles.menuTitle}>Tổng quan câu hỏi</Text>
+      <SafeAreaProvider>
+        <SafeAreaView
+          edges={["top", "right", "bottom", "left"]}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.questionMenuModal}>
+            {/* HEADER */}
+            <View style={styles.menuHeader}>
+              <View>
+                <Text style={styles.menuTitle}>Tổng quan câu hỏi</Text>
 
-              <Text style={styles.menuSubtitle}>
-                {answeredCount}/{totalQuestions} câu đã trả lời
+                <Text style={styles.menuSubtitle}>
+                  {answeredCount}/{totalQuestions} câu đã trả lời
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={onClose}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="close" size={22} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            {/* LEGEND */}
+            <View style={styles.legend}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, styles.legendAnswered]} />
+
+                <Text style={styles.legendText}>Đã trả lời</Text>
+              </View>
+
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, styles.legendUnanswered]} />
+
+                <Text style={styles.legendText}>Chưa trả lời</Text>
+              </View>
+
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, styles.legendFlagged]} />
+
+                <Text style={styles.legendText}>Đã đánh dấu</Text>
+              </View>
+            </View>
+
+            {/* QUESTION GRID */}
+            <ScrollView
+              style={styles.questionGridScroll}
+              contentContainerStyle={styles.questionGrid}
+              showsVerticalScrollIndicator={false}
+            >
+              {questionOverview.map((item, index) => {
+                const answered =
+                  isQuestionAnswered(item.answerNames, selectedAnswers);
+
+                const flagged = Boolean(
+                  flaggedQuestions[item.slot] ?? item.flagged,
+                );
+
+                return (
+                  <TouchableOpacity
+                    key={`question-menu-${item.slot}-${item.page}-${index}`}
+                    style={[
+                      styles.questionGridItem,
+
+                      answered && !flagged && styles.questionGridAnswered,
+
+                      !answered && !flagged && styles.questionGridUnanswered,
+
+                      flagged && styles.questionGridFlagged,
+                    ]}
+                    onPress={() => onGoToQuestion(item)}
+                    activeOpacity={0.75}
+                  >
+                    <Text
+                      style={[
+                        styles.questionGridNumber,
+
+                        answered && !flagged && styles.questionGridNumberAnswered,
+
+                        flagged && styles.questionGridNumberFlagged,
+                      ]}
+                    >
+                      {item.questionNumber || item.slot}
+                    </Text>
+
+                    {flagged && (
+                      <Ionicons
+                        name="flag"
+                        size={11}
+                        color={COLORS.warning}
+                        style={styles.gridFlagIcon}
+                      />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            {/* FOOTER */}
+            <View style={styles.menuFooter}>
+              <Ionicons
+                name="information-circle-outline"
+                size={17}
+                color={COLORS.textSecondary}
+              />
+
+              <Text style={styles.menuFooterText}>
+                Chạm vào số câu để xem nhanh câu hỏi cần kiểm tra.
               </Text>
             </View>
-
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={onClose}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="close" size={22} color={COLORS.text} />
-            </TouchableOpacity>
           </View>
-
-          {/* LEGEND */}
-          <View style={styles.legend}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, styles.legendAnswered]} />
-
-              <Text style={styles.legendText}>Đã trả lời</Text>
-            </View>
-
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, styles.legendUnanswered]} />
-
-              <Text style={styles.legendText}>Chưa trả lời</Text>
-            </View>
-
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, styles.legendFlagged]} />
-
-              <Text style={styles.legendText}>Đã đánh dấu</Text>
-            </View>
-          </View>
-
-          {/* QUESTION GRID */}
-          <ScrollView
-            style={styles.questionGridScroll}
-            contentContainerStyle={styles.questionGrid}
-            showsVerticalScrollIndicator={false}
-          >
-            {questionOverview.map((item, index) => {
-              const answered =
-                isQuestionAnswered(item.answerNames, selectedAnswers);
-
-              const flagged = Boolean(
-                flaggedQuestions[item.slot] ?? item.flagged,
-              );
-
-              return (
-                <TouchableOpacity
-                  key={`question-menu-${item.slot}-${item.page}-${index}`}
-                  style={[
-                    styles.questionGridItem,
-
-                    answered && !flagged && styles.questionGridAnswered,
-
-                    !answered && !flagged && styles.questionGridUnanswered,
-
-                    flagged && styles.questionGridFlagged,
-                  ]}
-                  onPress={() => onGoToQuestion(item)}
-                  activeOpacity={0.75}
-                >
-                  <Text
-                    style={[
-                      styles.questionGridNumber,
-
-                      answered && !flagged && styles.questionGridNumberAnswered,
-
-                      flagged && styles.questionGridNumberFlagged,
-                    ]}
-                  >
-                    {item.questionNumber || item.slot}
-                  </Text>
-
-                  {flagged && (
-                    <Ionicons
-                      name="flag"
-                      size={11}
-                      color={COLORS.warning}
-                      style={styles.gridFlagIcon}
-                    />
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-
-          {/* FOOTER */}
-          <View style={styles.menuFooter}>
-            <Ionicons
-              name="information-circle-outline"
-              size={17}
-              color={COLORS.textSecondary}
-            />
-
-            <Text style={styles.menuFooterText}>
-              Chạm vào số câu để xem nhanh câu hỏi cần kiểm tra.
-            </Text>
-          </View>
-        </View>
-      </View>
+        </SafeAreaView>
+      </SafeAreaProvider>
     </Modal>
   );
 }

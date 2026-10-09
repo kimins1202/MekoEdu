@@ -20,7 +20,7 @@ export default function EmptyState({
   return (
     <View style={styles.container}>
       <View style={styles.iconWrapper}>
-        <Ionicons name={icon} size={42} color={COLORS.primary} />
+        <Ionicons name={icon} size={42} color={COLORS.primaryText} />
       </View>
 
       <Text style={styles.title}>{title}</Text>

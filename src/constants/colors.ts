@@ -1,18 +1,15 @@
-import { DynamicColorIOS, Platform, PlatformColor } from "react-native";
+import { DynamicColorIOS, Platform } from "react-native";
 
 const adaptiveColor = (
   light: string,
   dark: string,
-  androidResource: string,
 ) => {
   if (Platform.OS === "ios") {
     return DynamicColorIOS({ light, dark });
   }
 
-  if (Platform.OS === "android") {
-    return PlatformColor(androidResource);
-  }
-
+  // Android theme attributes may resolve to ColorStateList resource IDs instead
+  // of ARGB colors. Keep text and surfaces on the explicit light palette.
   return light;
 };
 
@@ -21,45 +18,50 @@ const COLORS = {
   primary: "#006E27",
   primaryDark: "#006C46",
   primaryLight: "#7DBA18",
-  text: adaptiveColor("#223241", "#F2F5F3", "?android:attr/textColorPrimary"),
+  // Foreground accents need more contrast than filled brand backgrounds.
+  primaryText: adaptiveColor(
+    "#006E27",
+    "#83DFA5",
+  ),
+  warningText: adaptiveColor(
+    "#956500",
+    "#F4CC74",
+  ),
+  warningSurface: adaptiveColor(
+    "#FFF8E8",
+    "#362D1B",
+  ),
+  text: adaptiveColor("#223241", "#F2F5F3"),
 
   // TEXT
   textSecondary: adaptiveColor(
     "#5F6F7B",
-    "#B0BBB5",
-    "?android:attr/textColorSecondary",
+    "#C5D0CA",
   ),
   textLight: adaptiveColor(
     "#94A0AA",
-    "#84918A",
-    "?android:attr/textColorHint",
+    "#A9B8AF",
   ),
 
   // BACKGROUND
   background: adaptiveColor(
     "#FFFFFF",
     "#101714",
-    "?android:attr/colorBackground",
   ),
   backgroundSoft: adaptiveColor(
     "#F3F8F5",
     "#101714",
-    "?android:attr/colorBackground",
   ),
 
   // SURFACE
   surface: adaptiveColor(
     "#FFFFFF",
     "#1C2420",
-    "?android:attr/colorBackgroundFloating",
   ),
 
   // BORDER
-  border: adaptiveColor(
-    "#DDE7E1",
-    "#39443E",
-    "?android:attr/colorControlHighlight",
-  ),
+  // A translucent separator stays subtle on both light and dark surfaces.
+  border: "rgba(128, 151, 137, 0.24)",
 
   // STATUS
   success: "#2E8B57",

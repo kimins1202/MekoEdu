@@ -1,5 +1,6 @@
 import { parse } from "node-html-parser";
 import { parseQuestion } from "./questionParser";
+export { isDescriptionQuestion as isReviewDescription } from "../utils/questionCount";
 
 const escape = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 

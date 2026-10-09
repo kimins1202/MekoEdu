@@ -1,7 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
-  useFocusEffect,
   useNavigation,
   useRoute,
 } from "@react-navigation/native";
@@ -19,11 +18,12 @@ import {
 
 import AppButton from "../../components/common/AppButton";
 import AppCard from "../../components/common/AppCard";
-import AppHeader from "../../components/common/AppHeader";
-import AppProgressBar from "../../components/common/AppProgressBar";
+import ResultScoreWater from "../../components/exam/ResultScoreWater";
+import THEME from "../../constants/theme";
 import Loading from "../../components/common/Loading";
 
 import COLORS from "../../constants/colors";
+import { isDescriptionQuestion } from "../../utils/questionCount";
 import { AppStackParamList } from "../../types/navigation";
 
 type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
@@ -87,7 +87,7 @@ export default function ResultScreen() {
 
       // Tính số câu đúng.
       const questions = Array.isArray(reviewResponse.questions)
-        ? reviewResponse.questions
+        ? reviewResponse.questions.filter((question: any) => !isDescriptionQuestion(question))
         : [];
 
       let correctQ = 0;
@@ -245,347 +245,115 @@ export default function ResultScreen() {
     );
   }
 
+  const percent = getPercent();
+  const hasPercent = score !== null && gradeMax !== null && gradeMax > 0;
+
   return (
-    <SafeAreaView edges={["bottom"]} style={styles.container}>
-      <AppHeader title="Kết quả bài thi" showBack />
-
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Thông tin bài thi */}
-        <View style={styles.resultHeader}>
-          <View style={styles.successIcon}>
-            <Ionicons name="checkmark" size={38} color={COLORS.white} />
+    <SafeAreaView edges={["top", "bottom"]} style={styles.container}>
+      <View style={styles.background}>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.resultHeader}>
+            <Text style={styles.quizName}>{quizName}</Text>
           </View>
 
-          <Text style={styles.title}>Đã hoàn thành bài thi</Text>
-
-          <Text style={styles.quizName} numberOfLines={2}>
-            {quizName}
-          </Text>
-        </View>
-
-        {/* Thẻ điểm số */}
-        <AppCard style={styles.scoreCard}>
-          <Text style={styles.scoreLabel}>Điểm của bạn</Text>
-
-          <Text style={styles.score}>{getScoreText()}</Text>
-
-          <Text style={styles.scoreMax}>{getGradeText()}</Text>
-
-          <View style={styles.progressWrapper}>
-            <AppProgressBar progress={getPercent()} height={9} />
+          <View style={styles.scoreSection}>
+            <View style={styles.scoreCircle} accessible accessibilityLabel={
+              'Điểm ' + getGradeText() + (hasPercent ? ', đạt ' + percent.toFixed(0) + ' phần trăm' : '')
+            }>
+              <ResultScoreWater percent={percent} scoreText={getScoreText()} />
+            </View>
+            <Text style={styles.scoreMax}>{getGradeText()}</Text>
+            {hasPercent && <View style={styles.percentBadge}>
+              <Ionicons name="trending-up" size={16} color={COLORS.primary} />
+              <Text style={styles.percent}>Đạt {percent.toFixed(0)}%</Text>
+            </View>}
           </View>
 
-          <Text style={styles.percent}>{getPercent().toFixed(0)}%</Text>
-
-          {bestGrade !== null && (
-            <View style={styles.bestGradeContainer}>
-              <Ionicons
-                name="trophy-outline"
-                size={18}
-                color={COLORS.primary}
-              />
-
-              <Text style={styles.bestGradeText}>
-                Điểm cao nhất: {formatScore(bestGrade)}
-              </Text>
-            </View>
-          )}
-
-          {!!feedback && (
-            <View style={styles.feedbackContainer}>
-              <View style={styles.feedbackHeader}>
-                <Ionicons
-                  name="chatbubble-ellipses-outline"
-                  size={18}
-                  color={COLORS.primary}
-                />
-
-                <Text style={styles.feedbackTitle}>Nhận xét</Text>
-              </View>
-
-              <Text style={styles.feedbackText}>{feedback}</Text>
-            </View>
-          )}
-        </AppCard>
-
-        {/* Số câu trả lời đúng */}
-        {totalQuestions > 0 && (
-          <AppCard style={styles.infoCard}>
-            <View style={styles.infoRow}>
-              <View style={styles.infoIcon}>
-                <Ionicons
-                  name="checkmark-circle"
-                  size={24}
-                  color={COLORS.primary}
-                />
-              </View>
-
+          <View style={styles.details}>
+            {bestGrade !== null && <AppCard style={styles.infoCard}>
+              <View style={styles.infoIcon}><Ionicons name="trophy" size={23} color={COLORS.primary} /></View>
               <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>Số câu đúng</Text>
-
-                <Text style={styles.infoValue}>
-                  {correctAnswers} / {totalQuestions} câu
-                </Text>
+                <Text style={styles.infoLabel}>Điểm cao nhất</Text>
+                <Text style={styles.bestValue}>{formatScore(bestGrade)} điểm</Text>
               </View>
-            </View>
-          </AppCard>
-        )}
+            </AppCard>}
+            {totalQuestions > 0 && <AppCard style={styles.infoCard}>
+              <View style={styles.infoIcon}><Ionicons name="checkmark-circle" size={25} color={COLORS.primary} /></View>
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>Số câu trả lời đúng</Text>
+                <Text style={styles.infoValue}>{correctAnswers} / {totalQuestions} câu</Text>
+              </View>
+            </AppCard>}
+            {!!feedback && <AppCard style={styles.feedbackCard}>
+              <View style={styles.feedbackIcon}><Ionicons name="chatbubble-ellipses" size={23} color={COLORS.primary} /></View>
+              <View style={styles.infoContent}>
+                <Text style={styles.feedbackTitle}>Nhận xét</Text>
+                <Text style={styles.feedbackText}>{feedback}</Text>
+              </View>
+            </AppCard>}
+          </View>
 
-        {/* Trạng thái kết quả */}
-        <AppCard
-          style={[
-            styles.statusCard,
-            error ? styles.errorCard : styles.successCard,
-          ]}
-        >
-          <Ionicons
-            name={error ? "alert-circle-outline" : "checkmark-circle-outline"}
-            size={22}
-            color={error ? COLORS.error : COLORS.success}
-          />
+          {!!error && <View style={[styles.statusRow, styles.errorRow]}>
+            <Ionicons name="alert-circle" size={22} color={COLORS.error} />
+            <Text style={[styles.statusText, styles.errorText]}>
+              {error}
+            </Text>
+          </View>}
 
-          <Text
-            style={[
-              styles.statusText,
-              {
-                color: error ? COLORS.error : COLORS.success,
-              },
-            ]}
-          >
-            {error ? error : "Kết quả đã được ghi nhận trên hệ thống."}
-          </Text>
-        </AppCard>
-
-        {/* Các nút thao tác */}
+        </ScrollView>
+      </View>
+      <View style={styles.footer}>
         <View style={styles.actions}>
-          <AppButton
-            title="Xem lại bài làm"
-            onPress={handleReview}
-            style={styles.reviewButton}
-          />
-
-          <AppButton
-            title="Về trang chủ"
-            onPress={handleHome}
-            style={styles.homeButton}
-          />
+            <AppButton onPress={handleReview}>
+              <View style={styles.buttonContent}>
+                <Ionicons name="document-text-outline" size={20} color={COLORS.white} />
+                <Text style={styles.reviewButtonText}>Xem lại bài làm</Text>
+              </View>
+            </AppButton>
+            <AppButton onPress={handleHome} variant="outline">
+              <View style={styles.buttonContent}>
+                <Ionicons name="home" size={19} color={COLORS.primary} />
+                <Text style={styles.homeButtonText}>Về trang chủ</Text>
+              </View>
+            </AppButton>
         </View>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.backgroundSoft,
-  },
-
-  loadingContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: COLORS.backgroundSoft,
-  },
-
-  content: {
-    paddingHorizontal: 16,
-    paddingTop: 20,
-    paddingBottom: 32,
-  },
-
-  resultHeader: {
-    alignItems: "center",
-    marginBottom: 20,
-  },
-
-  successIcon: {
-    width: 68,
-    height: 68,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: COLORS.primary,
-    marginBottom: 14,
-  },
-
-  title: {
-    textAlign: "center",
-    fontSize: 22,
-    fontWeight: "800",
-    color: COLORS.text,
-  },
-
-  quizName: {
-    marginTop: 6,
-    textAlign: "center",
-    fontSize: 14,
-    lineHeight: 20,
-    color: COLORS.textSecondary,
-  },
-
-  scoreCard: {
-    alignItems: "center",
-    padding: 22,
-    marginBottom: 14,
-  },
-
-  scoreLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.textSecondary,
-  },
-
-  score: {
-    marginTop: 4,
-    fontSize: 46,
-    lineHeight: 56,
-    fontWeight: "800",
-    color: COLORS.primary,
-    fontVariant: ["tabular-nums"],
-  },
-
-  scoreMax: {
-    marginTop: 2,
-    fontSize: 14,
-    fontWeight: "500",
-    color: COLORS.textSecondary,
-  },
-
-  progressWrapper: {
-    width: "100%",
-    marginTop: 18,
-  },
-
-  percent: {
-    marginTop: 8,
-    fontSize: 13,
-    fontWeight: "700",
-    color: COLORS.primary,
-  },
-
-  bestGradeContainer: {
-    width: "100%",
-    marginTop: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
-    backgroundColor: COLORS.backgroundSoft,
-  },
-
-  bestGradeText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: COLORS.primary,
-  },
-
-  feedbackContainer: {
-    width: "100%",
-    marginTop: 14,
-    padding: 14,
-    borderRadius: 14,
-    backgroundColor: COLORS.backgroundSoft,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-
-  feedbackHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    marginBottom: 7,
-  },
-
-  feedbackTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: COLORS.primary,
-  },
-
-  feedbackText: {
-    fontSize: 13,
-    lineHeight: 19,
-    color: COLORS.text,
-  },
-
-  infoCard: {
-    marginBottom: 14,
-    paddingHorizontal: 18,
-    paddingVertical: 6,
-  },
-
-  infoRow: {
-    minHeight: 70,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  infoIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: COLORS.backgroundSoft,
-  },
-
-  infoContent: {
-    flex: 1,
-    marginLeft: 13,
-  },
-
-  infoLabel: {
-    fontSize: 12,
-    color: COLORS.textLight,
-  },
-
-  infoValue: {
-    marginTop: 3,
-    fontSize: 14,
-    fontWeight: "700",
-    color: COLORS.text,
-  },
-
-  statusCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 15,
-    marginBottom: 18,
-    gap: 10,
-  },
-
-  successCard: {
-    backgroundColor: COLORS.backgroundSoft,
-    borderColor: COLORS.border,
-  },
-
-  errorCard: {
-    backgroundColor: COLORS.backgroundSoft,
-    borderColor: COLORS.error,
-  },
-
-  statusText: {
-    flex: 1,
-    fontSize: 13,
-    lineHeight: 19,
-  },
-
-  actions: {
-    gap: 12,
-  },
-
-  reviewButton: {
-    minHeight: 52,
-  },
-
-  homeButton: {
-    minHeight: 52,
-  },
+  container: { flex: 1, backgroundColor: COLORS.backgroundSoft },
+  background: { flex: 1 },
+  loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: COLORS.backgroundSoft },
+  content: { flexGrow: 1, justifyContent: "center", paddingHorizontal: THEME.spacing.lg, paddingTop: THEME.spacing.lg, paddingBottom: THEME.spacing.lg, width: "100%", maxWidth: 520, alignSelf: "center" },
+  resultHeader: { alignItems: "center", gap: 5 },
+  successIcon: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: COLORS.primary, marginBottom: 3, borderWidth: 4, borderColor: COLORS.border },
+  title: { ...THEME.typography.heading, textAlign: "center", fontSize: 19, fontWeight: "800", color: COLORS.text },
+  quizName: { ...THEME.typography.title, textAlign: "center", lineHeight: 32, color: COLORS.text },
+  scoreSection: { alignItems: "center", paddingTop: THEME.spacing.lg, paddingBottom: THEME.spacing.lg },
+  scoreCircle: { width: 208, height: 208 },
+  scoreMax: { marginTop: 9, fontSize: 19, fontWeight: "800", color: COLORS.text, fontVariant: ["tabular-nums"] },
+  percentBadge: { marginTop: 8, flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: COLORS.backgroundSoft, borderRadius: 18, paddingHorizontal: 13, paddingVertical: 5 },
+  percent: { fontSize: 12, fontWeight: "700", color: COLORS.primary },
+  details: { gap: 10 },
+  infoCard: { flexDirection: "row", alignItems: "center", minHeight: 68, backgroundColor: COLORS.surface, borderRadius: THEME.radius.lg, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: COLORS.border, shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.035, shadowRadius: 9, elevation: 1 },
+  infoIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: COLORS.backgroundSoft, alignItems: "center", justifyContent: "center" },
+  infoContent: { flex: 1, marginLeft: 12 },
+  infoLabel: { ...THEME.typography.caption, color: COLORS.textSecondary, lineHeight: 18 },
+  bestValue: { fontSize: 20, fontWeight: "800", color: COLORS.primary, marginTop: 1 },
+  infoValue: { fontSize: 15, fontWeight: "700", color: COLORS.primary, marginTop: 2 },
+  feedbackCard: { flexDirection: "row", alignItems: "flex-start", borderRadius: 14, padding: 14, backgroundColor: COLORS.backgroundSoft, borderWidth: 1, borderColor: COLORS.border },
+  feedbackIcon: { width: 38, alignItems: "center", paddingTop: 2 },
+  feedbackTitle: { fontSize: 14, fontWeight: "700", color: COLORS.primary, marginBottom: 5 },
+  feedbackText: { ...THEME.typography.bodySmall, lineHeight: 20, color: COLORS.textSecondary },
+  statusRow: { flexDirection: "row", alignItems: "center", gap: 9, paddingHorizontal: 8, paddingVertical: 16 },
+  statusText: { flex: 1, fontSize: 11, lineHeight: 18, color: COLORS.textSecondary },
+  errorRow: { marginTop: 10, paddingHorizontal: 12, backgroundColor: COLORS.backgroundSoft, borderRadius: 12 },
+  errorText: { color: COLORS.error },
+  footer: { backgroundColor: COLORS.surface, borderTopWidth: 1, borderTopColor: COLORS.border, paddingHorizontal: THEME.spacing.lg, paddingTop: THEME.spacing.sm, paddingBottom: THEME.spacing.md },
+  actions: { gap: THEME.spacing.sm, width: "100%", maxWidth: 520, alignSelf: "center" },
+  buttonContent: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: THEME.spacing.sm },
+  reviewButtonText: { ...THEME.typography.bodySmall, fontWeight: "700", color: COLORS.white },
+  homeButtonText: { fontSize: 14, fontWeight: "700", color: COLORS.primary },
 });

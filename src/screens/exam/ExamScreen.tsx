@@ -56,6 +56,7 @@ import {
 } from "../../api/quizApi";
 
 import { parseQuestion } from "@/parsers/questionParser";
+import { isDescriptionQuestion } from "@/utils/questionCount";
 import { getQuestionAnswerNames, isAnswerableQuestion, isQuestionAnswered } from "@/utils/questionAnswerStatus";
 import type { ParsedQuestion } from "@/types/question";
 
@@ -97,7 +98,7 @@ type QuestionOverviewItem = {
 type ExamAnswers = Record<string, string>;
 
 function isCountedQuizQuestion(question: QuizQuestion): boolean {
-  return question.type !== "description" && isAnswerableQuestion(parseQuestion(question.html));
+  return !isDescriptionQuestion(question) && isAnswerableQuestion(parseQuestion(question.html));
 }
 
 /* -------------------------------------------------------------------------- */

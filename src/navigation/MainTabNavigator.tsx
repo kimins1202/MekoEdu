@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { useColorScheme } from "react-native";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -15,14 +16,15 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 
 export default function MainTabNavigator() {
   const insets = useSafeAreaInsets();
+  const isDark = useColorScheme() === "dark";
 
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
 
-        tabBarActiveTintColor: COLORS.primaryDark,
-        tabBarInactiveTintColor: "#94A0AA",
+        tabBarActiveTintColor: isDark ? "#83DFA5" : COLORS.primaryDark,
+        tabBarInactiveTintColor: isDark ? "#A9B8AF" : "#94A0AA",
 
         tabBarStyle: {
           height: 60 + insets.bottom,

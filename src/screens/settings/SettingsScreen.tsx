@@ -90,7 +90,7 @@ function SettingItem({
         <Ionicons
           name={icon}
           size={21}
-          color={danger ? COLORS.error : COLORS.primaryDark}
+          color={danger ? COLORS.error : COLORS.primaryText}
         />
       </View>
 
@@ -249,7 +249,7 @@ export default function SettingsScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor={COLORS.primary}
+            tintColor={COLORS.primaryText}
           />
         }
         contentContainerStyle={styles.content}
@@ -294,40 +294,15 @@ export default function SettingsScreen() {
           <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
         </TouchableOpacity>
 
-        <Text style={styles.sectionTitle}>Tài khoản</Text>
-
-        <View style={styles.settingsGroup}>
-          <SettingItem
-            icon="person-outline"
-            title="Thông tin cá nhân"
-            subtitle="Xem thông tin tài khoản"
-            onPress={() => navigation.navigate("Profile")}
-          />
-
-          <SettingItem
-            icon="lock-closed-outline"
-            title="Đổi mật khẩu"
-            subtitle="Cập nhật mật khẩu tài khoản"
-            onPress={() => navigation.navigate("Profile")}
-          />
-        </View>
-
         <Text style={styles.sectionTitle}>Ứng dụng</Text>
 
         <View style={styles.settingsGroup}>
-          <SettingItem
-            icon="notifications-outline"
-            title="Thông báo"
-            subtitle="Quản lý thông báo"
-            onPress={() => navigation.navigate("SettingsNotification")}
-          />
-
           <View style={styles.settingItem}>
             <View style={styles.settingIcon}>
               <Ionicons
                 name={darkMode ? "moon-outline" : "sunny-outline"}
                 size={21}
-                color={COLORS.primaryDark}
+                color={COLORS.primaryText}
               />
             </View>
 

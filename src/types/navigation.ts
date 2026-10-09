@@ -16,8 +16,6 @@ export type AppStackParamList = {
 
   CourseDetail: undefined;
 
-  Notifications: undefined;
-
   ExamList: {
     courseid: number;
   };
@@ -70,10 +68,6 @@ export type AppStackParamList = {
   MainTabs: undefined;
 
   Profile: undefined;
-
-  Notification: undefined;
-
-  SettingsNotification: undefined;
 
   Contact: undefined;
 

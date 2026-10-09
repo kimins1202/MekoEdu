@@ -19,6 +19,7 @@ interface AppButtonProps {
   style?: ViewStyle;
   children?: React.ReactNode;
   gradientColors?: readonly [string, string];
+  variant?: "primary" | "outline";
 }
 
 export default function AppButton({
@@ -29,6 +30,7 @@ export default function AppButton({
   style,
   children,
   gradientColors,
+  variant = "primary",
 }: AppButtonProps) {
   const isDisabled = disabled || loading;
 
@@ -39,7 +41,12 @@ export default function AppButton({
       activeOpacity={0.88}
       style={[styles.wrapper, style]}
     >
-      <LinearGradient
+      {variant === "outline" ? (
+        <View style={[styles.button, styles.outlineButton, isDisabled && styles.outlineDisabled]}>
+          {loading ? <ActivityIndicator size="small" color={COLORS.primary} />
+            : children ?? <Text style={[styles.text, styles.outlineText]}>{title}</Text>}
+        </View>
+      ) : <LinearGradient
         colors={
           isDisabled
             ? ["#B7C5BD", "#A3B2AA"]
@@ -62,12 +69,19 @@ export default function AppButton({
         ) : (
           <Text style={styles.text}>{title}</Text>
         )}
-      </LinearGradient>
+      </LinearGradient>}
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
+  outlineButton: {
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  outlineDisabled: { opacity: 0.5 },
+  outlineText: { color: COLORS.primary },
   wrapper: {
     width: "100%",
     marginTop: 8,
